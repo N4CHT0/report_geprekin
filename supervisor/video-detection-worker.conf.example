@@ -1,0 +1,12 @@
+[program:geprekin-video-detection-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /path/to/your/project/artisan queue:work redis --queue=video-detection --sleep=3 --tries=1 --timeout=1800
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/path/to/your/project/storage/logs/video-detection-worker.log
+stopwaitsecs=1900

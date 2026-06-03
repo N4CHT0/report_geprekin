@@ -1,0 +1,329 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "79e8d1c4-ef87-49a2-b6a4-3a43320aedf4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -304,
+        368
+      ],
+      "id": "714880f3-84cd-4b67-aadb-bd6b2cf5076f",
+      "name": "Webhook",
+      "webhookId": "79e8d1c4-ef87-49a2-b6a4-3a43320aedf4"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.sender }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -112,
+        576
+      ],
+      "id": "09738a9e-680e-4b31-ba87-dd90c7eee40b",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fonnte.com/send",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Hyy3ySsg9jX5Mr1RHAcc"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "name": "target",
+              "value": "={{ $('Webhook').item.json.body.sender }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        704,
+        368
+      ],
+      "id": "f8ba3f56-289d-4253-a985-faa0367f8319",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.message }}",
+        "options": {
+          "systemMessage": "=ID\tKategori\tPertanyaan\tJawaban\n1\tBPJS TK\tAPA BPJS TK ITU?\t\"BPJS TK ADALAH SINGKATAN DARI BPJS KETENAGAKERJAAN, YAITU BADAN PENYELENGGARA JAMINAN SOSIAL KETENAGAKERJAAN. BPJS KETENAGAKERJAAN MERUPAKAN LEMBAGA YANG DIBENTUK OLEH PEMERINTAH INDONESIA UNTUK MEMBERIKAN PERLINDUNGAN SOSIAL EKONOMI KEPADA SELURUH PEKERJA, BAIK DI SEKTOR FORMAL MAUPUN INFORMAL, DARI RISIKO-RISIKO YANG MUNGKIN TERJADI SELAMA MASA KERJA.\n \n TUJUAN BPJS KETENAGAKERJAAN:\n MEMBERIKAN JAMINAN SOSIAL AGAR PEKERJA DAN KELUARGANYA TETAP MENDAPATKAN PENGHASILAN ATAU SANTUNAN KETIKA MENGALAMI HAL-HAL SEPERTI: KECELAKAAN KERJA, KEMATIAN, HARI TUA (PENSIUN), DAN KEHILANGAN PEKERJAAN.\"\n2\tBPJS TK\tAPA SAJA PROGRAM BPJS TK YANG DI GEPREKIN?\t\"PROGRAM BPJS TK YANG DIIKUTI OLEH GEPREKIN ADA 3:\n 1. JAMINAN KECELAKAAN KERJA (JKK)\n 2. JAMINAN KEMATIAN (JKM)\n 3. JAMINAN HARI TUA (JHT)\"\n3\tBPJS TK\tBAGAIMANA CARA KLAIM BPJS TK PADA PROGRAM JAMINAN KECELAKAAN KERJA (JKK)?\t\"SEGERA SETELAH KECELAKAAN TERJADI:\n 1. SEGERA KE RUMAH SAKIT REKANAN BPJS TK DAN SAMPAIKAN INGIN MENGGUNAKAN BPJS TK.\n 2. LAPORKAN KE HRD/ATASAN DALAM 1X24 JAM.\n 3. PERUSAHAAN WAJIB MELAPORKAN KE BPJS DALAM 2X24 JAM.\n 4. SIAPKAN DOKUMEN: KTP PESERTA, KTP LEADER DAN SPV, SERTA KRONOLOGI KEJADIAN.\n 5. FORMAT LAPORAN KRONOLOGI: HARI/TANGGAL, LOKASI, KRONOLOGI KEJADIAN, RUTINITAS PERJALANAN.\n 6. LAPORAN KE ADMIN PAYROLL HARUS HARI H KEJADIAN, LEBIH DARI 1 HARI TIDAK BISA KLAIM BPJS TK.\"\n4\tBPJS TK\tBAGAIMANA CARA LOGIN JMO?\t\"1. Unduh aplikasi JMO (Jamsostek Mobile).\n 2. Pilih Masuk atau Buat Akun Baru.\n 3. Isi data sesuai BPJS: NIK, Nama, Tanggal Lahir, Nomor HP, Email, Nomor BPJS.\n 4. Buat password, verifikasi OTP.\n 5. Login dengan email/HP/NIK dan password.\n Jika gagal login:\n - Salah data, atau aplikasi belum update.\n Solusi: gunakan fitur 'Lupa Password' atau hubungi BPJS TK 175.\"\n5\tBPJS TK\tBAGAIMANA CARA KLAIM JHT?\t\"1. Syarat klaim JHT:\n - Berhenti bekerja\n - Usia 56 tahun\n - Meninggal dunia (oleh ahli waris)\n - Cacat total tetap\n - WNI keluar negeri selamanya\n \n 2. Cara via aplikasi JMO:\n - Login JMO → Jaminan Hari Tua → Klaim JHT\n - Isi data, unggah dokumen: KTP, KK, Buku Tabungan, Paklaring, NPWP (jika ada), foto diri sambil pegang KTP.\n - Proses 3–7 hari kerja.\n \n 3. Klaim manual di kantor BPJS:\n Bawa dokumen asli & fotokopi.\n \n 4. Cek status klaim di JMO → 'Riwayat Klaim' atau hubungi 175.\"\n6\tBPJS TK\tKAPAN SAYA DIDAFTARKAN BPJS KETENAGAKERJAAN?\tKaryawan baru didaftarkan BPJS TK setelah masa kerja di atas 20 hari (sesuai tanggal cut off).\n7\tBPJS TK\tAPA PERBEDAAN BPJS TK PERUSAHAAN DAN BPJS TK KARYAWAN?\tBPJS TK Perusahaan dibayarkan oleh perusahaan. BPJS TK Karyawan dipotong 2% dari gaji, untuk JKK, JKM, dan JHT.\n8\tKerjoo\tBAGAIMANA CARA PENGAJUAN AKUN KERJOO UNTUK KARYAWAN/CREW?\t\"1. Kumpulkan data lengkap crew baru (nama, HP, email, outlet, tanggal join, no rekening).\n 2. Verifikasi Surat Perjanjian Kerja (SPK).\n 3. Ajukan data ke grup Kerjoo.\n 4. Setelah akun dibuat, distribusikan email dan password ke crew baru.\"\n9\tKerjoo\tSAYA SUDAH MENERIMA EMAIL AKUN KERJOO, NAMUN BELUM TAHU PASSWORDNYA. APA YANG HARUS DILAKUKAN?\tPastikan tanya ke leader. Jika belum ada konfirmasi, tunggu info dari admin.\n10\tKerjoo\tTIDAK DAPAT ABSEN KARENA LOKASI MERAH. BAGAIMANA CARA MENGATASINYA?\t\"1. Aktifkan GPS dan pastikan lokasi akurat.\n 2. Nonaktifkan lalu aktifkan kembali GPS.\n 3. Refresh aplikasi Kerjoo.\n 4. Coba absen kembali setelah lokasi berubah hijau.\"\n11\tKerjoo\tWAJAH TIDAK TERDETEKSI SAAT ABSENSI. APA SOLUSINYA?\t\"Perbarui foto profil di aplikasi Kerjoo:\n 1. Klik profil kanan atas → ubah foto profil.\n 2. Ambil foto baru dengan wajah jelas, tanpa masker, helm, atau kacamata hitam.\n 3. Tunggu persetujuan admin.\"\n12\tKerjoo\tBELUM MENERIMA SURAT PERJANJIAN KERJA. APA YANG HARUS DILAKUKAN?\t\"1. Tulis nama lengkap dan outlet.\n 2. Periksa email (inbox/spam).\n 3. Pastikan kapasitas email cukup.\n 4. Tunggu proses verifikasi admin.\"\n13\tKerjoo\tSURAT PERJANJIAN KERJA DITOLAK SERVER. APA YANG HARUS DILAKUKAN?\t\"1. Pastikan ukuran file sesuai.\n 2. Pastikan penyimpanan email tidak penuh.\n 3. Coba isi ulang form dari awal.\n 4. Jika tetap gagal, coba isi menggunakan HP lain.\"\n14\tKerjoo\tSURAT PERJANJIAN KERJA BELUM MASUK KE EMAIL. APA YANG HARUS DILAKUKAN?\t\"1. Tulis nama lengkap, outlet, dan email aktif.\n 2. Pastikan penyimpanan gmail tidak penuh.\n 3. Tunggu pengecekan oleh admin.\"\n15\tKerjoo\tAPAKAH MASIH ADA LOWONGAN KERJA DI GEPREKIN?\tKlik link berikut untuk melihat lowongan: http://bit.ly/KarirGeprekinAja2025\n16\tLembur\tBAGAIMANA CARA PENGAJUAN LEMBUR?\t\"1. Konfirmasi ke atasan (crew ke Leader, Leader ke SPV).\n 2. Form diisi oleh Leader untuk crew dan SPV untuk Leader.\n 3. Isi form melalui: https://bit.ly/FORMPENGAJUANLEMBURGEPREKIN\"\n17\tPaklaring\tBAGAIMANA CARA PENGAJUAN PAKLARING?\t\"1. Konfirmasi ke Leader/SPV.\n 2. Isi form di: https://bit.ly/FORMPENGAJUANPAKLARING\n 3. Paklaring dibuat sesuai jenis resign: Prosedur, Unprosedur, atau Cut Off.\"\n\nINSTRUKSI PENTING UNTUK ASISTEN:\n- Jawab HANYA jika pertanyaan berkaitan dengan topik di tabel (BPJS TK, Kerjoo, Lembur, Paklaring, lowongan kerja Geprekin).\n- Jika pertanyaan TIDAK sesuai dengan kata kunci/topik tersebut ATAU tidak ditemukan padanannya di tabel, balas PERSIS dengan teks: IGNORE-QUESTION (tanpa tambahan kata lain)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -48,
+        368
+      ],
+      "id": "312ca110-7249-460a-9c0a-52c65565407d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -272,
+        592
+      ],
+      "id": "c54a4226-0b3b-4e9e-8bcd-57cf8a77aff9",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "eMFtBXB0DyyHMf6k",
+          "name": "OpenAPIKey"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1uU7xXtN9vqXHMBmvqGKHXZBI6iolgSv-vB39wVn9-70",
+          "mode": "list",
+          "cachedResultName": "Database_QA_Geprekin",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uU7xXtN9vqXHMBmvqGKHXZBI6iolgSv-vB39wVn9-70/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uU7xXtN9vqXHMBmvqGKHXZBI6iolgSv-vB39wVn9-70/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        48,
+        560
+      ],
+      "id": "382cbf90-a641-41ae-ac85-70cc495836d0",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "V8hy7qdTKcIhAnZN",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        160
+      ],
+      "id": "40d56141-c18d-4002-a198-0a94848dc7cb",
+      "name": "Keywords chat",
+      "webhookId": "e3a13919-6cbe-4141-aa48-28b28e2e7f91"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2a9f07f9-6eb3-40c8-8823-23c82ce57d35",
+              "leftValue": "={{ $json.output && $json.output.trim() !== '' && $json.output !== 'IGNORE-QUESTION' ? 'true' : 'false' }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        304,
+        368
+      ],
+      "id": "16d06c8a-3b41-4534-acf0-29c811e609c6",
+      "name": "If(kalau ngawur chatnya tidak sesuai keywords atau pertanyaan jangan dijawab)"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "If(kalau ngawur chatnya tidak sesuai keywords atau pertanyaan jangan dijawab)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If(kalau ngawur chatnya tidak sesuai keywords atau pertanyaan jangan dijawab)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook": [
+      {
+        "headers": {
+          "host": "geprekinaja.app.n8n.cloud",
+          "user-agent": "Go-http-client/2.0",
+          "content-length": "437",
+          "accept-encoding": "gzip, br",
+          "cdn-loop": "cloudflare; loops=1; subreqs=1",
+          "cf-connecting-ip": "103.52.212.50",
+          "cf-ew-via": "15",
+          "cf-ipcountry": "ID",
+          "cf-ray": "99cb1ae5106b87b4-SIN",
+          "cf-visitor": "{\"scheme\":\"https\"}",
+          "cf-worker": "n8n.cloud",
+          "content-type": "application/json",
+          "x-forwarded-for": "103.52.212.50, 172.70.188.98",
+          "x-forwarded-host": "geprekinaja.app.n8n.cloud",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "traefik-prod-users-gwc-87-bcb9f59f7-tfbjj",
+          "x-is-trusted": "yes",
+          "x-real-ip": "103.52.212.50"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "choices": [],
+          "device": "6282142933109",
+          "extension": "",
+          "filename": "",
+          "inboxid": 0,
+          "isforwarded": false,
+          "isgroup": false,
+          "location": "",
+          "member": "",
+          "message": "hai",
+          "mode": "pn",
+          "name": "Al Firas Manar",
+          "pengirim": "6282331016638",
+          "pesan": "hai",
+          "pollname": "",
+          "quick": false,
+          "sender": "6282331016638",
+          "senderlid": "13743928913981@lid",
+          "storedata": {},
+          "text": "non-button message",
+          "timestamp": 1762835958,
+          "type": "text",
+          "url": "",
+          "username": "6282142933109"
+        },
+        "webhookUrl": "https://geprekinaja.app.n8n.cloud/webhook/79e8d1c4-ef87-49a2-b6a4-3a43320aedf4",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "61189e0054bf6833c4c7e3813c1da1f6d829d0503562c56e7db1ff2648d0b2b7"
+  }
+}

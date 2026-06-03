@@ -1,0 +1,892 @@
+DATA BAPAK BAYU
+445
+G. WISMA PERMAI
+G. KEDUNGTURI
+G. WEDORO
+G. BUNGURASIH
+G. BENOWO
+G. MANUKAN
+G. BENDUL MERISI
+G. BALAS KLUMPRIK
+G. TAWANGSARI
+G. BOHAR
+G. KENDANGSARI
+G. PAGESANGAN
+G. MEDOKAN SAWAH
+G. JUMPUT REJO
+G. PRASUNG
+G. TUMAPEL
+G. RAJAWALI SAMPANG
+G. TRUNOJOYO
+G. CAMPLONG SAMPANG
+G. KEMIRI SIDOARJO
+G. GEDANGAN
+G. JL. RAYA BLURU KIDUL
+G. SIDOKEPUNG SIDOARJO
+G. RUNGKUT
+G. NGINDEN
+G. SEMOLOWARU
+G. BLEGA
+G. RAYA BANCARAN BANGKALAN
+G. RONGKEMASAN AROSBAYA BANGKALAN
+G. MARENGAN SUMENEP
+G. PAMOLOKAN SUMENEP
+G. ZAINAL ARIFIN SUMENEP
+G. JOGOROTO
+G. MOJOWARNO
+G. KANDANGAN
+G. BRAWIJAYA TROWULAN
+G. PULOREJO
+G. CANGGU
+G. WIJAYAKUSUMA
+G. KH NAWAWI
+G. TROPODO MERI
+G. SURODINAWAN
+G. LOSARI
+G. WATES
+G. MERI
+G. WARUJAYENG
+G. AR SALEH
+G. BARITO
+G. PLEMAHAN
+G. DLOPO KEDIRI
+G. PARE
+G. KEPUNG
+G. PARE MANGUNREJO
+G. GAJAH MADA
+G. TAMAN PRAJA
+G. KAPUAS
+G. WONOASRI
+G. KELAPA MANIS MANISREJO
+G. DOLOPO
+G. PONOROGO KRAJAN
+G. JAKSA AGUNG PONOROGO
+G. DR SOETOMO
+G. MAOSPATI
+G. SOLO JIWAN
+G. PARANG
+G. TEMBORO
+G. MAYJEND SUKOWATI
+G. JAKSA AGUNG NGAWI
+G. PARON
+G. BARAT
+G. AHMAD YANI NGAWI
+G. NGRAMBE
+G. JOGOROGO
+G. WALIKUKUN
+G. PANEKAN
+G. KARANGREJO MAGETAN
+G. TAKERAN
+G. TANJUNG RAYA
+G. PELITA TAMA
+G. JOSENAN
+G. MT. HARYONO
+G. GEGER
+G. LEMBEYAN
+G. GORANGGARENG
+G. MARON PROBOLINGGO
+G. TEUKU UMAR PS. SEMAMPIR PROBOLINGGO
+G. KARANGPURI
+G. KRAMAT JEGU
+G. CITRA HARMONI
+G. CEMENG BAKALAN
+G. ENTALSEWU
+G. VILLA JASMINE
+G. SUMOKALI
+G. SUGIHWARAS SIDOARJO
+G. TARIK
+G. PRAMBON
+G. KRIAN
+G. PS. PERNING
+G. KRATON
+G. BESUKI
+G. ASEMBAGUS
+G. UNTUNG SUROPATI PURWODADI
+G. GROBOGAN
+G. PRATOMO
+G. SUPRIYADI
+G. MLANGSEN
+G. PANGLIMA POLIM
+G. PEMUDA
+G. BULU MANIS (RONGGO KUSUMO)
+G. TAYU
+G. BLANDOK PLAWANGAN
+G. BOGORAME
+G. KARANGAWEN
+G. A. YANI SRAGEN
+G. VETERAN SRAGEN
+G. GENDINGAN
+G. KEDUNGGALAR
+G. TANON SRAGEN
+G. KEDUNGADEM BOJONEGORO
+G. SUGIHWARAS BANARAN BOJONEGORO
+G. PANCENG
+G. LUKMAN HAKIM
+G. PACIRAN
+G. BRONDONG
+G. MERAKURAK
+G. KARANGAGUNG TUBAN
+G. PLOSO
+G. JOJORAN
+G. LIDAH KULON
+G. WONOCOLO
+G. BABAT
+G. VETERAN LAMONGAN
+G. MASTRIP LAMONGAN
+G. SUMBERWUDI KARANGGENENG LAMONGAN
+G. TAMBAKBOYO
+G. BELAKANG PASAR TUBAN
+G. RENGEL TUBAN
+G. KEDUNG MENJANGAN PURBALINGGA
+G. RINJANI CILACAP
+G. GATOT SUBROTO SOKARAJA
+G. PENGGING BOYOLALI
+G. LOGERIT BOYOLALI
+G. MANGUNSARI SALATIGA
+G. JEND SUDIRMAN PURWOKERTO
+G. HR BOENYAMIN
+G. WAHID HASYIM PURWOKERTO
+G. YOS SUDARSO GOMBONG
+G. LODOYONG AMBARAWA
+G. TAMAN SISWA
+G. CANDISARI
+G. GEDANGANAK UNGARAN
+G. VETERAN SUKOHARJO
+G. MAYOR ACHMADI BEKONANG
+G. COKROAMINOTO
+G. BOYOLANGU
+G. CAMPURDARAT
+G. BANDUNG
+G. MANGUNSARI
+G. MASTRIP
+G. KETANON
+G. DR WAHIDIN
+G. PAKISAJI
+G. IR SOEKARNO
+G. NGUNUT
+G. URIP SUMOHARJO
+G. VETERAN PEKALONGAN
+G. SAPUGARUT
+G. TLOGOSARI
+G. BANGETAYU KULON
+G. MERDEKA BARAT CILEDUG
+G. GAYAMSARI
+G. FATAHILLAH CIREBON
+G. BALONGPANGGANG
+G. CERME
+G. BENJENG
+G. WATUGOLONG
+G. KEMANGSEN
+G. TAMBAK KEMERAKAN
+G. PASINAN
+G. WRINGINANOM
+G. SIDOREJO
+G. DRIYOREJO
+G. HULAAN MENGANTI GRESIK
+G. PALEMWATU
+G. PPS MANYAR
+G. BUNGAH
+G. BRANGKAL SOOKO
+G. MOJOSARI MOJOKERTO
+G. BRANGKAL
+G. BANGSAL
+G. GONDANG
+G. KEBONSARI
+G. JENGGAWAH
+G. TALANGSARI
+G. KARIMATA
+G. WAHID HASYIM
+G. KH. KHOLIL
+G. MUNCAR
+G. AMBULU
+G. BALUNG
+G. PEJATEN JAKSEL
+G. POLTANGAN JAKSEL
+G. JAGAKARSA JAKSEL
+G. MANUNGGAL JAKTIM
+G. DERMAGA RAYA JAKTIM
+G. BRIGJEND KATAMSO LUMAJANG
+G. DURUNG BEDUG CANDI SIDOARJO
+G. RAYA ADIRASA
+G. PEMUDA SIDAYU GRESIK
+G. AGUS SALIM SUMENEP
+G. S PARMAN NGAWI
+G. TANGGUL JEMBER
+G. KEMUNING TARIK SIDOARJO
+G. JOKO TOLE SANGSANG SAMPANG
+G. MOH KHOLIL BANGKALAN
+G. CILIMUS KUNINGAN
+G. SONO INDAH SIDOARJO
+G. KUSUMA BANGSA BANGKALAN
+G. DHARMA TANJUNG SAMPANG
+G. JATIWANGI MAJALENGKA
+G. RAJAGALUH MAJALENGKA
+G. CIDENG CIREBON
+G. SUGIO LAMONGAN
+G. TALANGO SUMENEP
+G. GEBANG LOR SURABAYA
+G. SIWALANKERTO SURABAYA
+G. KARANGAMPEL INDRAMAYU
+G. JATIBARANG INDRAMAYU
+G. JEND SUDIRMAN PATROL INDRAMAYU
+G. MANUKAN TENGAH SURABAYA
+G. LETKOL RE JAELANI TASIKMALAYA
+G. IKAN PIRANHA MALANG
+G. PACUAN KUDA SURABAYA
+G. KOL ISMAIL PETERONGAN JOMBANG
+G. IMAM BONJOL PAYAMAN NGANJUK
+G. RAYA CIMALAKA SUMEDANG
+G. H. DARHAM CIKOPO BANDUNG
+G. JL. PS. LAMA BOJONGGEDE BOGOR
+G. JL. ANGKREK SUMEDANG
+G. SULTAN AGUNG MALANG
+G. TAMBERU SOKOBANAH SAMPANG
+G. GANTING SIDOARJO
+G. KLAMPIS BANGKALAN
+G. KAYU MANIS TIMUR JAKTIM
+G. GRATI PASURUAN
+G. BRINGKONENG SAMPANG
+G. IMAM BONJOL BOJONEGORO
+G. RADEN SALEH TANGERANG
+G. SUNAN GIRI TANGERANG
+G. RONGGO WALUYO KARAWANG
+G. GEMURUNG SIDOARJO
+G. IMAM BONJOL GELURAN SIDOARJO
+G. BASUKI RAHMAT KEDUNGPRING LAMONGAN
+G. TANJUNGBUMI BANGKALAN
+G. BANYUATES SAMPANG
+G. JOKOTOLE SOCAH BANGKALAN
+G. TRUNOJOYO KAMAL BANGKALAN
+G. SUMORAME SIDOARJO
+G. JL. PAHLAWAN SUMENEP
+G. NUSANTARA RAYA BEKASI
+G. EXPRESS PAGERWOJO SIDOARJO
+G. JATISARI SIDOARJO
+G. GUBENG AIRLANGGA SURABAYA
+G. BASUKI RAHMAT LAMONGAN
+G. JATIROTO LUMAJANG
+G. MANYARSIDORUKUN GRESIK
+G. EXPRESS SAWUNGGALING SIDOARJO
+G. JL. RAYA PLUMPANG TUBAN
+G. TEGAL BESAR JEMBER
+G. SEKARDANGAN SIDOARJO
+G. EXPRESS WONOREJO SURABAYA
+G. EXPRESS MOJOPAHIT MADIUN
+G. JL. KENANGA LEDOK JEMBER
+G. JL. MASTRIP KRAJAN TIMUR JEMBER
+G. JL. BESUK KRAJAN PROBOLINGGO
+G. BANGILAN TUBAN
+G. EXPRESS TROPODO WARU SIDOARJO
+G. KUTISARI SURABAYA
+G. EXPRESS JL. JAWA PRASUNG SIDOARJO
+G. RAYA GAPURA BANGKAL SUMENEP
+G. JL MAYOR ADI DHARMA PUGER JEMBER
+G. KENCONG JEMBER
+G. EXPRESS KALIANGET BARAT, SUMENEP
+G. EXPRESS TENGKET AROSBAYA BANGKALAN
+G. KARANGBOYO CEPU
+G. PADANGAN BOJONEGORO
+G. MADURAN LAMONGAN
+G. BANJARWATI LAMONGAN
+G. SEBAUNG PROBOLINGGO
+G. SEPULU BANGKALAN
+G. EXPRESS DUNGUS MANIS MADIUN
+G. MONTONG TUBAN
+G. EXPRESS TEBEL SIDOARJO
+G. EXPRESS NGELOM SIDOARJO
+G. TIKUNG LAMONGAN
+G. EXPRESS PANDEAN SIDOARJO
+G. JL HAJI MEAN TANGERANG
+G. EXPRESS JL RAYA SUYITMAN AMBULU JEMBER
+G. EXPRESS MODO LAMONGAN
+G. MONGINSIDI MAGETAN
+G. EXPRESS SETIABUDI MADIUN
+G. NUSA INDAH TANGERANG
+G. EXPRESS PASAR SEMBAYAT GRESIK
+G. KEDANYANG GRESIK
+G. EXPRESS JL PATTIMURA BESUKI SITUBONDO
+G. EXPRESS RONGGOWARSITO NGAWI
+G. PULO WONOKROMO SURABAYA
+G. EXPRESS KRATON KRIAN SIDOARJO
+G. JERUKGAMPING KRIAN
+G. EXPRESS MENANGGAL SURABAYA
+G. PUTAT JAYA SURABAYA
+G. ARJASA JEMBER
+G. EXPRESS KEJAWAN GEBANG SURABAYA
+G. EXPRESS PABEAN SIDOARJO
+G. EXPRESS SIDOTOPO WETAN SURABAYA
+G. EXPRESS TAMBAK REJO SIDOARJO
+G. PAKONG PAMEKASAN
+G. EXPRESS JL ARYA WANGSAKARA TANGERANG
+G. SINDUJOYO GRESIK
+G. EXPRESS RAYA IJEN MOJOKERTO
+G. PANGEAN LAMONGAN
+G. EXPRESS JEGU SIDOARJO
+G. EXPRESS JOGOSATRU SIDOARJO
+G. KEBONAGUNG SIDOARJO
+G. EXPRESS SERAYU TIMUR, MADIUN
+G. TIGARAKSA TANGERANG
+G. EXPRESS JANTI, SIDOARJO
+G. EXPRESS KEDURUS, SURABAYA
+G. EXPRESS BERBELUK AROSBAYA, BANGKALAN
+G. EXPRESS KH. MOH. TOHA, BANGKALAN
+G. JL ANGGREK SITUBONDO
+G. EXPRESS SEPANDE SIDOARJO
+G. EXPRESS RAYA TAMBERU, PAMEKASAN
+G. LEBAK, SAMPANG
+G. RAYA AMBUNTEN SUMENEP
+G. EXPRESS MOJOPAHIT, TUBAN
+G. EXPRESS KEDUNG RUKEM, SURABAYA
+G. BLUTO SUMENEP
+G. EXPRESS NGAMPEL MADIUN
+G. EXPRESS IMAM BONJOL DALPENANG SAMPANG
+G. MAYANG PAMEKASAN
+G. EXPRESS MOJO, BOJONEGORO
+G. EXPRESS DEMPEL LOR, SEMARANG
+G. EXPRESS TLOGO TIMUN RAYA, SEMARANG
+G. JL. RAYA DUKUN, GRESIK
+G. EXPRESS JATI SELATAN, SIDOARJO
+G. EXPRESS JL. ANDANSARI, LAMONGAN
+G. BANGSRI SIDOARJO
+G. EXPRESS HOS. COKROAMINOTO SUMENEP
+G. EXPRESS JL. PRAJURIT KULON MOJOKERTO
+G. EXPRESS BURNEH, BANGKALAN
+G. EXPRESS MERTAJAZAH, BANGKALAN
+G. EXPRESS PAYAMAN, LAMONGAN
+G. EXPRESS PRENDUAN, SUMENEP
+G. EXPRESS PANAGUAN, PAMEKASAN
+G. EXPRESS MERGELO IJEN, MOJOKERTO
+G. EXPRESS KEMLAGI, MOJOKERTO
+G. EXPRESS RE. MARTHADINATA, BANGKALAN
+G. EXPRESS BARATLEKE KAMAL BANGKALAN
+G. EXPRESS SEBANAH, BANGKALAN
+G. WARU, PAMEKASAN
+G. EXPRESS LEMAH PUTIH, GRESIK
+G. EXPRESS RAWA BENDUNGAN, CILACAP
+G. EXPRESS BAGUSAN, MOJOKERTO
+G. EXPRESS JL PESISIR BARAT LEGGUNG SUMENEP
+G. EXPRESS IMAM GHAZALI SAMPANG
+G. EXPRESS HALIM PERDANA KUSUMA SUMENEP
+G. EXPRESS KUSUMA BANGSA, SAMPANG
+G. EXPRESS BATU LENGER, SAMPANG
+G. EXPRESS KH. AGUS SALIM, SAMPANG
+G. EXPRESS TAMBAKRIGADUNG, LAMONGAN
+G. EXPRESS MASTRIP MADE, LAMONGAN
+G. EXPRESS KEDUNDUNG, SAMPANG
+G. DUKUHWALUH, BANYUMAS
+G. MENOREH, SEMARANG
+G. EXPRESS JUPURO SIDORUKUN GRESIK
+G. EXPRESS KRAPYAK SRAGEN WETAN
+G. EXPRESS TAPEN, JOMBANG
+G. EXPRESS KAMPUNG MALANG, SURABAYA
+G. EXPRESS JAMPET NGASEM BOJONEGORO
+G. EXPRESS SLEMPIT DAMEAN GRESIK
+G. EXPRESS WONOAYU MEDOKAN, SURABAYA
+G. EXPRESS KALIANGET SUMENEP
+G. EXPRESS NGABAN, SIDOARJO
+G. EXPRESS JERUK SEGER, MOJOKERTO
+G. EXPRESS NGRAHO, BOJONEGORO
+G. EXPRESS RONGGOLAWE CEPU BLORA
+G. PANDUGO, SURABAYA
+G. EXPRESS BUNCITAN, SIDOARJO
+G. EXPRESS NGABAR, MOJOKERTO
+G. EXPRESS MERGELO SURODINAWAN, MOJOKERTO
+G. EXPRESS KEJAGAN, MOJOKERTO
+G. EXPRESS KESAMBEN, JOMBANG
+G. EXPRESS MANTUP
+G. EXPRESS WISMA SARINADI, SIDOARJO
+G. EXPRESS SIDODADI, TROWULAN
+G. EXPRESS KEMIRI TAMAN, MADIUN
+G. EXPRESS SAWO TIMUR, TEGAL
+G. EXPRESS SASAP MODONGAN
+G. EXPRESS NYALABU LAOK, PAMEKASAN
+G. EXPRESS GANGSIR BEJI, PASURUAN
+G. EXPRESS PARANG, MAGETAN
+G. EXPRESS PASONGSONGAN, SUMENEP
+G. EXPRESS BENDUL, SURABAYA
+G. EXPRESS VETERAN MULYOHARJO, PEMALANG
+G. EXPRESS SUWANDAK, LUMAJANG
+G. KALITIDU, PANJUNAN BOJONEGORO
+G. EXPRESS MASANGAN, SIDOARJO
+G. EXPRESS PILANG, SIDOARJO
+G. EXPRESS KEMIRI, SALATIGA
+G. EXPRESS GAPURA BANJAR, SUMENEP
+G. EXPRESS SEKAPUK PANCENG, GRESIK
+G. EXPRESS MULYOREJO CEPU, BLORA
+G. EXPRESS NGABLAK, SEMARANG
+G. EXPRESS PAKUNIRAN PAITON, PROBOLINGGO
+G. EXPRESS KARANG MIUWO MANGLI
+G. EXPRESS PEMUDA MLANGSEN, BLORA
+G. EXPRESS SILO, JEMBER
+G. EXPRESS NGARENG CEPU, BLORA
+G. EXPRESS KENONGO, TULANGAN
+G. EXPRESS SUNGELEBAK, LAMONGAN
+G. EXPRESS LONGEK GALIS, BANGKALAN
+G. EXPRESS KETAJEN GEDANGAN, SIDOARJO
+G. PUCANG GADING, DEMAK
+G. EXPRESS TLANAK KEDUNGPRING
+G. EXPRESS JL. MR. ISKANDAR DLUWUNGAN , BLORA
+G. EXPRESS PASINAN BAURENO, BOJONEGORO
+G. EXPRESS SADENGANMIJEN
+G. EXPRESS DALEM LOR, BOJONEGORO
+G. EXPRESS JIRAPAN, SRAGEN
+G. EXPRESS SENDANGLAWE, BOYOLALI
+G. EXPRESS SINGOPRONO, BOYOLALI
+G. EXPRESS SEKARAN, SEMARANG
+G. EXPRESS BLURU PERMAI, SIDOARJO
+G. EXPRESS JL DOKTER WAHIDIN, JOMBANG
+G. EXPRESS KUWU PULOKULON, GROBOGAN
+G. EXPRESS MAJENANG, GROBOGAN
+G. EXPRESS A. YANI, GROBOGAN
+G. EXPRESS KADEMANGAN, BONDOWOSO
+G. EXPRESS SUKOWONO JEMBER
+G. EXPRESS JEDONG URANGAGUNG, SIDOARJO
+G. EXPRESS GEMOLONG SRAGEN
+G. EXPRESS PACAR KEMBANG, SURABAYA
+
+DATA OUTLET SILVI
+Geprekin Gedangan
+Geprekin Krian
+Geprekin Rungkut
+Geprekin Wisma Permai
+Geprekin Wonocolo
+Geprekinaja Express Ngareng Cepu, Blora
+Geprekin Kraton
+Geprekin Kemiri
+Geprekin Nginden
+Geprekin Sumokali
+Geprekin Watugolong
+Geprekin Bohar
+Geprekin Karangpuri
+Geprekin Kramat Jegu
+Geprekin Cemeng Bakalan
+Geprekin Tambak Kemerakan
+Geprekin Prambon
+Geprekin Kemangsen
+Geprekin Tarik
+Geprekin Tumapel
+Geprekin Gendingan
+Geprekin Bungurasih
+Geprekin Kedungturi
+Geprekin Entalsewu
+Geprekin Lembeyan
+Geprekinaja Citra Harmoni
+Geprekin Jumput Rejo
+Geprekin Veteran
+Geprekin Geger
+Geprekin Tawangsari
+Geprekin Pasinan
+Geprekinaja Brangkal
+Geprekin Pagesangan
+Geprekin Wedoro
+Geprekinaja Canggu
+Geprekin Meri
+Geprekin Losari
+Geprekin Bangsal
+Geprekin Wates
+Geprekin Parang
+Geprekinaja jawa prasung
+Geprekin Taman Praja
+Geprekin Gajah Mada
+Geprekin Kapuas
+Geprekin Tanjung Raya
+Geprekin Semolowaru
+Geprekinaja Jaksa Agung
+Geprekinaja Gorang Gareng
+Geprekinaja Ahmad Yani
+Geprekin Paron
+Geprekin Pulorejo
+Geprekinaja Dolopo
+Geprekin Bendul Merisi
+Geprekinaja Barat
+Geprekinaja Jaksa Agung Suprapto
+Geprekinaja Pare
+Geprekinaja Kandangan
+Geprekin Gondang
+Geprekin Josenan
+Geprekinaja Dlopo, Kediri
+Geprekin Takeran
+Geprekinaja  Jl. Kenanga, Ledok Jember
+Geprekinaja Kedunggalar
+Geprekin Wonoasri
+Geprekinaja Bandung
+Geprekin Wringinanom
+Geprekinaja Sukowati
+Geprekinaja Sekardangan, Sidoarjo
+Geprekin Sidorejo
+Geprekin Cokroaminoto
+Geprekinaja Dr. Wahidin
+Geprekinaja Mangunsari
+Geprekinaja Mastrip
+Geprekinaja Boyolangu
+Geprekinaja Ngunut
+Geprekinaja Campurdarat
+Geprekinaja Ketanon
+Geprekinaja Panekan
+Geprekinaja Pelita Tama
+Geprekinaja Jogorogo
+Geprekinaja Maospati
+Geprekinaja Temboro
+Geprekinaja Walikukun
+Geprekinaja MT. Haryono
+Geprekinaja Cerme
+Geprekinaja Benjeng
+Geprekinaja Brangkal Sooko
+Geprekinaja Mangunrejo
+Geprekinaja Kepung
+Geprekinaja Ir. Soekarno
+Geprekinaja Warujayeng
+Geprekinaja Ngerambe
+Geprekinaja Menanggal (express), Surabaya
+Geprekinaja Barito
+Geprekinaja PPS Manyar
+Geprekinaja Palemwatu
+Geprekinaja Surodinawan
+Geprekinaja KH. Nawawi
+Geprekinaja Palemahan
+Geprekinaja Villa Jasmine
+Geprekin sapu garut
+Geprekinaja Ar saleh
+Geprekinaja Talangsari
+Geprekinaja Karimata
+Geprekinaja A Yani Sragen
+Geprekinaja Babat
+Geprekinaja Mastrip, Lamongan
+Geprekinaja Ambulu
+Geprekinaja Jenggawah
+Geprekinaja Mojosari
+Geprekinaja Kebonsari
+Geprekinaja Grobogan
+Geprekinaja Untung Suropati
+Geprekinaja Balongpanggang
+Geprekinaja Dr. Soetomo
+Geprekinaja Panglima Polim
+Geprekinaja Pemuda Timur
+Geprekinaja Bungah Gresik
+Geprekinaja Balas Klumprik
+Geprekinaja Veteran Sragen
+Geprekinaja Pakisaji
+Geprekinaja Ploso Bogen
+Geprekinaja Mojowarno
+Geprekinaja Wahid Hasyim
+Geprekinaja KH Kholil
+Geprekinaja Panceng
+Geprekinaja Panciran
+Geprekinaja Brondong
+Geprekinaja Balung
+Geprekinaja Jogoroto
+Geprekinaja Jojoran
+Geprekinaja Manukan
+Geprekinaja Kendangsari
+Geprekinaja Lukman Hakim
+Geprekinaja Muncar
+Geprekinaja Gayamsari
+Geprekinaja Bangetayu
+Geprekinaja Lidah Kulon
+Geprekinaja Tlogosari
+Geprekinaja Taman Siswa
+Geprekinaja Pucang Gading, Demak
+Geprekinaja Karangawen
+Geprekinaja Mlangsen
+Geprekinaja Pratomo
+Geprekinaja Supriyadi
+Geprekinaja Driyorejo
+Geprekinaja Merakurak
+Geprekinaja Benowo
+Geprekinaja Blega
+Geprekinaja Rajawali
+Geprekinaja Asembagus
+Geprekinaja alun-alun besuki
+Geprekinaja Tambakboyo
+Geprekinaja Bogorame
+Geprekinaja veteran
+Geprekinaja urip sumoharjo
+Geprekinaja Candisari
+Geprekinaja Ronggowarsito Ngawi (express)
+Geprekinaja Pakong, Pamekasan
+Geprekinaja Trunojoyo
+Geprekinaja PS. perning
+Geprekinaja Wijayakusuma
+Geprekinaja Gedanganak Ungaran
+Geprekinaja Marengan
+Geprekinaja lodoyo ambarawa
+Geprekinaja Jl. Pengging
+Geprekinaja Jl. Raya Logerit
+Geprekinaja Mangunsari, Salatiga
+Geprekinaja Sugihwaras
+Geprekinaja  Express Mojopahit , Tuban
+Geprekinaja Express Kemlagi, Mojokerto
+Geprekinaja medokan sawah
+Geprekinaja Kedung Rukem (express)
+Geprekinaja Raya Ijen (express)
+Geprekinaja jl gatot subroto
+Geprekinaja Raya Tamberu (express)
+Geprekinaja Imam Bonjol Dalpenang (express)
+Geprekinaja Bangsri Sidoarjo
+Geprekinaja Serayu Timur (express)
+Geprekinaja Jogosatru (express)
+Geprekinaja kedungmenjangan
+Geprekinaja solojiwan
+Geprekinaja Rinjani
+Geprekinaja HR. Boenyamin
+Geprekinaja Kalitidu Panjunan, Bojonegoro
+Geprekinaja wahid Hasyim, Purwokerto
+Geprekinaja belakang pasar tuban
+Geprekinaja yos sudarso gombong kauman
+Geprekinaja jend Sudirman
+Geprekinaja Kraton (express), Krian
+Geprekinaja blandok plawangan
+Geprekinaja Mojo, Bojonegoro (express)
+Geprekinaja Bulu manis
+Geprekinaja panglima Sudirman tayu
+Geprekinaja camplong
+Geprekinaja bancaran
+Geprekinaja pamolokan
+Geprekinaja Maron
+Geprekinaja zainal arifin
+Geprekinaja karangagung
+Geprekinaja merdeka barat
+Geprekinaja bluru kidul
+Geprekinaja fatahillah
+Geprekinaja sumberwudi karanggeneng
+Geprekinaja tropodo meri kranggan
+Geprekinaja rengel
+Geprekinaja taman mini manunggal
+Geprekinaja pejaten
+Geprekinaja dermaga raya
+Geprekinaja poltangan
+Geprekianaja jagakarsa
+Geprekinaja Kedungadem
+Geprekinaja sidokepung
+Geprekinaja teuku umar ps semampir
+Geprekinaja kelapa manis manisrejo
+Geprekinaja ponorogo krajan
+Geprekinaja sugihwara banaran
+Geprekinaja mayor achmadi bekonang
+Geprekinaja rongkemasan arosbaya
+Geprekinaja brawijaya trowulan
+Geprekinaja hullaan menganti
+Geprekinaja karangrejo
+Geprekinaja Express Ketajen Gedangan, Sidoarjo
+Geprekinaja tanon
+Geperekinaja durung bedug candi
+Geprekinaja raya adirasa
+Geprekinaja agus salim
+Geprekinaja brigjen katamso
+Geprekinaja s.parman
+Geprekinaja tanggul
+Geprekinaja kemuning Tarik
+Geprekinaja joko tole sangsang
+Geprekinaja moh.kholil
+Geprekinaja cilimus
+Geprekinaja Kusuma bangsa
+Geprekinaja dharma tanjung
+Geprekinaja pemuda sidayu
+Geprekinaja veteran, Sukoharjo
+Geprekinaja sono indah
+Geprekinaja cideng
+Geprekinaja sugio
+Geprekinaja karangampel
+Geprekinaja jatibarang
+Geprekinaja jend. Sudirman patrol
+Geprekinaka ikan piranha
+Geprekinaja Express Jampet Ngasem, Bojonegoro
+Geprekinaja kol. ismail peterongan
+Geprekinaja Jatiwangi
+Geprekinaja Rajagaluh
+Geprekinaja Talango
+Geprekinaja Gebang Lor
+Geprekinaja Siwalankerto
+Geprekinaja Manukan Tengah
+Geprekinaja Pacuan Kuda
+Geprekinaja RE Jaelani
+Geprekinaja Imam Bonjol Payaman 
+Geprekinaja Raya Cimalaka 
+Geprekinaja H. Darham Cikopo
+Geprekinaja Jl. Ps. Lama Bojonggede 
+Geprekinaja Jl. Angkrek 
+Geprekinaja Sultan Agung 
+Geprekinaja Tamberu Sokobanah 
+Geprekinaja Ganting 
+Geprekinaja Klampis
+Geprekinaja Kayu Manis Timur
+Geprekinaja Grati
+Geprekinaja Bringkoneng
+Geprekinaja Imam Bonjol, Bojonegoro
+Geprekinaja Ronggo Waluyo, 
+Geprekinaja Imam Bonjol, Geluran 
+Geprekinaja Basuki Rahmat, Kedungpring
+Geprekinaja Sunan Giri
+Geprekinaja Raden Saleh
+Geprekinaja Gemurung
+Geprekinaja Tanjungbumi, Bangkalan
+Geprekinaja Banyuates, Sampang
+Geprekinaja jokotole socah bangkalan
+Geprekinaja Trunojoyo, Kamal
+Geprekinaja Sumorame
+Geprekinaja Jl. Pahlawan
+Geprekinaja Nusantara Raya, Bekasi
+Geprekinaja Jl. Basuki Rahmat Lamongan
+Geprekinaja  jatiroto, Lumajang
+Geprekinaja Sawunggaling Sidoarjo (express)
+Geprekinaja Jl. Raya Plumpang, Tuban
+Geprekinaja Tegal Besar, Jember
+Geprekinaja Pagerwojo Sidoarjo (express)
+Geprekinaja Jatisari Sidoarjo
+Geprekinaja Manyarsidorukun, Gresik
+Geprekinaja Wonorejo, Surabaya (express)
+Geprekinaja Gubeng Airlangga, Surabaya
+Geprekinaja Mojopahit, Madiun (express)
+Geprekinaja  Jl. Mastrip, Krajan Timur Jember
+Geprekinaja  Jl. Raya Besuk Krajan, Probolinggo
+Geprekinaja  Bangilan, Tuban
+Geprekinaja Tropodo Waru, Sidoarjo (express)
+Geprekinaja Kutisari, Surabaya
+Geprekinaja Jl. Jawa, Prasung Sidoarjo (express)
+Geprekinaja  Jl. Raya Gapura Bangkal Sumenep
+Geprekinaja Jl. Mayor Adi Dharma, Puger, Jember
+Geprekinaja Kencong, Jember
+Geprekinaja Kalianget, Sumenep (express)
+Geprekinaja Tengket Arosbaya Bangkalan (express)
+Geprekinaja Karangboyo, Cepu
+Geprekinaja Padangan Bojonegoro
+Geprekinaja Maduran Lamongan
+Geprekinaja Banjarwati, Lamongan
+Geprekinaja Sebaung, Probolinggo
+Geprekinaja Sepulu, Bangkalan
+Geprekinaja Dungus Manis (express), Madiun
+Geprekinaja Montong, Tuban
+GeprekinajaTebel (express), Sidoarjo
+Geprekinaja Ngelom (express), Sidoarjo
+Geprekinaja Tikung, Lamongan
+Geprekinaja Pandean (express) Sidoarjo
+Geprekinaja Jl. Haji Mean, Tangerang (jabodetabek)
+Geprekinaja Jl. Raya Suyitman Ambulu (express) Jember
+Geprekinaja Modo (express) Lamongan
+Geprekinaja Monginsidi, Magetan
+Geprekinaja Setiabudi (express) Madiun
+Geprekinaja Pasar Sembayat (express), Gresik
+Geprekinaja Kedanyang, Gresik
+Geprekinaja Jl. Pattimura Besuki (express) Situbondo
+Geprekinaja Nusa Indah, Tangerang
+Geprekinaja Jerukgamping (express), Krian
+Geprekinaja Putat Jaya, Surabaya 
+Geprekinaja Arjasa, Jember 
+Geprekinaja Pulo Wonokromo, Surabaya
+Geprekinaja Kejawan Gebang (express), Surabaya
+Geprekinaja pabean (express), Sidoarjo 
+Geprekinaja Sidotopo Wetan (express), Surabaya
+Geprekinaja Tambak Rejo (express), Sidoarjo
+Geprekinaja Jl. Arya Wangsakara (express), Tangerang
+Geprekinaja Pangean, Lamongan
+Geprekinaja Jegu (express), Sidoarjo
+Geprekinaja Tigaraksa, Tangerang (jabodetabek)
+Geprekinaja Express Janti, Sidoarjo
+Geprekinaja  Express Kedurus, Surabaya
+Geprekinaja  Express Berbeluk Arosbaya, Bangkalan
+Geprekinaja  Express KH. Moh. Toha, Bangkalan
+Geprekinaja  Jl. Anggrek, Situbondo
+Geprekinaja  Express Sepande, Sidoarjo
+Geprekinaja Raya Ambunten, Sumenep
+Geprekinaja Sindujoyo, Gresik
+Geprekinaja Bluto, Sumenep
+Geprekinaja Kebonagung, Sidoarjo
+Geprekinaja Lebak Sampang
+Geprekinaja Express Kp. Malang
+Geprekinaja Mayang Pamekasan
+Geprekinaja Express Tlogo Timun Raya
+Geprekinaja Express Dempel Lor
+Geprekinaja Express Jati Selatan
+Geprekinaja Andansari
+Geprekinaja Jl Raya Dukun 
+Geprekinaja Express HOS. Cokroaminoto Sumenep
+Geprekinaja Express Jl. Prajurit Kulon Mojokerto
+Geprekinaja Express Burneh, Bangkalan
+Geprekinaja Express Mertajazah, Bangkalan
+Geprekinaja  Express Payaman, Lamongan
+Geprekinaja  Express Prenduan, Sumenep
+Geprekinaja  Express Panaguan, Pamekasan
+Geprekinaja Express Mergelo Ijen, Mojokerto
+Geprekinaja Express RE. Marthadinata, Bangkalan
+Geprekinaja Express Baratleke Kamal
+Geprekinaja Express Sebanah, Bangkalan
+Geprekinaja Waru, Pamekasan
+Geprekinaja Express Lemah Putih, Gresik
+Geprekinaja Express Rawa Bendungan (teh), Cilacap
+Geprekinaja Express Bagusan, Mojokerto
+Geprekinaja Express Jl Pesisir Barat, Leggung
+Geprekinaja Express Imam Ghazali, Sampang
+Geprekinaja Express Ngampel Madiun
+Geprekinaja Express Halim Perdana kusuma
+Geprekinaja Express Kusuma Bangsa
+Geprekinaja Express Batu Lenger
+Geprekinaja Express KH Agus Salim 
+Geprekinaja Express Tambakrigadung
+Geprekinaja Express Mastrip Made
+Geprekinaja Express Kedundung
+Geprekinaja Dukuhwaluh, Banyumas
+Geprekinaja Menoreh, Semarang
+Geprekinaja Express Jupuro Sidorukun
+Geprekinaja Express Krapyak, Sragen
+Geprekinaja Express Tapen, Jombang
+Geprekinaja Express Kp. Malang, Surabaya
+Geprekinaja Kalitidu Panjunan, Bojonegoro
+Geprekinaja Express Slempit Kedamean, Gresik
+Geprekinaja Express Wonoayu Medokan, Surabaya
+Geprekinaja Express Kalianget Barat, Sumenep
+Geprekinaja Express Ngaban, Sidoarjo
+Geprekinaja Express Jeruk Seger, Mojokerto
+Geprekinaja Express Ngraho, Bojonegoro
+Geprekinaja Express Ronggolawe, Cepu
+Geprekinaja Pandugo, Surabaya
+Geprekinaja Express Buncitan, Sidoarjo
+Geprekinaja Express Ngabar, Mojokerto
+Geprekinaja Express Mergelo Surodinawan, Mojokerto
+Geprekinaja Express Kejagan, Mojokerto
+Geprekinaja Express Kesamben, Jombang
+Geprekinaja Express Mantup, Lamongan
+Geprekinaja Express Wisma Sarinadi, Sidoarjo
+Geprekinaja Express Sidodadi/Troloyo, Trowulan
+Geprekinaja Express Kemiri Taman, Madiun
+Geprekinaja Express Sawo Timur, Tegal
+Geprekinaja Express Sasap Modongan, Mojokerto
+Geprekinaja Express Nyalabu Laok, Pamekasan
+Geprekinaja Express Gangsir Beji,Pasuruan
+Geprekinaja Express Poncol Parang, Magetan
+Geprekinaja Express Pasongsongan, Sumenep
+Geprekinaja Express Bendul, Surabaya
+Geprekinaja Express Veteran Mulyoharjo, Pemalang
+Geprekinaja Express Suwandak, Lumajang
+Geprekinaja Express Masangan, Sidoarjo
+Geprekinaja Express Pilang, Sidoarjo
+Geprekinaja Express Kemiri Sidorejo, Salatiga
+Geprekinaja Express Gapura Banjar, Sumenep
+Geprekinaja Express Sekapuk Panceng, Gresik
+Geprekinaja Express Mulyorejo Cepu, Blora
+Geprekinaja Express Ngablak Candirejo, Semarang
+Geprekinaja Express Pakuniran Paiton, Probolinggo
+Geprekinaja Express Karang Miuwo Mangli, Jember
+Geprekinaja Express Pemuda Mlangsen, Blora
+Geprekinaja Express Silo, Jember
+Geprekinaja Express Kenongo, Tulangan
+Geprekinaja Express Sungelebak, Lamongan
+Geprekinaja Express Longkek Galis, Bangkalan
+Geprekinaja Express Tlanak Kedungpring, Lamongan
+Geprekinaja Express Jl. Mr. Iskandar Dluwungan , Blora
+Geprekinaja Express Pasinan Baureno, Bojonegoro
+Geprekinaja Express Sekaran, Semarang
+Geprekinaja Express Sadenganmijen, Sidoarjo
+Geprekinaja Express Dalem Lor, Bojonegoro
+Geprekinaja Express Jirapan, Sragen
+Geprekinaja Express Sandanglawe, Boyolali
+Geprekinaja Express Singoprono, Boyolali
+Geprekinaja Express Bluru Permai, Sidoarjo
+Geprekinaja Express Jl Dokter Wahidin, Jombang
+Geprekinaja Express Kuwu Pulokulon, Grobogan
+Geprekinaja Express Majenang, Grobogan
+Geprekinaja Express A. Yani, Grobogan
+Geprekinaja Express Kademangan, Bondowoso
+Geprekinaja Express Sukowono, Jember
+Geprekinaja Express Jedong Urangagung, Sidoarjo
+Geprekinaja Express Gemolong, Sragen
+Geprekinaja Express Pacar Kembang, Surabaya
