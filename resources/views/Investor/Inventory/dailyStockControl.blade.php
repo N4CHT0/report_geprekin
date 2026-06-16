@@ -1,3 +1,4 @@
+{{-- EXPORT STOCK OPNAME TEMPLATE --}}
 @section('title', 'Daily Stock Control')
 @section('breadcrumb', 'Inventory / DSC')
 
@@ -767,6 +768,19 @@
                                 @if (!$hasRequiredFilter) style="pointer-events:none;opacity:.55;" aria-disabled="true" @endif>
                                 <i class="bi bi-file-earmark-excel me-1"></i> EXPORT HARI INI
                             </a>
+
+                            <a class="btn btn-sm btn-success"
+                                href="{{ route('master.dsc.export', [
+                                    'outlet_id' => $outletId,
+                                    'tanggal' => $today,
+                                    'start_date' => $exportStartDate,
+                                    'end_date' => $exportEndDate,
+                                    'shift_filter' => $shiftFilter,
+                                    'format' => 'stock_opname',
+                                ]) }}"
+                                @if (!$hasRequiredFilter) style="pointer-events:none;opacity:.55;" aria-disabled="true" @endif>
+                                <i class="bi bi-file-earmark-spreadsheet me-1"></i> EXPORT STOCK OPNAME
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -986,7 +1000,7 @@
                                                 </td>
                                                 <td class="num">{{ number_format($r['wP'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['wB'] ?? 0, 0, ',', '.') }}</td>
-                                                <td class="num">{{ number_format($r['wT'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['wT_input'] ?? $r['waste_tepung_input'] ?? $r['waste_tepung'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['actualTepung'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['shift1'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['shift2'] ?? 0, 0, ',', '.') }}</td>
@@ -1060,7 +1074,7 @@
                                                 </td>
                                                 <td class="num">{{ number_format($r['wP'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['wB'] ?? 0, 0, ',', '.') }}</td>
-                                                <td class="num">{{ number_format($r['wT'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['wT_input'] ?? $r['waste_tepung_input'] ?? $r['waste_tepung'] ?? 0, 0, ',', '.') }}</td>
                                                 <td>{{ $r['ket'] ?? '' }}</td>
                                             </tr>
                                         @empty

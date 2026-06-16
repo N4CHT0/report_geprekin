@@ -4,8 +4,59 @@
 @include('Temp.Investor.header')
 
 @php
-    $role = auth()->check() ? auth()->user()->role : null;
-    $hargaOutletOnly = $hargaOutletOnly ?? in_array($role, ['spv', 'tm_manager', 'terotorial_manager', 'territorial_manager'], true);
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Driven View
+    |--------------------------------------------------------------------------
+    | Tidak ada lagi penguncian berdasarkan role seperti SPV/TM.
+    | Semua tab, tombol, modal, dan aksi ditentukan dari permission role_permissions.
+    |
+    | master.qcr.index / master.qcr.dataqcr hanya untuk membuka halaman QCR/data.
+    | CRUD master stock operasional tetap memakai permission masing-masing.
+    */
+    $hargaOutletOnly = false;
+
+    $canMenuView = hasAnyPermission(['menu.store', 'menu.update', 'menu.destroy', 'menu.export']);
+    $canMenuStore = hasPermission('menu.store');
+    $canMenuUpdate = hasPermission('menu.update');
+    $canMenuDestroy = hasPermission('menu.destroy');
+    $canMenuExport = hasPermission('menu.export');
+
+    $canBahanView = hasAnyPermission(['bahan.store', 'bahan.update', 'bahan.destroy', 'bahan.export']);
+    $canBahanStore = hasPermission('bahan.store');
+    $canBahanUpdate = hasPermission('bahan.update');
+    $canBahanDestroy = hasPermission('bahan.destroy');
+    $canBahanExport = hasPermission('bahan.export');
+
+    $canBahanDscView = hasAnyPermission(['bahan-dsc.store', 'bahan-dsc.update', 'bahan-dsc.destroy']);
+    $canBahanDscStore = hasPermission('bahan-dsc.store');
+    $canBahanDscUpdate = hasPermission('bahan-dsc.update');
+    $canBahanDscDestroy = hasPermission('bahan-dsc.destroy');
+
+    $canHargaOutletView = hasAnyPermission(['master.qcr.dataqcr', 'master.qcr.index']);
+    $canHargaOutletEdit = hasAnyPermission(['master.qcr.uangplus.save', 'master.qcr.hide.save']);
+
+    $canBomView = hasAnyPermission(['bum.store', 'bum.update', 'bum.destroy', 'bum.export', 'bum.detail']);
+    $canBomStore = hasPermission('bum.store');
+    $canBomUpdate = hasPermission('bum.update');
+    $canBomDestroy = hasPermission('bum.destroy');
+    $canBomExport = hasPermission('bum.export');
+    $canBomDetail = hasPermission('bum.detail');
+
+    $canStockView = hasAnyPermission(['stock.store', 'stock.update', 'stock.edit', 'stock.destroy', 'stock.export']);
+    $canStockStore = hasPermission('stock.store');
+    $canStockUpdate = hasPermission('stock.update');
+    $canStockEdit = hasPermission('stock.edit');
+    $canStockDestroy = hasPermission('stock.destroy');
+    $canStockExport = hasPermission('stock.export');
+
+    $defaultPane = null;
+    if ($canMenuView) $defaultPane = 'pane-menu';
+    elseif ($canBahanView) $defaultPane = 'pane-bahan';
+    elseif ($canBahanDscView) $defaultPane = 'pane-bahan-dsc';
+    elseif ($canHargaOutletView) $defaultPane = 'pane-bahan-harga-outlet';
+    elseif ($canBomView) $defaultPane = 'pane-bom';
+    elseif ($canStockView) $defaultPane = 'pane-inv';
 @endphp
 
 <style>
@@ -592,37 +643,52 @@
                     Pilih modul untuk mengelola menu, bahan, BOM, harga outlet, atau inventory.
                 </div>
                 <div class="office-tabs" id="officeTabs">
-                    @if(!$hargaOutletOnly)
-                        <button class="office-tab active" data-target="#pane-menu" type="button">
+                    @if($canMenuView)
+                        <button class="office-tab {{ $defaultPane === 'pane-menu' ? 'active' : '' }}" data-target="#pane-menu" type="button">
                             <i class="bi bi-menu-button-wide"></i> Menu
                         </button>
+                    @endif
 
-                        <button class="office-tab" data-target="#pane-bahan" type="button">
+                    @if($canBahanView)
+                        <button class="office-tab {{ $defaultPane === 'pane-bahan' ? 'active' : '' }}" data-target="#pane-bahan" type="button">
                             <i class="bi bi-box-seam"></i> Bahan
                         </button>
+                    @endif
 
-                        <button class="office-tab" data-target="#pane-bahan-dsc" type="button">
+                    @if($canBahanDscView)
+                        <button class="office-tab {{ $defaultPane === 'pane-bahan-dsc' ? 'active' : '' }}" data-target="#pane-bahan-dsc" type="button">
                             <i class="bi bi-clipboard2-check"></i> Bahan DSC
                         </button>
                     @endif
 
-                    <button class="office-tab {{ $hargaOutletOnly ? 'active' : '' }}" data-target="#pane-bahan-harga-outlet" type="button">
-                        <i class="bi bi-geo-alt"></i> Harga Bahan Outlet
-                    </button>
+                    @if($canHargaOutletView)
+                        <button class="office-tab {{ $defaultPane === 'pane-bahan-harga-outlet' ? 'active' : '' }}" data-target="#pane-bahan-harga-outlet" type="button">
+                            <i class="bi bi-geo-alt"></i> Harga Bahan Outlet
+                        </button>
+                    @endif
 
-                    @if(!$hargaOutletOnly)
-                        <button class="office-tab" data-target="#pane-bom" type="button">
+                    @if($canBomView)
+                        <button class="office-tab {{ $defaultPane === 'pane-bom' ? 'active' : '' }}" data-target="#pane-bom" type="button">
                             <i class="bi bi-diagram-3"></i> Menu + BOM
                         </button>
+                    @endif
 
-                        <button class="office-tab" data-target="#pane-inv" type="button">
+                    @if($canStockView)
+                        <button class="office-tab {{ $defaultPane === 'pane-inv' ? 'active' : '' }}" data-target="#pane-inv" type="button">
                             <i class="bi bi-archive"></i> Inventory
                         </button>
                     @endif
                 </div>
 
+                @if(!$defaultPane)
+                    <div class="alert alert-warning">
+                        Anda belum memiliki akses ke modul Master Stock Operasional.
+                    </div>
+                @endif
+
                 {{-- ===================== MENU ===================== --}}
-                <div id="pane-menu" class="office-pane {{ $hargaOutletOnly ? 'd-none' : '' }}">
+                @if($canMenuView)
+                <div id="pane-menu" class="office-pane {{ $defaultPane === 'pane-menu' ? '' : 'd-none' }}">
                     <div class="office-card">
                         <div class="office-card-hd">
                             <div>
@@ -630,12 +696,16 @@
                                 <div class="office-card-desc">Tambah, ubah, hapus data menu</div>
                             </div>
                             <div class="office-card-tools">
+                                @if($canMenuStore)
                                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalMenuAdd">
                                     <i class="bi bi-plus-circle me-1"></i> Tambah
                                 </button>
+                                @endif
+                                @if($canMenuExport)
                                 <a href="{{ route('menu.export') }}" class="btn btn-outline-success btn-sm">
                                     <i class="bi bi-download me-1"></i> Export
                                 </a>
+                                @endif
                             </div>
                         </div>
 
@@ -664,6 +734,10 @@
                                                             <i class="bi bi-three-dots-vertical"></i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
+                                                            @if(!$canMenuUpdate && !$canMenuDestroy)
+                                                            <li><span class="dropdown-item text-muted">Tidak ada aksi</span></li>
+                                                            @endif
+                                                            @if($canMenuUpdate)
                                                             <li>
                                                                 <button class="dropdown-item btn-menu-edit"
                                                                     data-id="{{ $m->id }}"
@@ -672,6 +746,8 @@
                                                                     <i class="bi bi-pencil-square me-2"></i>Edit
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canMenuDestroy)
                                                             <li>
                                                                 <button class="dropdown-item text-danger btn-menu-delete"
                                                                     data-id="{{ $m->id }}"
@@ -679,6 +755,7 @@
                                                                     <i class="bi bi-trash me-2"></i>Hapus
                                                                 </button>
                                                             </li>
+                                                            @endif
                                                         </ul>
                                                     </div>
                                                 </td>
@@ -690,21 +767,27 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- ===================== BAHAN ===================== --}}
-                <div id="pane-bahan" class="office-pane d-none"><div class="office-card">
+                @if($canBahanView)
+                <div id="pane-bahan" class="office-pane {{ $defaultPane === 'pane-bahan' ? '' : 'd-none' }}"><div class="office-card">
                         <div class="office-card-hd">
                             <div>
                                 <div class="office-card-title">Daftar Bahan</div>
                                 <div class="office-card-desc">Kelola master bahan dan harga</div>
                             </div>
                             <div class="office-card-tools">
+                                @if($canBahanStore)
                                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBahanAdd">
                                     <i class="bi bi-plus-circle me-1"></i> Tambah
                                 </button>
+                                @endif
+                                @if($canBahanExport)
                                 <a href="{{ route('bahan.export') }}" class="btn btn-outline-success btn-sm">
                                     <i class="bi bi-download me-1"></i> Export
                                 </a>
+                                @endif
                             </div>
                         </div>
 
@@ -739,6 +822,10 @@
                                                             <i class="bi bi-three-dots-vertical"></i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
+                                                            @if(!$canBahanUpdate && !$canBahanDestroy)
+                                                            <li><span class="dropdown-item text-muted">Tidak ada aksi</span></li>
+                                                            @endif
+                                                            @if($canBahanUpdate)
                                                             <li>
                                                                 <button class="dropdown-item btn-bahan-edit"
                                                                     data-id="{{ $b->id }}"
@@ -750,6 +837,8 @@
                                                                     <i class="bi bi-pencil-square me-2"></i>Edit
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canBahanDestroy)
                                                             <li>
                                                                 <button class="dropdown-item text-danger btn-bahan-delete"
                                                                     data-id="{{ $b->id }}"
@@ -757,6 +846,7 @@
                                                                     <i class="bi bi-trash me-2"></i>Hapus
                                                                 </button>
                                                             </li>
+                                                            @endif
                                                         </ul>
                                                     </div>
                                                 </td>
@@ -767,10 +857,12 @@
                             </div>
                         </div>
                     </div></div>
+                @endif
 
 
                 {{-- ===================== BAHAN DSC ===================== --}}
-                <div id="pane-bahan-dsc" class="office-pane d-none">
+                @if($canBahanDscView)
+                <div id="pane-bahan-dsc" class="office-pane {{ $defaultPane === 'pane-bahan-dsc' ? '' : 'd-none' }}">
                     <div class="office-card">
                         <div class="office-card-hd">
                             <div>
@@ -778,9 +870,11 @@
                                 <div class="office-card-desc">Kelola master bahan yang tampil pada Daily Stock Control</div>
                             </div>
                             <div class="office-card-tools">
+                                @if($canBahanDscStore)
                                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBahanDscAdd">
                                     <i class="bi bi-plus-circle me-1"></i> Tambah
                                 </button>
+                                @endif
                             </div>
                         </div>
 
@@ -824,6 +918,10 @@
                                                             <i class="bi bi-three-dots-vertical"></i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
+                                                            @if(!$canBahanDscUpdate && !$canBahanDscDestroy)
+                                                            <li><span class="dropdown-item text-muted">Tidak ada aksi</span></li>
+                                                            @endif
+                                                            @if($canBahanDscUpdate)
                                                             <li>
                                                                 <button class="dropdown-item btn-bahan-dsc-edit"
                                                                     data-id="{{ $d->id }}"
@@ -834,6 +932,8 @@
                                                                     <i class="bi bi-pencil-square me-2"></i>Edit
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canBahanDscDestroy)
                                                             <li>
                                                                 <button class="dropdown-item text-danger btn-bahan-dsc-delete"
                                                                     data-id="{{ $d->id }}"
@@ -841,6 +941,7 @@
                                                                     <i class="bi bi-trash me-2"></i>Hapus / Nonaktifkan
                                                                 </button>
                                                             </li>
+                                                            @endif
                                                         </ul>
                                                     </div>
                                                 </td>
@@ -855,8 +956,10 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
-                <div id="pane-bahan-harga-outlet" class="office-pane {{ $hargaOutletOnly ? '' : 'd-none' }}">
+                @if($canHargaOutletView)
+                <div id="pane-bahan-harga-outlet" class="office-pane {{ $defaultPane === 'pane-bahan-harga-outlet' ? '' : 'd-none' }}">
                     <div class="office-card">
                         <div class="office-card-hd">
                             <div>
@@ -911,16 +1014,20 @@
                             </div>
 
                             <div class="mt-3 d-flex justify-content-end">
+                                @if($canHargaOutletEdit)
                                 <button type="button" class="btn btn-success btn-sm" id="btnSimpanSemuaHargaOutlet">
                                     <i class="bi bi-save me-1"></i> Simpan Semua
                                 </button>
+                                @endif
                             </div>
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- ===================== MENU + BOM ===================== --}}
-                <div id="pane-bom" class="office-pane d-none">
+                @if($canBomView)
+                <div id="pane-bom" class="office-pane {{ $defaultPane === 'pane-bom' ? '' : 'd-none' }}">
                     <div class="office-card">
                         <div class="office-card-hd">
                             <div>
@@ -928,12 +1035,16 @@
                                 <div class="office-card-desc">Atur bahan apa saja untuk setiap menu</div>
                             </div>
                             <div class="office-card-tools">
+                                @if($canBomStore)
                                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBomAdd">
                                     <i class="bi bi-plus-circle me-1"></i> Tambah BOM
                                 </button>
+                                @endif
+                                @if($canBomExport)
                                 <a href="{{ route('bum.export') }}" class="btn btn-outline-success btn-sm">
                                     <i class="bi bi-download me-1"></i> Export
                                 </a>
+                                @endif
                             </div>
                         </div>
 
@@ -959,6 +1070,10 @@
                                                             <i class="bi bi-three-dots-vertical"></i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
+                                                            @if(!$canBomDetail && !$canBomUpdate && !$canBomDestroy)
+                                                            <li><span class="dropdown-item text-muted">Tidak ada aksi</span></li>
+                                                            @endif
+                                                            @if($canBomDetail)
                                                             <li>
                                                                 <button class="dropdown-item btn-bom-view"
                                                                     data-id="{{ $m->id }}"
@@ -966,6 +1081,8 @@
                                                                     <i class="bi bi-eye me-2"></i>Lihat BOM
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canBomUpdate)
                                                             <li>
                                                                 <button class="dropdown-item btn-bom-edit"
                                                                     data-id="{{ $m->id }}"
@@ -973,6 +1090,8 @@
                                                                     <i class="bi bi-pencil-square me-2"></i>Edit BOM
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canBomDestroy)
                                                             <li><hr class="dropdown-divider"></li>
                                                             <li>
                                                                 <form action="{{ route('bum.destroy', $m->id) }}" method="POST"
@@ -984,6 +1103,7 @@
                                                                     </button>
                                                                 </form>
                                                             </li>
+                                                            @endif
                                                         </ul>
                                                     </div>
                                                 </td>
@@ -1119,9 +1239,11 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- ===================== INVENTORY ===================== --}}
-                <div id="pane-inv" class="office-pane d-none">
+                @if($canStockView)
+                <div id="pane-inv" class="office-pane {{ $defaultPane === 'pane-inv' ? '' : 'd-none' }}">
                     <div class="office-card">
                         <div class="office-card-hd">
                             <div>
@@ -1129,12 +1251,16 @@
                                 <div class="office-card-desc">Kelola stock bahan</div>
                             </div>
                             <div class="office-card-tools">
+                                @if($canStockStore)
                                 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#tambahStockModal">
                                     <i class="bi bi-plus-circle me-1"></i> Tambah
                                 </button>
+                                @endif
+                                @if($canStockExport)
                                 <a href="{{ route('stock.export') }}" class="btn btn-outline-success btn-sm">
                                     <i class="bi bi-download me-1"></i> Export
                                 </a>
+                                @endif
                             </div>
                         </div>
 
@@ -1179,11 +1305,17 @@
                                                             <i class="bi bi-three-dots-vertical"></i>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
+                                                            @if(!$canStockEdit && !$canStockUpdate && !$canStockDestroy)
+                                                            <li><span class="dropdown-item text-muted">Tidak ada aksi</span></li>
+                                                            @endif
+                                                            @if($canStockEdit || $canStockUpdate)
                                                             <li>
                                                                 <button class="dropdown-item btn-edit-stock" data-id="{{ $s->id }}">
                                                                     <i class="bi bi-pencil-square me-2"></i>Edit
                                                                 </button>
                                                             </li>
+                                                            @endif
+                                                            @if($canStockDestroy)
                                                             <li><hr class="dropdown-divider"></li>
                                                             <li>
                                                                 <form action="{{ route('stock.destroy', $s->id) }}" method="POST"
@@ -1195,6 +1327,7 @@
                                                                     </button>
                                                                 </form>
                                                             </li>
+                                                            @endif
                                                         </ul>
                                                     </div>
                                                 </td>
@@ -1297,9 +1430,11 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
 </div>{{-- /office-wrap --}}
 
+@if($canMenuStore || $canMenuUpdate || $canMenuDestroy)
 {{-- ===================== MODAL MENU ===================== --}}
 <div class="modal fade" id="modalMenuAdd" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -1376,6 +1511,9 @@
     </div>
 </div>
 
+@endif
+
+@if($canBahanStore || $canBahanUpdate || $canBahanDestroy)
 {{-- ===================== MODAL BAHAN ===================== --}}
 <div class="modal fade" id="modalBahanAdd" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -1496,6 +1634,9 @@
 </div>
 
 
+@endif
+
+@if($canBahanDscStore || $canBahanDscUpdate || $canBahanDscDestroy)
 {{-- ===================== MODAL BAHAN DSC ===================== --}}
 <div class="modal fade" id="modalBahanDscAdd" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -1584,9 +1725,20 @@
 </div>
 
 
+@endif
+
 @push('scripts')
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+    const canHargaOutletEdit = @json($canHargaOutletEdit);
+    const canMenuUpdate = @json($canMenuUpdate);
+    const canMenuDestroy = @json($canMenuDestroy);
+    const canBahanUpdate = @json($canBahanUpdate);
+    const canBahanDestroy = @json($canBahanDestroy);
+    const canBahanDscUpdate = @json($canBahanDscUpdate);
+    const canBahanDscDestroy = @json($canBahanDscDestroy);
+    const canBomUpdate = @json($canBomUpdate);
+    const canStockUpdate = @json($canStockUpdate || $canStockEdit);
     if (window.$) {
         $.ajaxSetup({
             headers: {
@@ -1683,7 +1835,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </tr>
         `);
 
-        $.get(`/master/bahan-harga-outlet/list?outlet_id=${outletId}`, function(res) {
+        $.get(`/inventory/qcr/bahan-harga-outlet/list?outlet_id=${outletId}`, function(res) {
             const rows = (res && res.data) ? res.data : [];
 
             if (!rows.length) {
@@ -1726,9 +1878,11 @@ document.addEventListener("DOMContentLoaded", () => {
                                 data-bahan-id="${r.id}"
                                 value="${r.harga_bahan}"
                                 step="0.01"
+                                ${canHargaOutletEdit ? '' : 'readonly'}
                             >
                         </td>
                         <td class="center">
+                            ${canHargaOutletEdit ? `
                             <div class="d-flex gap-1 justify-content-center">
                                 <button
                                     type="button"
@@ -1746,7 +1900,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     data-nama-bahan="${r.nama_bahan}">
                                     Reset
                                 </button>
-                            </div>
+                            </div>` : `<span class="text-muted small">Read only</span>`}
                         </td>
                     </tr>
                 `;
@@ -1771,6 +1925,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     $(document).on('click', '.btn-harga-outlet-edit', function() {
+        if (!canHargaOutletEdit) return;
         const outletId = getSelectedOutletId();
         const outletName = getSelectedOutletName();
 
@@ -1789,10 +1944,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     $('#formHargaOutletEdit').on('submit', function(e) {
+        if (!canHargaOutletEdit) return;
         e.preventDefault();
 
         $.ajax({
-            url: '/master/bahan-harga-outlet/store-update',
+            url: '/inventory/qcr/bahan-harga-outlet/store-update',
             method: 'POST',
             data: $(this).serialize(),
             success: function(res) {
@@ -1811,6 +1967,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     $('#btnSimpanSemuaHargaOutlet').on('click', function() {
+        if (!canHargaOutletEdit) return;
         const outletId = getSelectedOutletId();
 
         if (!outletId) {
@@ -1824,7 +1981,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         $.ajax({
-            url: '/master/bahan-harga-outlet/bulk-update',
+            url: '/inventory/qcr/bahan-harga-outlet/bulk-update',
             method: 'POST',
             data: {
                 _token: '{{ csrf_token() }}',
@@ -1846,6 +2003,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     $(document).on('click', '.btn-harga-outlet-reset', async function() {
+        if (!canHargaOutletEdit) return;
         const outletId = getSelectedOutletId();
         const bahanId = $(this).data('bahan-id');
         const namaBahan = $(this).data('nama-bahan');
@@ -1860,7 +2018,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         $.ajax({
-            url: '/master/bahan-harga-outlet/delete',
+            url: '/inventory/qcr/bahan-harga-outlet/delete',
             method: 'POST',
             data: {
                 _token: '{{ csrf_token() }}',
@@ -1931,6 +2089,8 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     ['#menuTable', '#bahanTable', '#bahanDscTable', '#menuBumTable', '#stockTable'].forEach(function(selector) {
+        if (!$(selector).length) return;
+
         if ($.fn.DataTable.isDataTable(selector)) {
             $(selector).DataTable().destroy();
         }
@@ -1953,6 +2113,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== MENU: edit =====
     $(document).on('click', '.btn-menu-edit', function() {
+        if (!canMenuUpdate) return;
         const id = $(this).data('id');
         $('#menuEditName').val($(this).data('name'));
         $('#menuEditHarga').val($(this).data('harga'));
@@ -1962,6 +2123,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== MENU: delete =====
     $(document).on('click', '.btn-menu-delete', function() {
+        if (!canMenuDestroy) return;
         const id = $(this).data('id');
         $('#menuDeleteName').text($(this).data('name'));
         $('#formMenuDelete').attr('action', `/master/menu/delete/${id}`);
@@ -1970,6 +2132,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== BAHAN: edit =====
     $(document).on('click', '.btn-bahan-edit', function() {
+        if (!canBahanUpdate) return;
         const id = $(this).data('id');
         $('#bahanEditNama').val($(this).data('nama'));
         $('#bahanEditQty').val($(this).data('qty'));
@@ -1982,6 +2145,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== BAHAN: delete =====
     $(document).on('click', '.btn-bahan-delete', function() {
+        if (!canBahanDestroy) return;
         const id = $(this).data('id');
         $('#bahanDeleteName').text($(this).data('name'));
         $('#formBahanDelete').attr('action', `/master/bahan/delete/${id}`);
@@ -1990,6 +2154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== BAHAN DSC: edit =====
     $(document).on('click', '.btn-bahan-dsc-edit', function() {
+        if (!canBahanDscUpdate) return;
         const id = $(this).data('id');
         $('#bahanDscEditNama').val($(this).data('nama'));
         $('#bahanDscEditSatuan').val($(this).data('satuan'));
@@ -2001,6 +2166,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== BAHAN DSC: delete/nonaktif =====
     $(document).on('click', '.btn-bahan-dsc-delete', function() {
+        if (!canBahanDscDestroy) return;
         const id = $(this).data('id');
         $('#bahanDscDeleteName').text($(this).data('name'));
         $('#formBahanDscDelete').attr('action', `/master/bahan-dsc/delete/${id}`);
@@ -2017,7 +2183,8 @@ document.addEventListener("DOMContentLoaded", () => {
         $('#modalBomView').modal('show');
 
         $.get(`/bum/${menuId}/detail`, function(data) {
-            if (!data || !data.length) {
+            data = data || [];
+            if (!data.length) {
                 $('#bomViewBody').html('<tr><td colspan="3" class="text-center text-muted">Belum ada bahan</td></tr>');
                 return;
             }
@@ -2029,16 +2196,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 </tr>
             `).join('');
             $('#bomViewBody').html(rows);
+        }).fail(function(){
+            $('#bomViewBody').html('<tr><td colspan="3" class="text-center text-danger">Gagal memuat BOM</td></tr>');
         });
     });
 
     // ===== BOM: edit =====
     $(document).on('click', '.btn-bom-edit', function() {
+        if (!canBomUpdate) return;
         const menuId = $(this).data('id');
         const menuName = $(this).data('name');
 
         $('#bomEditTitle').text(menuName);
-        $('#bomEditForm').attr('action', `/master/bum/update/${menuId}`);
+        $('#bomEditForm').attr('action', `/inventory/bum/update/${menuId}`);
 
         $('#bomEditBody').html(`<tr><td colspan="4" class="ux-loading-row">Memuat...</td></tr>`);
         $('#modalBomEdit').modal('show');
@@ -2100,6 +2270,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ===== STOCK: edit load =====
     $(document).on("click", ".btn-edit-stock", function() {
+        if (!canStockUpdate) return;
         const stockId = $(this).data("id");
         $("#editStockForm").attr("action", `/master/stock/update/${stockId}`);
         $("#editStockBody").html('<div class="text-center text-muted">Memuat...</div>');

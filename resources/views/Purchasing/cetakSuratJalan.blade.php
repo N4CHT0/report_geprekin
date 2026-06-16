@@ -1,11 +1,11 @@
 {{--
     resources/views/Purchasing/cetakSuratJalan.blade.php
     Controller harus kirim:
-    - $sj           → object tbl_surat_jalan
-    - $pos          → collection tbl_po yang linked ke SJ ini
+    - $sj          → object tbl_surat_jalan
+    - $pos         → collection tbl_po yang linked ke SJ ini
     - $detailsPerPo → collection detail per po_id (keyed by po_id)
-    - $dc           → object warehouse/DC pengirim (TAMBAHAN BARU)
-                      kolom: nama_warehouse, alamat, telepon (opsional)
+    - $dc          → object warehouse/DC pengirim (TAMBAHAN BARU)
+                     kolom: nama_warehouse, alamat, telepon (opsional)
 --}}
 <!DOCTYPE html>
 <html lang="id">
@@ -193,6 +193,16 @@
             font-size: 10px; font-weight: 700;
         }
 
+        /* ── Checklist Box ── */
+        .check-box {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 1.5px solid #a6adc8;
+            border-radius: 3px;
+            background: #fff;
+            vertical-align: middle;
+        }
+
         /* ── Empty state ── */
         .empty-row { text-align: center; padding: 20px; color: #bbb; font-style: italic; }
 
@@ -233,6 +243,7 @@
             .paper-wrap { padding: 0; }
             .page { box-shadow: none; margin: 0; border-radius: 0; width: 100%; min-height: 100vh; }
             .page-break { page-break-after: always; }
+            .check-box { border-color: #555 !important; }
         }
         @page { size: A4 portrait; margin: 0; }
     </style>
@@ -269,7 +280,6 @@
 @foreach($pos as $po)
 @php
     $items    = $detailsPerPo[$po->id] ?? collect();
-    $subtotal = $items->sum(fn($i) => $i->jumlah * ($i->harga_satuan ?? 0));
     $isLast   = $loop->last;
 @endphp
 
@@ -372,8 +382,7 @@
                     <th class="tl">Nama Barang</th>
                     <th class="tc" style="width:72px;">Qty</th>
                     <th class="tc" style="width:58px;">Satuan</th>
-                    <th class="tr" style="width:110px;">Harga Satuan</th>
-                    <th class="tr" style="width:120px;">Subtotal</th>
+                    <th class="tc" style="width:70px;">Cek</th>
                 </tr>
             </thead>
             <tbody>
@@ -383,12 +392,11 @@
                     <td><strong>{{ $item->nama_bahan }}</strong></td>
                     <td class="tc">{{ number_format($item->jumlah, 2, ',', '.') }}</td>
                     <td class="tc">{{ $item->satuan }}</td>
-                    <td class="tr">Rp {{ number_format($item->harga_satuan ?? 0, 0, ',', '.') }}</td>
-                    <td class="tr"><strong>Rp {{ number_format($item->jumlah * ($item->harga_satuan ?? 0), 0, ',', '.') }}</strong></td>
+                    <td class="tc"><div class="check-box"></div></td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="empty-row">
+                    <td colspan="5" class="empty-row">
                         Tidak ada barang {{ $sj->tipe_sj }} di PO ini.
                     </td>
                 </tr>
@@ -396,8 +404,9 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="5" style="font-weight:700;">TOTAL TAGIHAN ({{ $sj->tipe_sj }})</td>
-                    <td class="tr">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
+                    <td colspan="2" style="font-weight:700; text-align:right; padding-right:15px;">TOTAL QTY</td>
+                    <td class="tc">{{ number_format($items->sum('jumlah'), 2, ',', '.') }}</td>
+                    <td colspan="2"></td>
                 </tr>
             </tfoot>
         </table>

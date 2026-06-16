@@ -230,7 +230,7 @@ class SimpleSalesService
         return Http::withToken($token)
             ->withoutVerifying()
             ->withHeaders(['company-code' => 'OKNHO'])
-            ->get('https://services.esb.co.id/pilot-core/sales/simple-product-sales', $params);
+            ->get('https://services.esb.co.id/core/sales/simple-product-sales', $params);
     }
 
     private function fetchSalesDetail($salesNum, $token)
@@ -239,7 +239,7 @@ class SimpleSalesService
             $response = Http::withToken($token)
                 ->withoutVerifying()
                 ->withHeaders(['company-code' => 'OKNHO'])
-                ->get("https://services.esb.co.id/pilot-core/sales/simple-product-sales/{$salesNum}");
+                ->get("https://services.esb.co.id/core/sales/simple-product-sales/{$salesNum}");
 
             if ($response->successful()) {
                 $details = data_get($response->json(), 'result.simpleProductSalesDetails', []);

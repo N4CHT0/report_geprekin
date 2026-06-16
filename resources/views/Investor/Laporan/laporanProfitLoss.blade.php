@@ -32,6 +32,11 @@
         'is_stale' => false,
         'cache_key' => null,
     ];
+
+    $syncState = $syncStatus ?? null;
+    $currentSyncKey = $syncKey ?? request('sync_key');
+    $currentSyncStatus = is_array($syncState) ? ($syncState['status'] ?? null) : null;
+    $isSyncRunning = in_array($currentSyncStatus, ['queued', 'processing', 'finalizing'], true);
 @endphp
 
 <style>
@@ -422,6 +427,107 @@
         color:#7c2d12;
     }
 
+
+    .sync-panel{
+        margin:14px;
+        border:1px solid #b6d7f5;
+        background:#f1f8ff;
+        border-radius:var(--aws-radius);
+        padding:12px 14px;
+        display:none;
+    }
+
+    .sync-panel.is-visible{
+        display:block;
+    }
+
+    .sync-panel-title{
+        font-size:.86rem;
+        font-weight:850;
+        color:#033160;
+        margin-bottom:8px;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        flex-wrap:wrap;
+    }
+
+    .sync-progress-wrap{
+        height:10px;
+        border-radius:999px;
+        background:#dbeafe;
+        overflow:hidden;
+        border:1px solid #bfdbfe;
+    }
+
+    .sync-progress-bar{
+        height:100%;
+        width:0%;
+        background:var(--aws-blue);
+        transition:width .35s ease;
+    }
+
+    .sync-message{
+        margin-top:8px;
+        color:#033160;
+        font-size:.8rem;
+        font-weight:700;
+    }
+
+    .sync-grid{
+        margin-top:8px;
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:8px;
+    }
+
+    .sync-stat{
+        background:#fff;
+        border:1px solid #dbeafe;
+        border-radius:8px;
+        padding:8px 10px;
+        font-size:.76rem;
+        color:#334155;
+        font-weight:800;
+    }
+
+    .sync-stat span{
+        display:block;
+        margin-top:3px;
+        color:#0f172a;
+        font-size:.9rem;
+    }
+
+    .btn-sync-custom{
+        height:38px;
+        padding:0 14px;
+        border-radius:8px;
+        font-weight:800;
+        text-decoration:none;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        border:1px solid var(--aws-green);
+        background:var(--aws-green);
+        color:#fff;
+        font-size:.86rem;
+        white-space:nowrap;
+        line-height:1;
+    }
+
+    .btn-sync-custom:hover{
+        background:#025f0a;
+        border-color:#025f0a;
+        color:#fff;
+    }
+
+    .btn-sync-custom:disabled{
+        opacity:.7;
+        cursor:not-allowed;
+    }
+
     @media (max-width:991.98px){
         .meta-box{
             grid-template-columns:1fr;
@@ -429,6 +535,10 @@
 
         .filter-actions{
             align-items:stretch;
+        }
+
+        .sync-grid{
+            grid-template-columns:1fr 1fr;
         }
     }
 
@@ -468,8 +578,13 @@
         }
 
         .btn-filter-custom,
-        .btn-reset-custom{
+        .btn-reset-custom,
+        .btn-sync-custom{
             width:100%;
+        }
+
+        .sync-grid{
+            grid-template-columns:1fr;
         }
 
         .summary-value{
@@ -554,13 +669,35 @@
                         <div class="col-md-6 mb-3">
                             <label class="filter-label">Aksi</label>
                             <div class="filter-actions">
-                                <button type="submit" class="btn-filter-custom"><i class="bi bi-funnel"></i> Filter Live</button>
+                                <button type="submit" class="btn-filter-custom"><i class="bi bi-funnel"></i> Filter Cache</button>
+                                <button type="button" id="btnStartPnlSync" class="btn-sync-custom" {{ $isSyncRunning ? 'disabled' : '' }}>
+                                    <i class="bi bi-cloud-arrow-down"></i> {{ $isSyncRunning ? 'Sync Berjalan' : 'Tarik Data ESB' }}
+                                </button>
                                 <a href="{{ route('investor.laporan.profitnloss.oknho') }}" class="btn-reset-custom"><i class="bi bi-arrow-clockwise"></i> Reset</a>
                             </div>
                         </div>
                         <div class="filter-help">Batas maksimum data live: 1 sampai 7 hari.</div>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div id="pnlSyncPanel" class="sync-panel {{ $currentSyncKey ? 'is-visible' : '' }}" data-sync-key="{{ $currentSyncKey }}">
+            <div class="sync-panel-title">
+                <span><i class="bi bi-activity"></i> Status Sync PNL Live</span>
+                <span id="pnlSyncPercent">{{ (int) data_get($syncState, 'progress', 0) }}%</span>
+            </div>
+            <div class="sync-progress-wrap">
+                <div id="pnlSyncBar" class="sync-progress-bar" style="width: {{ (int) data_get($syncState, 'progress', 0) }}%;"></div>
+            </div>
+            <div id="pnlSyncMessage" class="sync-message">
+                {{ data_get($syncState, 'message', $currentSyncKey ? 'Menunggu status sync...' : 'Belum ada sync berjalan.') }}
+            </div>
+            <div class="sync-grid">
+                <div class="sync-stat">Status <span id="pnlSyncStatus">{{ data_get($syncState, 'status', '-') }}</span></div>
+                <div class="sync-stat">Page <span id="pnlSyncPages">{{ (int) data_get($syncState, 'processed_pages', 0) }} / {{ (int) data_get($syncState, 'total_pages', 0) }}</span></div>
+                <div class="sync-stat">Rows API <span id="pnlSyncRows">{{ (int) data_get($syncState, 'total_api_rows', 0) }}</span></div>
+                <div class="sync-stat">Rows Saved <span id="pnlSyncSaved">{{ (int) data_get($syncState, 'total_saved_rows', 0) }}</span></div>
             </div>
         </div>
 
@@ -661,5 +798,139 @@
         </div>
     </div>
 </div>
+
+
+<script>
+(function () {
+    const startButton = document.getElementById('btnStartPnlSync');
+    const startInput = document.getElementById('start_date');
+    const endInput = document.getElementById('end_date');
+    const panel = document.getElementById('pnlSyncPanel');
+    const bar = document.getElementById('pnlSyncBar');
+    const percentText = document.getElementById('pnlSyncPercent');
+    const messageText = document.getElementById('pnlSyncMessage');
+    const statusText = document.getElementById('pnlSyncStatus');
+    const pagesText = document.getElementById('pnlSyncPages');
+    const rowsText = document.getElementById('pnlSyncRows');
+    const savedText = document.getElementById('pnlSyncSaved');
+
+    let syncKey = panel ? panel.dataset.syncKey : null;
+    let pollTimer = null;
+
+    function setLoading(isLoading) {
+        if (!startButton) return;
+        startButton.disabled = isLoading;
+        startButton.innerHTML = isLoading
+            ? '<i class="bi bi-hourglass-split"></i> Memulai Sync...'
+            : '<i class="bi bi-cloud-arrow-down"></i> Tarik Data ESB';
+    }
+
+    function renderStatus(data) {
+        if (!panel || !data) return;
+        panel.classList.add('is-visible');
+
+        const progress = Math.max(0, Math.min(100, parseInt(data.progress || 0, 10)));
+        bar.style.width = progress + '%';
+        percentText.textContent = progress + '%';
+        messageText.textContent = data.message || '-';
+        statusText.textContent = data.status || '-';
+        pagesText.textContent = (data.processed_pages || 0) + ' / ' + (data.total_pages || 0);
+        rowsText.textContent = data.total_api_rows || 0;
+        savedText.textContent = data.total_saved_rows || 0;
+
+        const doneStatuses = ['done', 'done_with_errors', 'failed'];
+        if (doneStatuses.includes(data.status)) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            if (startButton) {
+                startButton.disabled = false;
+                startButton.innerHTML = '<i class="bi bi-cloud-arrow-down"></i> Tarik Data ESB';
+            }
+
+            if (data.status === 'done' || data.status === 'done_with_errors') {
+                setTimeout(function () {
+                    window.location.reload();
+                }, 1200);
+            }
+        } else if (startButton) {
+            startButton.disabled = true;
+            startButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Sync Berjalan';
+        }
+    }
+
+    function pollStatus(key) {
+        if (!key) return;
+        const statusUrl = "{{ route('investor.laporan.profitnloss.oknho.status', ['key' => '__KEY__']) }}".replace('__KEY__', encodeURIComponent(key));
+
+        fetch(statusUrl, {
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
+            .then(function (response) { return response.json(); })
+            .then(renderStatus)
+            .catch(function () {
+                if (messageText) messageText.textContent = 'Gagal membaca status sync. Cek koneksi atau laravel.log.';
+            });
+    }
+
+    if (startButton) {
+        startButton.addEventListener('click', function () {
+            if (!startInput.value || !endInput.value) {
+                alert('Tanggal mulai dan tanggal akhir wajib diisi.');
+                return;
+            }
+
+            setLoading(true);
+            if (panel) panel.classList.add('is-visible');
+            if (messageText) messageText.textContent = 'Mengirim job sync PNL live...';
+
+            fetch("{{ route('investor.laporan.profitnloss.oknho.start-sync') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': "{{ csrf_token() }}"
+                },
+                body: JSON.stringify({
+                    start_date: startInput.value,
+                    end_date: endInput.value
+                })
+            })
+                .then(async function (response) {
+                    const data = await response.json().catch(function () { return {}; });
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Gagal memulai sync PNL live.');
+                    }
+                    return data;
+                })
+                .then(function (data) {
+                    syncKey = data.sync_key;
+                    if (panel) panel.dataset.syncKey = syncKey;
+                    renderStatus(data);
+
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('start_date', startInput.value);
+                    url.searchParams.set('end_date', endInput.value);
+                    url.searchParams.set('sync_key', syncKey);
+                    window.history.replaceState({}, '', url.toString());
+
+                    pollStatus(syncKey);
+                    pollTimer = setInterval(function () { pollStatus(syncKey); }, 2500);
+                })
+                .catch(function (error) {
+                    setLoading(false);
+                    if (messageText) messageText.textContent = error.message;
+                    alert(error.message);
+                });
+        });
+    }
+
+    if (syncKey) {
+        pollStatus(syncKey);
+        pollTimer = setInterval(function () { pollStatus(syncKey); }, 2500);
+    }
+})();
+</script>
 
 @include('Temp.Investor.footer')

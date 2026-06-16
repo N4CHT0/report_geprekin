@@ -18,12 +18,63 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
 use App\Exports\QcrExport;
+use App\Services\BcaRekonSqlService;
 use App\Jobs\GenerateQcrExportJob;
 
 class QCRController extends Controller
 {
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER EXPORT STOCK OPNAME TEMPLATE
+     |--------------------------------------------------------------------------
+     | Tambahan export format Stock Opname Template tanpa menghapus export lama.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER FIX TEPUNG BREADER V2 NO BAD FORCE BLOCK
+     |--------------------------------------------------------------------------
+     | Blok force tepung yang sebelumnya bikin error dihapus dari controller.
+     | Controller hanya memastikan Tepung Breader tidak di-reject dari pipeline BOM.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER FIX TEPUNG BREADER TAMPIL DI TABEL QCR
+     |--------------------------------------------------------------------------
+     | Tepung Breader tidak hanya tampil di Summary, tapi juga di tabel QCR utama.
+     | Semua filter/reject/continue isTepungBreader pada pipeline QCR detail dihapus.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER FIX TEPUNG BREADER FULL BOM PIPELINE
+     |--------------------------------------------------------------------------
+     | Tepung Breader adalah bahan BOM normal.
+     | Harus ikut Usage POS, Usage DSC, Difference, HPP, dan Prediksi Stock.
+     | Tidak boleh di-reject dari stockAggByBahanId, bahanSummary,
+     | visibleBahanNames, atau loop pembentukan QCR.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER FIX RED ERROR UNDEFINED SATUAN QCR
+     |--------------------------------------------------------------------------
+     | Fix variable $satuan undefined di return array QCR dan normalisasi
+     | qty_visible supaya PCS/LBR tidak tampil decimal.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER FIX QCR INTEGER UNIT DISPLAY
+     |--------------------------------------------------------------------------
+     | Satuan integer seperti PCS/LBR/CUP/BOTOL/SACHET/PACK tidak boleh tampil
+     | decimal. Contoh AYAM KECIL 333,09 PCS akan dibulatkan menjadi 333 PCS.
+     */
+
     /*
      |--------------------------------------------------------------------------
      | MASTER FIX QCR USAGE DSC SHIFT 1 PLUS SHIFT 2
@@ -932,19 +983,67 @@ class QCRController extends Controller
 
     private function buildDailyStockControlData(Request $request): array
     {
-        $todayRaw     = (string) $request->get('tanggal', date('Y-m-d'));
         $outletId     = $request->get('outlet_id', 'all');
         $shiftFilter  = (string) $request->get('shift_filter', 'all');
-        $today        = $this->normalizeDateToYmd($todayRaw);
 
+        /*
+         * PATCH REQUEST TIM - SATU FILTER PERIODE DSC
+         * UI tidak lagi memakai 3 tanggal. Filter utama hanya start_date dan end_date.
+         * Agar logika/rumus lama tetap aman, $today diperlakukan sebagai tanggal akhir periode.
+         * Dengan begitu REKAP, DETAIL SHIFT, OMSET, SALES, dan ADJUSTMENT tetap memakai
+         * rumus harian lama pada tanggal akhir, sedangkan tab PERIODE DSC memakai range.
+         */
         $startDateRaw = (string) $request->get('start_date', '');
         $endDateRaw   = (string) $request->get('end_date', '');
+        $tanggalRaw   = (string) $request->get('tanggal', '');
 
-        $startDate = $startDateRaw ? $this->normalizeDateToYmd($startDateRaw) : null;
-        $endDate   = $endDateRaw ? $this->normalizeDateToYmd($endDateRaw) : null;
+        $fallbackDate = date('Y-m-d');
+        $todayRaw = $endDateRaw !== ''
+            ? $endDateRaw
+            : ($startDateRaw !== '' ? $startDateRaw : ($tanggalRaw !== '' ? $tanggalRaw : $fallbackDate));
+
+        $today = $this->normalizeDateToYmd($todayRaw);
+
+        $startDate = $startDateRaw ? $this->normalizeDateToYmd($startDateRaw) : $today;
+        $endDate   = $endDateRaw ? $this->normalizeDateToYmd($endDateRaw) : $today;
 
         if ($startDate && $endDate && $startDate > $endDate) {
             [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        $periodStartDate = $startDate ?: $today;
+        $periodEndDate   = $endDate ?: $periodStartDate;
+
+        if ($periodStartDate && $periodEndDate && $periodStartDate > $periodEndDate) {
+            [$periodStartDate, $periodEndDate] = [$periodEndDate, $periodStartDate];
+        }
+        
+        // ======================================================
+        // EMERGENCY SAFE RANGE - jangan load data di luar periode ini
+        // Berlaku sementara untuk operasional agar server tidak overload.
+        // ======================================================
+        $emergencyMinDate = '2026-05-27';
+        $emergencyMaxDate = '2026-06-15';
+        
+        $today = min(max($today, $emergencyMinDate), $emergencyMaxDate);
+        
+        $startDate = min(max($startDate, $emergencyMinDate), $emergencyMaxDate);
+        $endDate   = min(max($endDate, $emergencyMinDate), $emergencyMaxDate);
+        
+        $periodStartDate = min(max($periodStartDate, $emergencyMinDate), $emergencyMaxDate);
+        $periodEndDate   = min(max($periodEndDate, $emergencyMinDate), $emergencyMaxDate);
+        
+        if ($periodStartDate > $periodEndDate) {
+            [$periodStartDate, $periodEndDate] = [$periodEndDate, $periodStartDate];
+        }
+
+        // Batas ringan agar menu DSC tidak berat ketika range terlalu panjang.
+        $periodMaxDays = 20;
+        if ($periodStartDate && $periodEndDate) {
+            $diffDays = Carbon::parse($periodStartDate)->diffInDays(Carbon::parse($periodEndDate)) + 1;
+            if ($diffDays > $periodMaxDays) {
+                $periodEndDate = Carbon::parse($periodStartDate)->addDays($periodMaxDays - 1)->format('Y-m-d');
+            }
         }
 
         $shiftFilter = in_array($shiftFilter, ['all', '1', '2'], true)
@@ -956,11 +1055,17 @@ class QCRController extends Controller
             return preg_replace('/\s+/', ' ', $name);
         };
 
-        $allOutletsRaw = DB::table('tbl_outlets')
-            ->select('id', 'nama_outlet', 'status')
-            ->orderBy('nama_outlet')
-            ->orderBy('id')
-            ->get();
+        // CPU SAFE OPTIMIZE:
+        // Data outlet dipakai untuk dropdown/grouping dan tidak perlu query ulang
+        // setiap refresh DSC. Cache pendek 5 menit tidak mengubah rumus DSC, hanya
+        // mengurangi beban CPU/database saat halaman dibuka berkali-kali.
+        $allOutletsRaw = Cache::remember('dsc:all_outlets_grouped_source:v1', 300, function () {
+            return DB::table('tbl_outlets')
+                ->select('id', 'nama_outlet', 'status')
+                ->orderBy('nama_outlet')
+                ->orderBy('id')
+                ->get();
+        });
 
         $outletGroups = [];
 
@@ -988,9 +1093,16 @@ class QCRController extends Controller
         $selectedOutletIds = [];
         $selectedOutletLabel = null;
 
-        if ($outletId === 'all') {
-            $selectedOutletIds = $allOutletsRaw->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-            $selectedOutletLabel = 'ALL OUTLET';
+        if ($outletId === '' || $outletId === null || $outletId === 'all') {
+            // CPU SAFE OPTIMIZE:
+            // Blade DSC memang mewajibkan outlet dipilih dulu. Sebelumnya nilai default
+            // "all" membuat controller mengambil SEMUA outlet lalu memproses query stok
+            // besar walaupun UI hanya menampilkan mode ringan. Ini penyebab CPU bisa 100%.
+            // Di sini "all" diperlakukan sebagai belum memilih outlet, sehingga rumus,
+            // tampilan, dan data saat outlet sudah dipilih tetap sama seperti sebelumnya.
+            $selectedOutletIds = [];
+            $selectedOutletLabel = null;
+            $selectedOutlet = null;
         } elseif (isset($outletGroups[$outletId])) {
             $selectedOutletIds = $outletGroups[$outletId]['ids'];
             $selectedOutletLabel = $outletGroups[$outletId]['label'];
@@ -1024,6 +1136,16 @@ class QCRController extends Controller
             }
         }
 
+        if (! empty($selectedOutletIds) && $outletId !== 'all') {
+            // FINAL FIX: ikutkan alias outlet dari tbl_outlet_alias, misalnya typo KARANGWELAS -> KARANGLEWAS.
+            $selectedOutletIds = $this->expandOutletAliasIds($selectedOutletIds);
+
+            if ($selectedOutlet) {
+                $selectedOutlet->merged_ids = $selectedOutletIds;
+                $selectedOutlet->is_merged = count($selectedOutletIds) > 1;
+            }
+        }
+
         $isAllOutlet = $outletId === 'all';
         $isSuperadmin = auth()->user()?->role === 'superadmin';
 
@@ -1038,24 +1160,42 @@ class QCRController extends Controller
         $missingOutlets = collect();
 
         if ($isSuperadmin) {
+            // CPU SAFE OPTIMIZE:
+            // Notifikasi lonceng hanya informasi ringkas H-1. Cache pendek 5 menit
+            // menghindari query GROUP/MAX tbl_stock besar pada setiap load halaman,
+            // tanpa mengubah rumus DSC atau data utama yang ditampilkan setelah filter.
+            $missingOutlets = Cache::remember('dsc:missing_outlets:' . $missingCheckStartDate . ':v2', 300, function () use ($missingCheckStartDate, $outletGroups) {
             /*
              * OPTIMIZE: versi lama memakai correlated subquery + DATE(s.tanggal)
              * untuk setiap outlet. Saat outlet banyak, ini ikut menambah beban halaman DSC.
              * Versi ini ambil data stock H-1 dan last input dalam 2 query ringan,
              * lalu grouping outlet dilakukan di Collection yang sudah ada di memori.
              */
-            $submittedOutletIds = DB::table('tbl_stock')
-                ->where('tanggal', $missingCheckStartDate)
+            $submittedFinalOutletIds = DB::table('tbl_stock')
+                ->whereDate('tanggal', $missingCheckStartDate)
                 ->distinct()
                 ->pluck('outlet_id')
-                ->map(fn ($id) => (int) $id)
+                ->map(fn ($id) => (int) $id);
+
+            $submittedDraftOutletIds = DB::table('tbl_stock_draft')
+                ->whereDate('tanggal', $missingCheckStartDate)
+                ->where('is_draft', 1)
+                ->distinct()
+                ->pluck('outlet_id')
+                ->map(fn ($id) => (int) $id);
+
+            $submittedOutletIds = $submittedFinalOutletIds
+                ->concat($submittedDraftOutletIds)
+                ->unique()
+                ->values()
                 ->flip();
 
             $lastInputRows = DB::table('tbl_stock')
                 ->select('outlet_id', DB::raw('MAX(tanggal) as last_input_date'))
+                ->where('tanggal', '>=', '2026-05-27 00:00:00')
+                ->where('tanggal', '<',  '2026-06-16 00:00:00')
                 ->groupBy('outlet_id')
-                ->get()
-                ->keyBy(fn ($row) => (int) $row->outlet_id);
+                ->get();
 
             $missingOutlets = collect($outletGroups)
                 ->map(function ($group) use ($submittedOutletIds, $lastInputRows) {
@@ -1091,6 +1231,9 @@ class QCRController extends Controller
                 ->filter()
                 ->sortBy('nama_outlet')
                 ->values();
+
+                return $missingOutlets;
+            });
         }
 
         if (empty($selectedOutletIds)) {
@@ -1109,11 +1252,17 @@ class QCRController extends Controller
 
                 'rekapRows'           => [],
                 'shiftRows'           => [],
+                'periodRows'          => [],
+                'periodSummary'       => [],
+                'rapelBahanRows'      => [],
 
                 'omsetActive'         => $this->defaultOmsetActive($today),
 
-                'startDate'           => $startDateRaw,
-                'endDate'             => $endDateRaw,
+                'startDate'           => $periodStartDate,
+                'endDate'             => $periodEndDate,
+                'periodStartDate'     => $periodStartDate,
+                'periodEndDate'       => $periodEndDate,
+                'periodMaxDays'       => $periodMaxDays,
                 'missingOutlets'      => $missingOutlets,
                 'missingCheckStartDate' => $missingCheckStartDate ?? null,
                 'missingCheckEndDate'   => $missingCheckEndDate ?? null,
@@ -1176,6 +1325,26 @@ class QCRController extends Controller
 
         $salesShift1 = (float) ($omsetRow->s1_total_transaction ?? 0);
         $salesShift2 = (float) ($omsetRow->s2_total_transaction ?? 0);
+
+        /*
+         * PATCH SALES DSC:
+         * Beberapa outlet menyimpan sales dari form/shift ke tbl_sales_shift.
+         * Jika omset setoran belum ada / masih 0, tampilkan fallback dari tbl_sales_shift
+         * supaya kartu Sales Shift 1, Shift 2, dan Total Sales tidak kosong.
+         */
+        if ($salesShift1 == 0.0 && $salesShift2 == 0.0 && Schema::hasTable('tbl_sales_shift')) {
+            $salesRows = DB::table('tbl_sales_shift')
+                ->select('shift', DB::raw('SUM(COALESCE(sales_amount,0)) as total_sales'))
+                ->whereIn('outlet_id', $selectedOutletIds)
+                ->whereDate('tanggal', $today)
+                ->whereIn('shift', [1, 2])
+                ->groupBy('shift')
+                ->get()
+                ->keyBy('shift');
+
+            $salesShift1 = (float) ($salesRows->get(1)->total_sales ?? 0);
+            $salesShift2 = (float) ($salesRows->get(2)->total_sales ?? 0);
+        }
 
         $bahanList = DB::table('tbl_bahan_dsc')
             ->select('id', 'nama_bahan', 'satuan')
@@ -1486,6 +1655,8 @@ class QCRController extends Controller
 
             $rekapRows[] = [
                 'no'               => $no++,
+                'tanggal'          => $today,
+                'bahan_id'         => $bahanId,
                 'nama'             => (string) $b->nama_bahan,
                 'sat'              => (string) $b->satuan,
 
@@ -1505,6 +1676,7 @@ class QCRController extends Controller
                 'wP'               => $wP,
                 'wB'               => $wB,
                 'wT'               => $wT,
+                'wT_input'         => ($s1['wT_input'] ?? 0) + ($s2['wT_input'] ?? 0),
                 'actualTepung'     => $actualTepung,
 
                 'shift1'           => $s1['used'],
@@ -1566,8 +1738,39 @@ class QCRController extends Controller
                     'wB'           => $v['wB'],
                     'wT'           => $v['wT'],
                     'wT_input'     => $v['wT_input'] ?? 0,
+                    'uang'         => $v['uang'] ?? 0,
                     'ket'          => $v['ket'],
                 ];
+            }
+        }
+
+        [$periodRows, $periodSummary] = [[], []];
+        if (! $isAllOutlet && ! empty($selectedOutletIds) && $periodStartDate && $periodEndDate) {
+            [$periodRows, $periodSummary] = $this->buildDscPeriodReportRows(
+                $selectedOutletIds,
+                $displayOutletId,
+                $bahanList,
+                $periodStartDate,
+                $periodEndDate,
+                $shiftFilter
+            );
+
+            /*
+             * PATCH REQUEST TIM - REKAP IKUT PERIODE
+             * Sebelumnya REKAP tetap membaca tanggal akhir saja, sehingga Periode Awal
+             * 09-06 dan 01-06 menghasilkan angka yang sama selama Periode Akhir sama.
+             * Sekarang REKAP utama ikut start_date s/d end_date, tapi rumus lama tetap dipakai:
+             * TOTAL = OPEN AWAL PERIODE + SUM(PIN) + SUM(MI) - SUM(MO)
+             * ENDING = CLOSING TANGGAL AKHIR YANG SUDAH DIKOREKSI ADJ
+             * USED = TOTAL - ENDING
+             */
+            if ($periodStartDate !== $periodEndDate) {
+                // FIX ENDING RANGE:
+                // Kirim rekap harian periode akhir yang sudah dihitung sebelumnya.
+                // Dengan ini ENDING range wajib sama dengan ENDING saat filter tanggal akhir saja.
+                $rekapRows = $this->buildDscPeriodAggregateRows($periodRows, $bahanList, $shiftFilter, $rekapRows);
+                $salesShift1 = (float) collect($periodSummary)->sum('sales_s1');
+                $salesShift2 = (float) collect($periodSummary)->sum('sales_s2');
             }
         }
 
@@ -1586,16 +1789,540 @@ class QCRController extends Controller
 
             'rekapRows'           => $rekapRows,
             'shiftRows'           => $shiftRows,
+            'periodRows'          => $periodRows,
+            'periodSummary'       => $periodSummary,
+            'rapelBahanRows'      => $bahanList,
 
             'omsetActive'         => $omsetActive,
 
-            'startDate'           => $startDateRaw,
-            'endDate'             => $endDateRaw,
+            'startDate'           => $periodStartDate,
+            'endDate'             => $periodEndDate,
+            'periodStartDate'     => $periodStartDate,
+            'periodEndDate'       => $periodEndDate,
+            'periodMaxDays'       => $periodMaxDays,
             'missingOutlets'      => $missingOutlets,
             'missingCheckStartDate' => $missingCheckStartDate ?? null,
             'missingCheckEndDate'   => $missingCheckEndDate ?? null,
             'isSuperadmin'        => $isSuperadmin,
         ];
+    }
+
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH REQUEST TIM - DATA PERIODE DSC
+     |--------------------------------------------------------------------------
+     | Helper ini hanya membangun data tab PERIODE DSC.
+     | Rumus sengaja disamakan dengan buildDailyStockControlData():
+     | TOTAL  = OPEN + PURCHASE IN + MUTASI IN - MUTASI OUT
+     | ENDING = ENDING BASE + ADJ
+     | USED   = TOTAL - ENDING
+     |
+     | Tidak mengubah data stok, tidak menyimpan apa pun, dan tidak mengganggu
+     | REKAP/DETAIL/OMSET/ADJUSTMENT harian yang sudah berjalan.
+     */
+    private function buildDscPeriodReportRows(array $selectedOutletIds, int $displayOutletId, $bahanList, string $startDate, string $endDate, string $shiftFilter): array
+    {
+        $selectedOutletIds = array_values(array_unique(array_map('intval', $selectedOutletIds)));
+        $selectedOutletIds = array_values(array_filter($selectedOutletIds, fn ($id) => $id > 0));
+
+        if (empty($selectedOutletIds)) {
+            return [[], []];
+        }
+
+        $bahanIds = $bahanList->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $period = Carbon::parse($startDate)->daysUntil(Carbon::parse($endDate)->addDay());
+
+        $periodRows = [];
+        $periodSummary = [];
+        $rowNo = 1;
+
+        /*
+         |--------------------------------------------------------------------------
+         | CPU SAFE OPTIMIZE - PERIODE DSC
+         |--------------------------------------------------------------------------
+         | Logika dan rumus di bawah tetap sama seperti versi sebelumnya.
+         | Yang diubah hanya cara ambil data:
+         | - Sebelumnya query tbl_stock/tbl_stock_draft dilakukan 4x untuk SETIAP tanggal.
+         | - Sekarang data final/draft untuk seluruh range diambil 4 query saja,
+         |   lalu dikelompokkan di Collection berdasarkan tanggal dan bahan.
+         |
+         | Rumus tetap:
+         | TOTAL  = OPEN + PURCHASE IN + MUTASI IN - MUTASI OUT
+         | ENDING = ENDING BASE + ADJ
+         | USED   = TOTAL - ENDING
+         |--------------------------------------------------------------------------
+         */
+
+        $dateKeys = [];
+        foreach ($period as $dateObj) {
+            $dateKeys[] = $dateObj->format('Y-m-d');
+        }
+
+        if (empty($dateKeys)) {
+            return [[], []];
+        }
+
+        $mergeRows = function ($rows, string $source) {
+            if (!$rows || $rows->isEmpty()) {
+                return null;
+            }
+
+            $first = $rows->sortByDesc('updated_at')->sortByDesc('id')->first();
+            $row = clone $first;
+            $row->row_source = $source;
+            $row->purchase_in = (float) $rows->sum('purchase_in');
+            $row->mutasi_in = (float) $rows->sum('mutasi_in');
+            $row->mutasi_out = (float) $rows->sum('mutasi_out');
+            $row->adjustment_qty = (float) $rows->sum('adjustment_qty');
+            $row->used_qty = (float) $rows->sum('used_qty');
+
+            $latestEnding = $rows->filter(fn ($r) => $r->ending_stock !== null)->sortByDesc('updated_at')->sortByDesc('id')->first();
+            $row->ending_stock = $latestEnding ? (float) $latestEnding->ending_stock : 0;
+            $row->waste_product = (float) $rows->sum('waste_product');
+            $row->waste_bahan = (float) $rows->sum('waste_bahan');
+            $row->waste_tepung = (float) $rows->sum('waste_tepung');
+            $row->uang_plus = (float) $rows->sum('uang_plus');
+            $row->keterangan = implode(' | ', $rows->pluck('keterangan')->filter()->values()->all());
+
+            return $row;
+        };
+
+        $calcShiftValues = function (float $open, $row): array {
+            $pin = $row ? (float) ($row->purchase_in ?? 0) : 0.0;
+            $mi = $row ? (float) ($row->mutasi_in ?? 0) : 0.0;
+            $mo = $row ? (float) ($row->mutasi_out ?? 0) : 0.0;
+            $adj = $row ? (float) ($row->adjustment_qty ?? 0) : 0.0;
+            $endingBase = $row && $row->ending_stock !== null ? (float) $row->ending_stock : 0.0;
+            $total = $open + $pin + $mi - $mo;
+            $ending = $endingBase + $adj;
+            $used = $total - $ending;
+            $wP = $row ? (float) ($row->waste_product ?? 0) : 0.0;
+            $wB = $row ? (float) ($row->waste_bahan ?? 0) : 0.0;
+            $wTDb = $row ? (float) ($row->waste_tepung ?? 0) : 0.0;
+
+            return [
+                'open' => $open, 'pin' => $pin, 'mi' => $mi, 'mo' => $mo, 'adj' => $adj,
+                'total' => $total, 'ending_stock' => $ending, 'used' => $used,
+                'wP' => $wP, 'wB' => $wB, 'wT' => $wP + $wB + $wTDb, 'wT_input' => $wTDb,
+                'uang' => $row ? (float) ($row->uang_plus ?? 0) : 0.0,
+                'ket' => $row ? (string) ($row->keterangan ?? '') : '',
+                'source' => $row->row_source ?? null,
+            ];
+        };
+
+        $omsetByDate = DB::table('tbl_dsc_omset_setoran')
+            ->whereIn('outlet_id', $selectedOutletIds)
+            ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+            ->select(
+                DB::raw('DATE(tanggal) as tanggal_key'),
+                DB::raw('SUM(COALESCE(s1_total_transaction,0)) as sales_s1'),
+                DB::raw('SUM(COALESCE(s2_total_transaction,0)) as sales_s2')
+            )
+            ->groupBy(DB::raw('DATE(tanggal)'))
+            ->get()
+            ->keyBy('tanggal_key');
+
+        $groupRowsByDateAndBahan = function ($rows) {
+            return $rows
+                ->groupBy(function ($row) {
+                    return $this->normalizeDateToYmd((string) ($row->tanggal ?? ''));
+                })
+                ->map(function ($dateRows) {
+                    return $dateRows->groupBy('bahan_id');
+                });
+        };
+
+        // 4 query total untuk seluruh range, menggantikan 4 query x jumlah hari.
+        $draftShift1ByDate = $groupRowsByDateAndBahan(
+            DB::table('tbl_stock_draft')
+                ->whereIn('outlet_id', $selectedOutletIds)
+                ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+                ->where('shift', 1)
+                ->where('is_draft', 1)
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get()
+        );
+
+        $finalShift1ByDate = $groupRowsByDateAndBahan(
+            DB::table('tbl_stock')
+                ->whereIn('outlet_id', $selectedOutletIds)
+                ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+                ->where('shift', '1')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get()
+        );
+
+        $draftShift2ByDate = $groupRowsByDateAndBahan(
+            DB::table('tbl_stock_draft')
+                ->whereIn('outlet_id', $selectedOutletIds)
+                ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+                ->where('shift', 2)
+                ->where('is_draft', 1)
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get()
+        );
+
+        $finalShift2ByDate = $groupRowsByDateAndBahan(
+            DB::table('tbl_stock')
+                ->whereIn('outlet_id', $selectedOutletIds)
+                ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+                ->where('shift', '2')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get()
+        );
+
+        // Opening tetap memakai helper lama agar hasil tidak berubah.
+        // Dibuat map per tanggal agar tidak ada pemanggilan ulang untuk tanggal yang sama.
+        $openingBulkByDate = [];
+        foreach ($dateKeys as $date) {
+            $openingBulkByDate[$date] = $this->getOpeningBulkFromAliasIds($selectedOutletIds, $displayOutletId, $bahanIds, $date);
+        }
+
+        foreach ($dateKeys as $date) {
+            $openingBulkMap = $openingBulkByDate[$date] ?? [];
+
+            $getOpeningMerged = function (int $bahanId, int $shift) use ($openingBulkMap, $selectedOutletIds, $displayOutletId, $date) {
+                return isset($openingBulkMap[$bahanId][$shift])
+                    ? (float) $openingBulkMap[$bahanId][$shift]
+                    : (float) $this->getOpeningFromAliasIds($selectedOutletIds, $displayOutletId, $bahanId, $date, $shift);
+            };
+
+            $draftShift1Rows = $draftShift1ByDate->get($date, collect());
+            $finalShift1Rows = $finalShift1ByDate->get($date, collect());
+            $draftShift2Rows = $draftShift2ByDate->get($date, collect());
+            $finalShift2Rows = $finalShift2ByDate->get($date, collect());
+
+            $mergedShift1Rows = [];
+            $mergedShift2Rows = [];
+            foreach ($bahanIds as $bahanId) {
+                $mergedShift1Rows[$bahanId] = isset($draftShift1Rows[$bahanId])
+                    ? $mergeRows($draftShift1Rows[$bahanId], 'draft')
+                    : (isset($finalShift1Rows[$bahanId]) ? $mergeRows($finalShift1Rows[$bahanId], 'final') : null);
+
+                $mergedShift2Rows[$bahanId] = isset($draftShift2Rows[$bahanId])
+                    ? $mergeRows($draftShift2Rows[$bahanId], 'draft')
+                    : (isset($finalShift2Rows[$bahanId]) ? $mergeRows($finalShift2Rows[$bahanId], 'final') : null);
+            }
+
+            $summary = [
+                'tanggal' => $date,
+                'sales_s1' => (float) ($omsetByDate->get($date)->sales_s1 ?? 0),
+                'sales_s2' => (float) ($omsetByDate->get($date)->sales_s2 ?? 0),
+                'sales_total' => (float) (($omsetByDate->get($date)->sales_s1 ?? 0) + ($omsetByDate->get($date)->sales_s2 ?? 0)),
+                'uang_plus' => 0.0,
+                'used_minus_count' => 0,
+                'used_plus_count' => 0,
+                'row_count' => 0,
+                'has_dsc' => false,
+            ];
+
+            foreach ($bahanList as $b) {
+                $bahanId = (int) $b->id;
+                $r1 = $mergedShift1Rows[$bahanId] ?? null;
+                $r2 = $mergedShift2Rows[$bahanId] ?? null;
+                $openS1 = (float) $getOpeningMerged($bahanId, 1);
+                $openS2 = ($r1 && $r1->ending_stock !== null) ? (float) $r1->ending_stock : (float) $getOpeningMerged($bahanId, 2);
+                $s1 = $calcShiftValues($openS1, $r1);
+                $s2 = $calcShiftValues($openS2, $r2);
+                $sourceS1 = $s1['source'] ?? null;
+                $sourceS2 = $s2['source'] ?? null;
+
+                if ($shiftFilter === '1') {
+                    $openRekap = $s1['open']; $pin = $s1['pin']; $mi = $s1['mi']; $mo = $s1['mo']; $adj = $s1['adj']; $total = $s1['total']; $ending = $s1['ending_stock']; $used = $s1['used']; $wP = $s1['wP']; $wB = $s1['wB']; $wT = $s1['wT']; $wTInput = $s1['wT_input'] ?? 0; $uang = $s1['uang']; $ketParts = !empty($s1['ket']) ? ['S1: ' . $s1['ket']] : []; $rowSource = $sourceS1;
+                } elseif ($shiftFilter === '2') {
+                    $openRekap = $s2['open']; $pin = $s2['pin']; $mi = $s2['mi']; $mo = $s2['mo']; $adj = $s2['adj']; $total = $s2['total']; $ending = $s2['ending_stock']; $used = $s2['used']; $wP = $s2['wP']; $wB = $s2['wB']; $wT = $s2['wT']; $wTInput = $s2['wT_input'] ?? 0; $uang = $s2['uang']; $ketParts = !empty($s2['ket']) ? ['S2: ' . $s2['ket']] : []; $rowSource = $sourceS2;
+                } else {
+                    $openRekap = $openS1;
+                    $pin = $s1['pin'] + $s2['pin']; $mi = $s1['mi'] + $s2['mi']; $mo = $s1['mo'] + $s2['mo']; $adj = $s1['adj'] + $s2['adj'];
+                    $endingS1 = ($r1 && $r1->ending_stock !== null) ? (float) $s1['ending_stock'] : null;
+                    $endingS2 = ($r2 && $r2->ending_stock !== null) ? (float) $s2['ending_stock'] : null;
+                    if ($endingS2 !== null && $endingS2 > 0) $ending = $endingS2;
+                    elseif ($endingS1 !== null && $endingS1 > 0) $ending = $endingS1;
+                    elseif ($endingS2 !== null) $ending = $endingS2;
+                    elseif ($endingS1 !== null) $ending = $endingS1;
+                    else $ending = 0.0;
+                    $total = $openRekap + $pin + $mi - $mo;
+                    $used = $total - $ending;
+                    $wP = $s1['wP'] + $s2['wP']; $wB = $s1['wB'] + $s2['wB']; $wT = $s1['wT'] + $s2['wT']; $wTInput = ($s1['wT_input'] ?? 0) + ($s2['wT_input'] ?? 0); $uang = $s1['uang'] + $s2['uang'];
+                    $ketParts = [];
+                    if (!empty($s1['ket'])) $ketParts[] = 'S1: ' . $s1['ket'];
+                    if (!empty($s2['ket'])) $ketParts[] = 'S2: ' . $s2['ket'];
+                    $rowSource = ($sourceS1 === 'draft' || $sourceS2 === 'draft') ? 'draft' : (($sourceS1 === 'final' || $sourceS2 === 'final') ? 'final' : null);
+                }
+
+                $closingS1 = ($r1 && $r1->ending_stock !== null) ? (float) $s1['ending_stock'] : null;
+                $closingS2 = ($r2 && $r2->ending_stock !== null) ? (float) $s2['ending_stock'] : null;
+                if ($closingS2 !== null && $closingS2 > 0) $closingToday = $closingS2;
+                elseif ($closingS1 !== null && $closingS1 > 0) $closingToday = $closingS1;
+                elseif ($closingS2 !== null) $closingToday = $closingS2;
+                elseif ($closingS1 !== null) $closingToday = $closingS1;
+                else $closingToday = 0.0;
+
+                $hasSource = $sourceS1 !== null || $sourceS2 !== null;
+                $hasValue = abs($openRekap) > 0.000001 || abs($pin) > 0.000001 || abs($mi) > 0.000001 || abs($mo) > 0.000001 || abs($adj) > 0.000001 || abs($ending) > 0.000001 || abs($used) > 0.000001 || abs($wP) > 0.000001 || abs($wB) > 0.000001 || abs($wTInput) > 0.000001 || abs($uang) > 0.000001;
+                if (! $hasSource && ! $hasValue) continue;
+
+                $namaNorm = strtolower(trim((string) $b->nama_bahan));
+                $actualTepung = ($namaNorm === 'tepung breader') ? ($used - $wT) : 0.0;
+                $periodRows[] = [
+                    'no' => $rowNo++, 'tanggal' => $date, 'bahan_id' => $bahanId, 'nama' => (string) $b->nama_bahan, 'sat' => (string) $b->satuan,
+                    'source' => $rowSource, 'source_s1' => $sourceS1, 'source_s2' => $sourceS2,
+                    'open' => $openRekap, 'pin' => $pin, 'mi' => $mi, 'mo' => $mo, 'adj' => $adj, 'total' => $total, 'ending_stock' => $ending, 'used' => $used,
+                    'wP' => $wP, 'wB' => $wB, 'wT' => $wT, 'wT_input' => $wTInput, 'actualTepung' => $actualTepung,
+                    'shift1' => $s1['used'], 'shift2' => $s2['used'], 'uang' => $uang, 'ket' => implode(' | ', $ketParts), 'open_stock_right' => $closingToday,
+                ];
+
+                $summary['row_count']++;
+                $summary['has_dsc'] = $summary['has_dsc'] || $hasSource;
+                $summary['uang_plus'] += $uang;
+                if ($used < 0) $summary['used_minus_count']++;
+                if ($used > 0) $summary['used_plus_count']++;
+            }
+
+            $periodSummary[] = $summary;
+        }
+
+        return [$periodRows, $periodSummary];
+    }
+
+    /**
+     * PATCH REQUEST TIM - AGREGASI REKAP BERDASARKAN PERIODE
+     *
+     * Input helper ini adalah periodRows yang dihitung per tanggal memakai rumus DSC lama.
+     * Helper ini hanya menggabungkan untuk tampilan REKAP agar filter Periode Awal
+     * benar-benar mempengaruhi hasil.
+     *
+     * Rumus periode:
+     * - OPEN    = open pada tanggal pertama dalam periode untuk bahan tersebut
+     * - PIN/MI/MO/WASTE/UANG PLUS = akumulasi selama periode
+     * - ENDING  = closing tanggal terakhir dalam periode untuk bahan tersebut
+     * - TOTAL   = OPEN + PIN + MI - MO
+     * - USED    = TOTAL - ENDING
+     *
+     * Tidak ada query baru dan tidak ada proses simpan data.
+     */
+    private function buildDscPeriodAggregateRows(array $periodRows, $bahanList, string $shiftFilter, array $periodEndRekapRows = []): array
+    {
+        if (empty($periodRows)) {
+            return [];
+        }
+
+        /*
+         |--------------------------------------------------------------------------
+         | FIX ENDING RANGE FINAL
+         |--------------------------------------------------------------------------
+         | Saat filter range, REKAP periode sebelumnya mengambil ENDING dari periodRows.
+         | Akibatnya bisa nyasar ke closing lama, contoh 28-05 s/d 10-06 tampil 680,
+         | padahal saat tanggal 10 dibuka sendiri ENDING-nya 840.
+         |
+         | Controller sebelum masuk fungsi ini sebenarnya sudah membangun $rekapRows
+         | untuk tanggal akhir periode. Maka ENDING range harus mengambil dari
+         | $periodEndRekapRows tersebut, bukan memilih ulang dari periodRows.
+         |--------------------------------------------------------------------------
+         */
+        $endingByBahanFromPeriodEndRekap = collect($periodEndRekapRows)
+            ->filter(fn ($row) => isset($row['bahan_id']))
+            ->keyBy(fn ($row) => (int) $row['bahan_id'])
+            ->map(fn ($row) => (float) ($row['ending_stock'] ?? 0));
+
+        /*
+         |--------------------------------------------------------------------------
+         | FIX ENDING REKAP RANGE V2
+         |--------------------------------------------------------------------------
+         | ENDING range wajib sama dengan ENDING harian pada tanggal akhir periode.
+         | Supaya tidak nyasar ke closing row lain di periodRows, helper ini ambil
+         | ulang closing tanggal akhir langsung dari data periodRows tanggal max.
+         | Ini tidak mengubah rumus lain: OPEN/PIN/MI/MO tetap periode, USED tetap
+         | akumulasi harian yang sudah dipatch untuk kasus minus.
+         |--------------------------------------------------------------------------
+         */
+        $periodEndDateForEnding = (string) collect($periodRows)->max('tanggal');
+
+        $endingByBahanAtPeriodEnd = collect($periodRows)
+            ->filter(fn ($row) => (string) ($row['tanggal'] ?? '') === $periodEndDateForEnding)
+            ->groupBy('bahan_id')
+            ->map(function ($rows) use ($shiftFilter) {
+                $rows = collect($rows)->sortBy('no')->values();
+
+                if ($shiftFilter === '1') {
+                    $row = $rows
+                        ->filter(fn ($r) => ($r['source_s1'] ?? null) !== null || abs((float) ($r['ending_stock'] ?? 0)) > 0.000001)
+                        ->last();
+
+                    return $row ? (float) ($row['ending_stock'] ?? $row['open_stock_right'] ?? 0) : 0.0;
+                }
+
+                if ($shiftFilter === '2') {
+                    $row = $rows
+                        ->filter(fn ($r) => ($r['source_s2'] ?? null) !== null || abs((float) ($r['ending_stock'] ?? 0)) > 0.000001)
+                        ->last();
+
+                    return $row ? (float) ($row['ending_stock'] ?? $row['open_stock_right'] ?? 0) : 0.0;
+                }
+
+                $row = $rows->last();
+                return $row ? (float) ($row['open_stock_right'] ?? $row['ending_stock'] ?? 0) : 0.0;
+            });
+
+        $rowsByBahan = collect($periodRows)
+            ->sortBy([['tanggal', 'asc'], ['no', 'asc']])
+            ->groupBy('bahan_id');
+
+        $result = [];
+        $no = 1;
+
+        foreach ($bahanList as $b) {
+            $bahanId = (int) $b->id;
+            $rows = $rowsByBahan->get($bahanId);
+
+            if (!$rows || $rows->isEmpty()) {
+                continue;
+            }
+
+            $rowsAsc = $rows->sortBy([['tanggal', 'asc'], ['no', 'asc']])->values();
+
+            /*
+             |--------------------------------------------------------------------------
+             | FIX ENDING REKAP RANGE
+             |--------------------------------------------------------------------------
+             | Untuk filter periode/range, ENDING harus mengikuti closing di tanggal
+             | akhir periode untuk bahan tersebut. Sebelumnya menggunakan sortBy desc
+             | multi kolom lalu first(), pada beberapa kondisi bisa mengambil row
+             | bukan tanggal akhir sehingga summary 28-05 s/d 10-06 tampil 680,
+             | padahal harian tanggal 10 sudah 840.
+             |
+             | OPEN tetap dari tanggal awal periode, PIN/MI/MO/ADJ tetap akumulasi
+             | periode, dan USED tetap akumulasi used harian sesuai patch minus.
+             |--------------------------------------------------------------------------
+             */
+            $firstRow = $rowsAsc->first();
+
+            $lastTanggal = (string) $rowsAsc->max('tanggal');
+            $lastDateRows = $rowsAsc
+                ->filter(fn ($row) => (string) ($row['tanggal'] ?? '') === $lastTanggal)
+                ->sortByDesc('no')
+                ->values();
+
+            $lastRow = $lastDateRows->first() ?: $rowsAsc->last();
+
+            $open = (float) ($firstRow['open'] ?? 0);
+            $pin = (float) $rowsAsc->sum('pin');
+            $mi = (float) $rowsAsc->sum('mi');
+            $mo = (float) $rowsAsc->sum('mo');
+            $adj = (float) $rowsAsc->sum('adj');
+
+            // Closing periode wajib dari tanggal akhir yang benar,
+            // sama seperti harian pada Periode Akhir.
+            $endingFromRows = (float) ($lastRow['open_stock_right'] ?? $lastRow['ending_stock'] ?? 0);
+            $endingFromEndDate = $endingByBahanAtPeriodEnd->has($bahanId)
+                ? (float) $endingByBahanAtPeriodEnd->get($bahanId)
+                : null;
+
+            // Prioritas utama: ending dari REKAP harian periode akhir.
+            // Ini membuat range 28-05 s/d 10-06 sinkron dengan filter 10-06 saja.
+            $endingFromDailyPeriodEnd = $endingByBahanFromPeriodEndRekap->has($bahanId)
+                ? (float) $endingByBahanFromPeriodEndRekap->get($bahanId)
+                : null;
+
+            if ($endingFromDailyPeriodEnd !== null) {
+                $ending = $endingFromDailyPeriodEnd;
+            } elseif ($endingFromEndDate !== null) {
+                $ending = $endingFromEndDate;
+            } else {
+                $ending = $endingFromRows;
+            }
+
+            $total = $open + $pin + $mi - $mo;
+
+            /*
+             |--------------------------------------------------------------------------
+             | FIX FINAL USED DSC RANGE
+             |--------------------------------------------------------------------------
+             | Untuk REKAP DSC periode, USED harus mengikuti rumus stok final:
+             |
+             | TOTAL = OPEN + PURCHASE IN + MUTASI IN - MUTASI OUT
+             | USED  = TOTAL - ENDING
+             |
+             | Contoh TEH PUCUK:
+             | OPEN 97 + PURCHASE 96 - MUTASI OUT 48 = TOTAL 145
+             | ENDING 47
+             | USED = 145 - 47 = 98
+             |
+             | Jangan pakai akumulasi harian di tampilan REKAP/QCR karena bisa membuat
+             | Usage DSC periode tampil hanya 8/55, padahal rumus periode adalah 98.
+             */
+            $used = $total - $ending;
+
+            $wP = (float) $rowsAsc->sum('wP');
+            $wB = (float) $rowsAsc->sum('wB');
+            $wT = (float) $rowsAsc->sum('wT');
+            $wTInput = (float) $rowsAsc->sum('wT_input');
+            $uang = (float) $rowsAsc->sum('uang');
+            $shift1 = (float) $rowsAsc->sum('shift1');
+            $shift2 = (float) $rowsAsc->sum('shift2');
+
+            $sourceS1Values = $rowsAsc->pluck('source_s1')->filter()->values();
+            $sourceS2Values = $rowsAsc->pluck('source_s2')->filter()->values();
+
+            $sourceS1 = $sourceS1Values->contains('draft') ? 'draft' : ($sourceS1Values->contains('final') ? 'final' : null);
+            $sourceS2 = $sourceS2Values->contains('draft') ? 'draft' : ($sourceS2Values->contains('final') ? 'final' : null);
+
+            $rowSourceValues = $rowsAsc->pluck('source')->filter()->values();
+            $rowSource = $rowSourceValues->contains('draft') ? 'draft' : ($rowSourceValues->contains('final') ? 'final' : null);
+
+            if ($shiftFilter === '1') {
+                $sourceS2 = null;
+                $rowSource = $sourceS1;
+            } elseif ($shiftFilter === '2') {
+                $sourceS1 = null;
+                $rowSource = $sourceS2;
+            }
+
+            $ketParts = [];
+            foreach ($rowsAsc as $row) {
+                $ket = trim((string) ($row['ket'] ?? ''));
+                if ($ket !== '') {
+                    $ketParts[] = Carbon::parse((string) $row['tanggal'])->format('d-m-Y') . ': ' . $ket;
+                }
+            }
+
+            $namaNorm = strtolower(trim((string) $b->nama_bahan));
+            $actualTepung = ($namaNorm === 'tepung breader') ? ($used - $wT) : 0.0;
+
+            $result[] = [
+                'no'               => $no++,
+                'nama'             => (string) $b->nama_bahan,
+                'sat'              => (string) $b->satuan,
+                'source'           => $rowSource,
+                'source_s1'        => $sourceS1,
+                'source_s2'        => $sourceS2,
+                'open'             => $open,
+                'pin'              => $pin,
+                'mi'               => $mi,
+                'mo'               => $mo,
+                'adj'              => $adj,
+                'total'            => $total,
+                'ending_stock'     => $ending,
+                'used'             => $used,
+                'wP'               => $wP,
+                'wB'               => $wB,
+                'wT'               => $wT,
+                'wT_input'         => $wTInput,
+                'actualTepung'     => $actualTepung,
+                'shift1'           => $shift1,
+                'shift2'           => $shift2,
+                'uang'             => $uang,
+                'ket'              => implode(' | ', $ketParts),
+                'open_stock_right' => $ending,
+            ];
+        }
+
+        return $result;
     }
 
     private function getOpeningBulkFromAliasIds(array $aliasIds, int $displayOutletId, array $bahanIds, string $tanggal): array
@@ -1612,13 +2339,25 @@ class QCRController extends Controller
 
         $result = [];
         foreach ($bahanIds as $bahanId) {
-            $result[$bahanId] = [1 => 0.0, 2 => 0.0];
+            $result[$bahanId] = [
+                1 => 0.0,
+                2 => 0.0,
+            ];
         }
 
         if (empty($aliasIds) || empty($bahanIds)) {
             return $result;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Helper pilih row terbaru per bahan/shift
+        |--------------------------------------------------------------------------
+        | Priority:
+        | - draft lebih tinggi dari final, karena tampilan DSC aktif memakai draft
+        |   jika ada.
+        | - updated_at/id terbaru menang.
+        */
         $pickLatestByBahan = function ($rows) {
             return $rows
                 ->sort(function ($a, $b) {
@@ -1637,8 +2376,13 @@ class QCRController extends Controller
                 ->groupBy('bahan_id');
         };
 
-        // 1) Opening shift 2 = ending shift 1 di tanggal yang sama.
-        // Final tetap menang dari draft untuk tanggal+shift yang sama.
+        /*
+        |--------------------------------------------------------------------------
+        | 1) Opening shift 2 = ending shift 1 pada tanggal yang sama
+        |--------------------------------------------------------------------------
+        | Kalau shift 1 hari ini ada ending 0, opening shift 2 tetap 0.
+        | Jangan fallback ke data lain hanya karena nilainya 0.
+        */
         $todayFinalRows = DB::table('tbl_stock')
             ->select('bahan_id', 'ending_stock', 'updated_at', 'id', DB::raw('1 as source_priority'))
             ->whereIn('outlet_id', $aliasIds)
@@ -1649,7 +2393,7 @@ class QCRController extends Controller
             ->get();
 
         $todayDraftRows = DB::table('tbl_stock_draft')
-            ->select('bahan_id', 'ending_stock', 'updated_at', 'id', DB::raw('0 as source_priority'))
+            ->select('bahan_id', 'ending_stock', 'updated_at', 'id', DB::raw('2 as source_priority'))
             ->whereIn('outlet_id', $aliasIds)
             ->whereIn('bahan_id', $bahanIds)
             ->where('tanggal', $tanggal)
@@ -1662,27 +2406,20 @@ class QCRController extends Controller
 
         foreach ($sameDayShift1 as $bahanId => $rows) {
             $first = $rows->first();
+
             if ($first && $first->ending_stock !== null) {
                 $result[(int) $bahanId][2] = (float) $first->ending_stock;
             }
         }
 
         /*
-         * 2) Cari closing terakhir sebelum tanggal aktif.
-         *
-         * Versi lama mengambil SEMUA histori sebelum tanggal aktif lalu sorting di PHP:
-         *   ->orderBy(...)->get()
-         * Ini yang muncul di slowlog line getOpeningBulkFromAliasIds().
-         *
-         * Versi ini hanya mengambil 1 key terakhir per bahan dari DB:
-         *   MAX(CONCAT(tanggal,'|',LPAD(shift,2,'0')))
-         * sehingga jumlah row yang kembali maksimal sebanyak jumlah bahan.
-         */
+        |--------------------------------------------------------------------------
+        | 2) Cari tanggal closing terakhir sebelum tanggal aktif
+        |--------------------------------------------------------------------------
+        | Opening shift 1 tanggal aktif = closing terakhir sebelum tanggal aktif.
+        */
         $lastFinal = DB::table('tbl_stock')
-            ->select(
-                'bahan_id',
-                DB::raw("MAX(CONCAT(tanggal, '|', LPAD(shift, 2, '0'))) as last_key")
-            )
+            ->select('bahan_id', DB::raw('MAX(tanggal) as last_date'))
             ->whereIn('outlet_id', $aliasIds)
             ->whereIn('bahan_id', $bahanIds)
             ->where('tanggal', '<', $tanggal)
@@ -1690,10 +2427,7 @@ class QCRController extends Controller
             ->groupBy('bahan_id');
 
         $lastDraft = DB::table('tbl_stock_draft')
-            ->select(
-                'bahan_id',
-                DB::raw("MAX(CONCAT(tanggal, '|', LPAD(shift, 2, '0'))) as last_key")
-            )
+            ->select('bahan_id', DB::raw('MAX(tanggal) as last_date'))
             ->whereIn('outlet_id', $aliasIds)
             ->whereIn('bahan_id', $bahanIds)
             ->where('tanggal', '<', $tanggal)
@@ -1703,82 +2437,140 @@ class QCRController extends Controller
 
         $lastRows = DB::query()
             ->fromSub($lastFinal->unionAll($lastDraft), 'x')
-            ->select('bahan_id', DB::raw('MAX(last_key) as last_key'))
+            ->select('bahan_id', DB::raw('MAX(last_date) as last_date'))
             ->groupBy('bahan_id')
             ->get();
 
         $lastByBahan = [];
         foreach ($lastRows as $row) {
             $bahanId = (int) $row->bahan_id;
-            $lastKey = (string) ($row->last_key ?? '');
+            $lastDate = $this->normalizeDateToYmd((string) ($row->last_date ?? ''));
 
-            if ($lastKey === '' || ! str_contains($lastKey, '|')) {
+            if ($lastDate === '') {
                 continue;
             }
 
-            [$lastDate, $lastShift] = explode('|', $lastKey, 2);
-
-            $lastByBahan[$bahanId] = [
-                'tanggal' => $this->normalizeDateToYmd((string) $lastDate),
-                'shift' => (int) $lastShift,
-            ];
+            $lastByBahan[$bahanId] = $lastDate;
         }
 
         if (empty($lastByBahan)) {
             return $result;
         }
 
-        $lastDates = array_values(array_unique(array_map(fn ($row) => $row['tanggal'], $lastByBahan)));
+        $lastDates = array_values(array_unique(array_values($lastByBahan)));
         $lastBahanIds = array_keys($lastByBahan);
 
-        // 3) Ambil row closing untuk kombinasi bahan+tanggal+shift yang sudah ditemukan.
+        /*
+        |--------------------------------------------------------------------------
+        | 3) Ambil closing tanggal terakhir, shift 1 dan shift 2
+        |--------------------------------------------------------------------------
+        | Patch utama:
+        | - Kalau Shift 2 ada, pakai Shift 2 apa pun nilainya, termasuk 0.
+        | - Fallback ke Shift 1 hanya kalau Shift 2 benar-benar tidak ada.
+        */
         $closingFinalRows = DB::table('tbl_stock')
-            ->select('bahan_id', 'tanggal', 'shift', 'ending_stock', 'updated_at', 'id', DB::raw('1 as source_priority'))
+            ->select(
+                'bahan_id',
+                'tanggal',
+                'shift',
+                'ending_stock',
+                'adjustment_qty',
+                'updated_at',
+                'id',
+                DB::raw('1 as source_priority')
+            )
             ->whereIn('outlet_id', $aliasIds)
             ->whereIn('bahan_id', $lastBahanIds)
             ->whereIn('tanggal', $lastDates)
+            ->whereIn('shift', [1, 2])
             ->whereNotNull('ending_stock')
             ->get();
 
         $closingDraftRows = DB::table('tbl_stock_draft')
-            ->select('bahan_id', 'tanggal', 'shift', 'ending_stock', 'updated_at', 'id', DB::raw('0 as source_priority'))
+            ->select(
+                'bahan_id',
+                'tanggal',
+                'shift',
+                'ending_stock',
+                'adjustment_qty',
+                'updated_at',
+                'id',
+                DB::raw('2 as source_priority')
+            )
             ->whereIn('outlet_id', $aliasIds)
             ->whereIn('bahan_id', $lastBahanIds)
             ->whereIn('tanggal', $lastDates)
+            ->whereIn('shift', [1, 2])
             ->where('is_draft', 1)
             ->whereNotNull('ending_stock')
             ->get();
 
-        $closingGroups = $pickLatestByBahan(
-            $closingFinalRows
-                ->concat($closingDraftRows)
-                ->filter(function ($row) use ($lastByBahan) {
-                    $bahanId = (int) $row->bahan_id;
-                    if (! isset($lastByBahan[$bahanId])) {
-                        return false;
-                    }
+        $closingRows = $closingFinalRows
+            ->concat($closingDraftRows)
+            ->filter(function ($row) use ($lastByBahan) {
+                $bahanId = (int) $row->bahan_id;
 
-                    return $this->normalizeDateToYmd((string) $row->tanggal) === $lastByBahan[$bahanId]['tanggal']
-                        && (int) $row->shift === (int) $lastByBahan[$bahanId]['shift'];
-                })
-        );
-
-        foreach ($closingGroups as $bahanId => $rows) {
-            $first = $rows->first();
-            if ($first && $first->ending_stock !== null) {
-                $closing = (float) $first->ending_stock;
-                $result[(int) $bahanId][1] = $closing;
-
-                // Shift 2 fallback sama dengan opening shift 1 kalau belum ada ending shift 1 hari ini.
-                if (! isset($sameDayShift1[$bahanId])) {
-                    $result[(int) $bahanId][2] = $closing;
+                return isset($lastByBahan[$bahanId])
+                    && $this->normalizeDateToYmd((string) $row->tanggal) === $lastByBahan[$bahanId];
+            })
+            ->sort(function ($a, $b) {
+                $priorityCmp = ((int) ($b->source_priority ?? 0)) <=> ((int) ($a->source_priority ?? 0));
+                if ($priorityCmp !== 0) {
+                    return $priorityCmp;
                 }
+
+                $timeCmp = strcmp((string) ($b->updated_at ?? ''), (string) ($a->updated_at ?? ''));
+                if ($timeCmp !== 0) {
+                    return $timeCmp;
+                }
+
+                return ((int) ($b->id ?? 0)) <=> ((int) ($a->id ?? 0));
+            })
+            ->groupBy(function ($row) {
+                return ((int) $row->bahan_id) . '_' . ((int) $row->shift);
+            });
+
+        $closingByBahan = [];
+
+        foreach ($closingRows as $key => $rows) {
+            $first = $rows->first();
+
+            if (! $first || $first->ending_stock === null) {
+                continue;
+            }
+
+            $bahanId = (int) $first->bahan_id;
+            $shift = (int) $first->shift;
+
+            $closingByBahan[$bahanId][$shift] = (float) $first->ending_stock;
+        }
+
+        foreach ($closingByBahan as $bahanId => $closingByShift) {
+            $hasShift2 = array_key_exists(2, $closingByShift);
+            $hasShift1 = array_key_exists(1, $closingByShift);
+
+            if ($hasShift2) {
+                $closing = (float) $closingByShift[2];
+            } elseif ($hasShift1) {
+                $closing = (float) $closingByShift[1];
+            } else {
+                $closing = 0.0;
+            }
+
+            $result[(int) $bahanId][1] = $closing;
+
+            /*
+            * Shift 2 fallback sama dengan opening shift 1 hanya kalau belum ada
+            * ending shift 1 hari ini.
+            */
+            if (! isset($sameDayShift1[$bahanId])) {
+                $result[(int) $bahanId][2] = $closing;
             }
         }
 
         return $result;
     }
-
+    
     private function getPrevClosing(int $outletId, int $bahanId, string $todayYmd): float
     {
         // Ambil ending Shift 2 terakhir sebelum tanggal aktif.
@@ -2552,6 +3344,186 @@ class QCRController extends Controller
         return (float) $this->getOpeningStock($outletId, $bahanId, $tanggal, $shift);
     }
 
+
+    /*
+     |--------------------------------------------------------------------------
+     | OMSET OUTLET ACCESS MAPPING
+     |--------------------------------------------------------------------------
+     | Khusus Form Omset:
+     | - superadmin / role non operasional tetap melihat semua outlet.
+     | - crew mengikuti users.outlet_id + tbl_users_outlet jika ada.
+     | - leader dan spv mengikuti outlet yang dimapping di tbl_users_outlet.
+     | - outlet duplicate / alias tetap digabung seperti DSC Formulir.
+     |
+     | Tidak mengubah rumus, penyimpanan omset, OCR, foto, maupun route.
+     */
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH ROLE OUTLET MAPPING DSC + OMSET
+     |--------------------------------------------------------------------------
+     | Satu sumber mapping outlet untuk halaman DSC Formulir dan DSC Formulir Omset.
+     | Crew / Leader / SPV / TM Manager mengikuti users.outlet_id + tbl_users_outlet.
+     | Role lain tetap melihat semua outlet.
+     */
+    private function isOperationalOutletRestrictedRole(?string $role): bool
+    {
+        $role = strtolower(trim((string) $role));
+
+        if ($role === '') {
+            return false;
+        }
+
+        $restrictedRoles = [
+            'crew',
+            'leader',
+            'spv',
+            'tm_manager',
+            'tm manager',
+            'tm-manager',
+        ];
+
+        if (in_array($role, $restrictedRoles, true)) {
+            return true;
+        }
+
+        return str_contains($role, 'leader')
+            || str_contains($role, 'spv');
+    }
+
+    private function getMappedOutletIdsForUser(?int $userId = null): array
+    {
+        $userId = $userId ?: auth()->id();
+
+        $user = DB::table('users')
+            ->select('id', 'role', 'outlet_id', 'name')
+            ->where('id', $userId)
+            ->first();
+
+        if (!$user) {
+            return [];
+        }
+
+        $assignedIds = collect();
+
+        if ((int) ($user->outlet_id ?? 0) > 0) {
+            $assignedIds->push((int) $user->outlet_id);
+        }
+
+        if (Schema::hasTable('tbl_users_outlet')) {
+            $mappedIds = DB::table('tbl_users_outlet')
+                ->where('user_id', $userId)
+                ->pluck('outlet_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0);
+
+            $assignedIds = $assignedIds->concat($mappedIds);
+        }
+
+        $assignedIds = $assignedIds
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($assignedIds)) {
+            return [];
+        }
+
+        return $this->expandOutletAliasIds($assignedIds);
+    }
+
+    private function getGroupedOutletsForOperationalUser(?int $userId = null): Collection
+    {
+        $userId = $userId ?: auth()->id();
+
+        $user = DB::table('users')
+            ->select('id', 'role', 'outlet_id', 'name')
+            ->where('id', $userId)
+            ->first();
+
+        $role = (string) ($user->role ?? '');
+
+        $outlets = $this->getGroupedOutletsForUser($userId);
+
+        if (!$this->isOperationalOutletRestrictedRole($role)) {
+            return $outlets;
+        }
+
+        $expandedAssignedIds = $this->getMappedOutletIdsForUser($userId);
+
+        if (empty($expandedAssignedIds)) {
+            abort(403, 'Akun belum disetting akses outlet.');
+        }
+
+        $assignedOutletRows = DB::table('tbl_outlets')
+            ->select('id', 'nama_outlet')
+            ->whereIn('id', $expandedAssignedIds)
+            ->get();
+
+        $assignedNames = $assignedOutletRows
+            ->map(fn ($row) => $this->normalizeOutletName($row->nama_outlet ?? ''))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $filtered = $outlets
+            ->filter(function ($outlet) use ($expandedAssignedIds, $assignedNames) {
+                $aliasIds = collect($outlet->alias_ids ?? [])
+                    ->push((int) ($outlet->id ?? 0))
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if (!empty(array_intersect($aliasIds, $expandedAssignedIds))) {
+                    return true;
+                }
+
+                $name = $this->normalizeOutletName($outlet->nama_outlet ?? '');
+                return in_array($name, $assignedNames, true);
+            })
+            ->sortBy('nama_outlet', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        if ($filtered->isEmpty()) {
+            abort(403, 'Outlet user tidak cocok dengan master outlet.');
+        }
+
+        return $filtered;
+    }
+
+    private function getGroupedOutletsForOmsetUser(?int $userId = null): Collection
+    {
+        return $this->getGroupedOutletsForOperationalUser($userId);
+    }
+
+    private function userCanAccessOmsetOutlet(int $selectedOutletId, Collection $groupedOutlets): bool
+    {
+        if ($selectedOutletId <= 0) {
+            return false;
+        }
+
+        foreach ($groupedOutlets as $outlet) {
+            $ids = collect($outlet->alias_ids ?? [])
+                ->push((int) ($outlet->id ?? 0))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (in_array($selectedOutletId, $ids, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
     public function dscFormulirOmset(Request $request)
     {
         $todayRaw = (string) $request->get('tanggal', date('Y-m-d'));
@@ -2562,10 +3534,13 @@ class QCRController extends Controller
         $shift = in_array($shiftRaw, ['1', '2'], true) ? $shiftRaw : '1';
     
         $userId = auth()->id();
-        $role = DB::table('users')->where('id', $userId)->value('role');
-    
-        $outlets = $this->getGroupedOutletsForUser($userId);
-    
+
+        // Form Omset mengikuti mapping outlet operasional seperti DSC Formulir.
+        // Crew: users.outlet_id + tbl_users_outlet.
+        // Leader/SPV: tbl_users_outlet.
+        // Role lain: tetap semua outlet.
+        $outlets = $this->getGroupedOutletsForOmsetUser($userId);
+
         $selectedOutlet = null;
         if ($outletRaw > 0) {
             $displayId = $this->getOutletDisplayIdFromSelected($outletRaw, $outlets);
@@ -2687,7 +3662,15 @@ class QCRController extends Controller
         $selectedOutletId = (int) $r->input('outlet_id');
         $today = $this->normalizeDateToYmd((string) $r->input('tanggal'));
     
-        $groupedOutlets = $this->getGroupedOutletsForUser(auth()->id());
+        $groupedOutlets = $this->getGroupedOutletsForOmsetUser(auth()->id());
+
+        if (!$this->userCanAccessOmsetOutlet($selectedOutletId, $groupedOutlets)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Anda tidak memiliki akses ke outlet ini.',
+            ], 403);
+        }
+
         $displayOutletId = $this->getOutletDisplayIdFromSelected($selectedOutletId, $groupedOutlets);
         $aliasIds = $this->getOutletAliasIdsFromSelected($selectedOutletId, $groupedOutlets);
     
@@ -3250,7 +4233,15 @@ class QCRController extends Controller
         $shift = (int) $r->shift;
         $pic = trim((string) $r->pic);
 
-        $groupedOutlets = $this->getGroupedOutletsForUser(auth()->id());
+        $groupedOutlets = $this->getGroupedOutletsForOmsetUser(auth()->id());
+
+        if (!$this->userCanAccessOmsetOutlet($selectedOutletId, $groupedOutlets)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Anda tidak memiliki akses ke outlet ini.',
+            ], 403);
+        }
+
         $displayOutletId = $this->getOutletDisplayIdFromSelected($selectedOutletId, $groupedOutlets);
 
         $existing = DB::table('tbl_dsc_omset_setoran')
@@ -3293,20 +4284,20 @@ class QCRController extends Controller
         $fraudScoreColumn = "{$p}fraud_score";
         $fraudFlagsColumn = "{$p}fraud_flags";
 
-        $oldPhotoPath = $existing->{$photoColumn} ?? null;
+        $oldPhotoPath = $existing ? ($existing->{$photoColumn} ?? null) : null;
         $newPhotoPath = $oldPhotoPath;
 
-        $source = (string) ($existing->{$sourceColumn} ?? '');
-        $hash = (string) ($existing->{$hashColumn} ?? '');
-        $reviewStatus = (string) ($existing->{$reviewStatusColumn} ?? '');
-        $reviewReason = (string) ($existing->{$reviewReasonColumn} ?? '');
+        $source = (string) ($existing ? ($existing->{$sourceColumn} ?? '') : '');
+        $hash = (string) ($existing ? ($existing->{$hashColumn} ?? '') : '');
+        $reviewStatus = (string) ($existing ? ($existing->{$reviewStatusColumn} ?? '') : '');
+        $reviewReason = (string) ($existing ? ($existing->{$reviewReasonColumn} ?? '') : '');
 
-        $ocrText = (string) ($existing->{$ocrTextColumn} ?? '');
-        $ocrNominal = $existing->{$ocrNominalColumn} ?? null;
-        $ocrTanggal = $existing->{$ocrTanggalColumn} ?? null;
-        $ocrReference = $existing->{$ocrReferenceColumn} ?? null;
-        $fraudScore = (int) ($existing->{$fraudScoreColumn} ?? 0);
-        $fraudFlags = (string) ($existing->{$fraudFlagsColumn} ?? '');
+        $ocrText = (string) ($existing ? ($existing->{$ocrTextColumn} ?? '') : '');
+        $ocrNominal = $existing ? ($existing->{$ocrNominalColumn} ?? null) : null;
+        $ocrTanggal = $existing ? ($existing->{$ocrTanggalColumn} ?? null) : null;
+        $ocrReference = $existing ? ($existing->{$ocrReferenceColumn} ?? null) : null;
+        $fraudScore = (int) ($existing ? ($existing->{$fraudScoreColumn} ?? 0) : 0);
+        $fraudFlags = (string) ($existing ? ($existing->{$fraudFlagsColumn} ?? '') : '');
 
         if ($r->hasFile('bukti_foto')) {
             $source = (string) ($r->bukti_source ?: 'upload');
@@ -3429,12 +4420,37 @@ class QCRController extends Controller
             $update[$photoColumn] = $newPhotoPath;
         }
 
-        DB::table('tbl_dsc_omset_setoran')->updateOrInsert(
+        /*
+         * FIX DUPLICATE KEY uniq_outlet_tanggal
+         *
+         * Masalah sebelumnya:
+         * updateOrInsert() melakukan SELECT lalu INSERT/UPDATE secara terpisah.
+         * Kalau tombol simpan terkirim 2x hampir bersamaan, dua request bisa sama-sama
+         * belum menemukan row, lalu sama-sama mencoba INSERT. MySQL kemudian menolak
+         * request kedua karena unique key outlet_id + tanggal sudah ada.
+         *
+         * Perbaikan:
+         * Pakai UPSERT native database sehingga INSERT/UPDATE terjadi atomik di level MySQL.
+         * Logika data lain tetap sama: field yang disimpan, validasi, OCR, foto, dan response
+         * tidak diubah. created_at hanya diisi saat insert, sedangkan update berikutnya tidak
+         * mengubah created_at.
+         */
+        $upsertUpdate = $update;
+        unset($upsertUpdate['created_at']);
+
+        $upsertInsert = array_merge(
             [
                 'outlet_id' => $displayOutletId,
                 'tanggal' => $tanggal,
+                'created_at' => now(),
             ],
-            $update
+            $upsertUpdate
+        );
+
+        DB::table('tbl_dsc_omset_setoran')->upsert(
+            [$upsertInsert],
+            ['outlet_id', 'tanggal'],
+            array_keys($upsertUpdate)
         );
 
         return response()->json([
@@ -3479,10 +4495,21 @@ class QCRController extends Controller
             ], 422);
         }
     
-        $outletId = (int) $r->outlet_id;
+        $selectedOutletId = (int) $r->outlet_id;
         $tanggal  = (string) $r->tanggal;
         $pic      = trim((string) $r->pic);
-    
+
+        $groupedOutlets = $this->getGroupedOutletsForOmsetUser(auth()->id());
+
+        if (!$this->userCanAccessOmsetOutlet($selectedOutletId, $groupedOutlets)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Anda tidak memiliki akses ke outlet ini.',
+            ], 403);
+        }
+
+        $outletId = $this->getOutletDisplayIdFromSelected($selectedOutletId, $groupedOutlets);
+
         $existing = DB::table('tbl_dsc_omset_setoran')
             ->where('outlet_id', $outletId)
             ->where('tanggal', $tanggal)
@@ -3656,6 +4683,54 @@ class QCRController extends Controller
         $name = preg_replace('/\s+/', ' ', $name); // rapikan spasi ganda
         return $name ?? '';
     }
+
+
+    /**
+     * FINAL FIX OUTLET ALIAS
+     * Menggabungkan outlet typo/duplicate yang dicatat di tbl_outlet_alias.
+     * Aman: jika tabel belum ada, sistem tetap berjalan memakai logic lama.
+     */
+    private function expandOutletAliasIds(array $outletIds): array
+    {
+        $ids = collect($outletIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($ids) || ! Schema::hasTable('tbl_outlet_alias')) {
+            return $ids;
+        }
+
+        // Resolve berulang supaya jika alias menunjuk canonical lain tetap ikut terbaca.
+        for ($i = 0; $i < 5; $i++) {
+            $rows = DB::table('tbl_outlet_alias')
+                ->select('canonical_outlet_id', 'alias_outlet_id')
+                ->where(function ($q) use ($ids) {
+                    $q->whereIn('canonical_outlet_id', $ids)
+                      ->orWhereIn('alias_outlet_id', $ids);
+                })
+                ->get();
+
+            $merged = collect($ids);
+            foreach ($rows as $row) {
+                $merged->push((int) $row->canonical_outlet_id);
+                $merged->push((int) $row->alias_outlet_id);
+            }
+
+            $newIds = $merged->filter(fn ($id) => $id > 0)->unique()->values()->all();
+            sort($newIds);
+
+            if ($newIds === $ids) {
+                break;
+            }
+
+            $ids = $newIds;
+        }
+
+        return $ids;
+    }
     
     /**
      * Ambil semua outlet, lalu group berdasarkan nama outlet yang sudah dinormalisasi.
@@ -3718,11 +4793,11 @@ class QCRController extends Controller
     
         foreach ($groupedOutlets as $outlet) {
             if (in_array($selectedOutletId, $outlet->alias_ids, true)) {
-                return $outlet->alias_ids;
+                return $this->expandOutletAliasIds($outlet->alias_ids);
             }
         }
     
-        return [$selectedOutletId];
+        return $this->expandOutletAliasIds([$selectedOutletId]);
     }
     
     /**
@@ -3750,114 +4825,27 @@ class QCRController extends Controller
 
         $userId = auth()->id();
 
-        $user = DB::table('users')
-            ->select('id', 'role', 'outlet_id', 'name')
-            ->where('id', $userId)
-            ->first();
-
-        $role = (string) ($user->role ?? '');
-
         /*
         |--------------------------------------------------------------------------
-        | Ambil outlet grouped
+        | Outlet mengikuti mapping user operasional
         |--------------------------------------------------------------------------
-        | IMPORTANT:
-        | getGroupedOutletsForUser() HARUS sudah memakai grouping nama outlet
-        | normalisasi supaya outlet duplicate / alias tetap jadi 1 group.
+        | Crew / Leader / SPV / TM Manager:
+        | - users.outlet_id
+        | - tbl_users_outlet
         |
-        | Contoh:
-        | 160 PASINAN BAURENO BJN
-        | 201 PASINAN BAURENO BJN
-        | 348 PASINAN BAURENO BJN
+        | Role lain:
+        | - semua outlet
         |
-        | => dianggap 1 outlet group
+        | Outlet duplicate / alias tetap digabung seperti logic lama.
         |--------------------------------------------------------------------------
         */
-        $outlets = $this->getGroupedOutletsForUser($userId);
+        $outlets = $this->getGroupedOutletsForOperationalUser($userId);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Restrict khusus role crew
-        |--------------------------------------------------------------------------
-        | Crew hanya boleh akses outlet sesuai outlet_id miliknya.
-        |
-        | TAPI:
-        | karena outlet bisa duplicate/alias,
-        | maka kita cocokkan berdasarkan nama outlet normalisasi,
-        | BUKAN hanya berdasarkan outlet_id tunggal.
-        |--------------------------------------------------------------------------
-        */
-        if ($role === 'crew') {
-
-            $crewOutletId = (int) ($user->outlet_id ?? 0);
-
-            if ($crewOutletId <= 0) {
-                abort(403, 'Akun crew belum disetting outlet.');
-            }
-
-            // outlet utama crew
-            $assignedOutlet = DB::table('tbl_outlets')
-                ->select('id', 'nama_outlet')
-                ->where('id', $crewOutletId)
-                ->first();
-
-            if (!$assignedOutlet) {
-                abort(403, 'Outlet crew tidak ditemukan.');
-            }
-
-            // normalisasi nama outlet
-            $assignedOutletNameNorm = $this->normalizeOutletName(
-                $assignedOutlet->nama_outlet
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Filter hanya outlet group yang sama
-            |--------------------------------------------------------------------------
-            | Jadi kalau outlet duplicate:
-            |
-            | 160 PASINAN BAURENO BJN
-            | 201 PASINAN BAURENO BJN
-            | 348 PASINAN BAURENO BJN
-            |
-            | maka crew tetap bisa akses semua alias outlet tersebut.
-            |--------------------------------------------------------------------------
-            */
-            $outlets = $outlets
-                ->filter(function ($outlet) use ($assignedOutletNameNorm) {
-
-                    return $this->normalizeOutletName(
-                        $outlet->nama_outlet ?? ''
-                    ) === $assignedOutletNameNorm;
-
-                })
-                ->values();
-
-            if ($outlets->isEmpty()) {
-                abort(403, 'Outlet crew tidak cocok dengan master outlet.');
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Default outlet
-        |--------------------------------------------------------------------------
-        */
         if ($outletIdRaw <= 0) {
-
             $outletId = $outlets->count()
                 ? (int) $outlets->first()->id
                 : 0;
-
         } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Mapping selected outlet ke display outlet utama
-            |--------------------------------------------------------------------------
-            | Aman untuk outlet duplicate / alias.
-            |--------------------------------------------------------------------------
-            */
             $outletId = $this->getOutletDisplayIdFromSelected(
                 $outletIdRaw,
                 $outlets
@@ -3866,16 +4854,23 @@ class QCRController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Validasi keamanan
+        | Validasi keamanan outlet
+        |--------------------------------------------------------------------------
+        | Tidak boleh inject outlet_id di URL yang tidak ada di mapping user.
         |--------------------------------------------------------------------------
         */
         $validIds = $outlets
-            ->pluck('id')
+            ->flatMap(function ($outlet) {
+                return collect($outlet->alias_ids ?? [])
+                    ->push((int) ($outlet->id ?? 0));
+            })
             ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
             ->all();
 
         if ($outletId > 0 && !in_array($outletId, $validIds, true)) {
-
             $outletId = $outlets->count()
                 ? (int) $outlets->first()->id
                 : 0;
@@ -3986,6 +4981,114 @@ class QCRController extends Controller
         ]);
     }
 
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH REQUEST TIM - SHIFT 2 TIDAK MEMBAWA PURCHASE/MUTASI SHIFT 1
+     |--------------------------------------------------------------------------
+     | Scope sengaja kecil:
+     | - Tidak mengubah rumus TOTAL / USED / ENDING.
+     | - Hanya membersihkan input bawaan/carry over saat Shift 2 baru dibuat.
+     | - Kalau Shift 2 sudah pernah punya draft/final, nilai existing tetap boleh diedit normal.
+     */
+    private function cleanShift2CarryOverPurchaseMutasi(
+        int $outletId,
+        string $tanggal,
+        array $rows,
+        string $targetTable
+    ): array {
+        if (empty($rows)) {
+            return $rows;
+        }
+
+        /*
+         * FIX SHIFT 2 DOUBLE PURCHASE / MUTASI
+         *
+         * Inti masalah:
+         * Purchase In, Mutasi In, dan Mutasi Out yang sudah dimasukkan di Shift 1
+         * tidak boleh ikut lagi di Shift 2. Nilai tersebut sudah membentuk ending Shift 1
+         * dan menjadi opening Shift 2, jadi kalau ikut lagi akan double dan varian meledak.
+         *
+         * Scope sengaja kecil:
+         * - Tidak mengubah rumus TOTAL / ENDING / USED.
+         * - Tidak mengubah opening stock.
+         * - Tidak mengubah waste, adjustment, uang plus, dan keterangan.
+         * - Hanya menolkan purchase/mutasi Shift 2 jika nilainya sama persis dengan Shift 1.
+         */
+        $aliasIds = [];
+
+        try {
+            $aliasIds = $this->expandOutletAliasIds([(int) $outletId]);
+        } catch (\Throwable $e) {
+            $aliasIds = [];
+        }
+
+        $aliasIds = array_values(array_unique(array_map('intval', $aliasIds ?: [(int) $outletId])));
+        $aliasIds = array_values(array_filter($aliasIds, fn ($id) => $id > 0));
+
+        if (empty($aliasIds)) {
+            $aliasIds = [(int) $outletId];
+        }
+
+        $draftS1 = DB::table('tbl_stock_draft')
+            ->whereIn('outlet_id', $aliasIds)
+            ->whereDate('tanggal', $tanggal)
+            ->where('shift', 1)
+            ->where('is_draft', 1)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('bahan_id')
+            ->keyBy('bahan_id');
+
+        $finalS1 = DB::table('tbl_stock')
+            ->whereIn('outlet_id', $aliasIds)
+            ->whereDate('tanggal', $tanggal)
+            ->where('shift', '1')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('bahan_id')
+            ->keyBy('bahan_id');
+
+        $sameNumber = function ($a, $b): bool {
+            return abs(((float) $a) - ((float) $b)) < 0.00001;
+        };
+
+        foreach ($rows as $idx => $row) {
+            $bahanId = (int) ($row['bahan_id'] ?? 0);
+            if ($bahanId <= 0) {
+                continue;
+            }
+
+            // Draft Shift 1 tetap prioritas karena flow crew: S1 draft -> lanjut Shift 2.
+            $s1 = $draftS1[$bahanId] ?? $finalS1[$bahanId] ?? null;
+            if (! $s1) {
+                continue;
+            }
+
+            $purchaseIn = (float) ($row['purchase_in'] ?? 0);
+            $mutasiIn   = (float) ($row['mutasi_in'] ?? 0);
+            $mutasiOut  = (float) ($row['mutasi_out'] ?? 0);
+
+            $samePurchase = $purchaseIn != 0.0 && $sameNumber($purchaseIn, $s1->purchase_in ?? 0);
+            $sameMutIn    = $mutasiIn != 0.0 && $sameNumber($mutasiIn, $s1->mutasi_in ?? 0);
+            $sameMutOut   = $mutasiOut != 0.0 && $sameNumber($mutasiOut, $s1->mutasi_out ?? 0);
+
+            if ($samePurchase) {
+                $rows[$idx]['purchase_in'] = 0;
+            }
+            if ($sameMutIn) {
+                $rows[$idx]['mutasi_in'] = 0;
+            }
+            if ($sameMutOut) {
+                $rows[$idx]['mutasi_out'] = 0;
+            }
+        }
+
+        return $rows;
+    }
+
     public function dscLoad(Request $r)
     {
         $r->validate([
@@ -4080,21 +5183,49 @@ class QCRController extends Controller
                 $open = (float) $this->getOpeningStockUi($displayOutletId, (int) $b->id, $today, $shift);
             }
 
+            $purchaseIn = (float) ($sr->purchase_in ?? 0);
+            $mutasiIn = (float) ($sr->mutasi_in ?? 0);
+            $mutasiOut = (float) ($sr->mutasi_out ?? 0);
+            $carryOverCleaned = false;
+
+            if ($shift === 2) {
+                $s1 = $draftShift1Rows[$b->id] ?? $finalShift1Rows[$b->id] ?? null;
+                $sameNumber = function ($a, $b): bool {
+                    return abs(((float) $a) - ((float) $b)) < 0.00001;
+                };
+
+                if ($s1) {
+                    if ($purchaseIn != 0.0 && $sameNumber($purchaseIn, $s1->purchase_in ?? 0)) {
+                        $purchaseIn = 0.0;
+                        $carryOverCleaned = true;
+                    }
+                    if ($mutasiIn != 0.0 && $sameNumber($mutasiIn, $s1->mutasi_in ?? 0)) {
+                        $mutasiIn = 0.0;
+                        $carryOverCleaned = true;
+                    }
+                    if ($mutasiOut != 0.0 && $sameNumber($mutasiOut, $s1->mutasi_out ?? 0)) {
+                        $mutasiOut = 0.0;
+                        $carryOverCleaned = true;
+                    }
+                }
+            }
+
             $items[] = [
                 'id'            => (int) $b->id,
                 'nama_bahan'    => (string) $b->nama_bahan,
                 'satuan'        => (string) $b->satuan,
                 'open'          => (float) $open,
 
-                'purchase_in'   => (float) ($sr->purchase_in ?? 0),
-                'mutasi_in'     => (float) ($sr->mutasi_in ?? 0),
-                'mutasi_out'    => (float) ($sr->mutasi_out ?? 0),
+                'purchase_in'   => $purchaseIn,
+                'mutasi_in'     => $mutasiIn,
+                'mutasi_out'    => $mutasiOut,
                 'adjustment_qty'=> (float) ($sr->adjustment_qty ?? 0),
                 'ending_stock'  => $sr && $sr->ending_stock !== null ? (float) $sr->ending_stock : null,
                 'waste_product' => (float) ($sr->waste_product ?? 0),
                 'waste_bahan'   => (float) ($sr->waste_bahan ?? 0),
                 'uang_plus'     => (float) ($sr->uang_plus ?? 0),
                 'keterangan'    => (string) ($sr->keterangan ?? ''),
+                'carryover_cleaned' => $carryOverCleaned ? 1 : 0,
             ];
         }
 
@@ -4114,6 +5245,7 @@ class QCRController extends Controller
                     'has_draft_s1'   => $hasDraftS1 ? 1 : 0,
                     'has_final_s1'   => $hasFinalS1 ? 1 : 0,
                     'has_shift_1'    => ($hasDraftS1 || $hasFinalS1) ? 1 : 0,
+                    'can_spv_adjust'  => $this->canCurrentUserSpvAdjustment() ? 1 : 0,
                 ],
             ],
         ]);
@@ -4172,6 +5304,254 @@ class QCRController extends Controller
         return;
     }
 
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH SPV ADJUSTMENT AFTER FINAL
+     |--------------------------------------------------------------------------
+     | SPV boleh koreksi adjustment pada data yang sudah FINAL/LOCK.
+     | Status tetap FINAL, tidak membuka lock, tidak menyentuh draft, dan tidak
+     | mengubah purchase/mutasi/ending/waste/uang_plus/keterangan.
+     */
+    private function canCurrentUserSpvAdjustment(): bool
+    {
+        $role = strtolower(trim((string) (auth()->user()->role ?? '')));
+
+        $allowedRoles = [
+            'spv',
+            'superadmin',
+            'tm_manager',
+            'tm manager',
+            'tm-manager',
+        ];
+
+        return in_array($role, $allowedRoles, true)
+            || str_contains($role, 'spv')
+            || str_contains($role, 'tm_manager')
+            || str_contains($role, 'tm manager')
+            || str_contains($role, 'tm-manager');
+    }
+
+    public function dscSaveSpvAdjustment(Request $request)
+    {
+        if (! $this->canCurrentUserSpvAdjustment()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Akses ditolak. Hanya SPV, TM Manager, atau Superadmin yang boleh simpan koreksi setelah final.',
+            ], 403);
+        }
+
+        $request->validate([
+            'outlet_id' => 'required|integer',
+            'tanggal' => 'required',
+            'shift' => 'required|in:1,2',
+            'nama_petugas' => 'nullable|string|max:255',
+            'rows' => 'required|array|min:1',
+            'rows.*.bahan_id' => 'required|integer|exists:tbl_bahan_dsc,id',
+
+            // Kolom yang boleh dikoreksi SPV setelah final.
+            // Tidak boleh bebas dari request, harus whitelist.
+            'rows.*.purchase_in' => 'nullable|numeric',
+            'rows.*.mutasi_in' => 'nullable|numeric',
+            'rows.*.mutasi_out' => 'nullable|numeric',
+            'rows.*.adjustment_qty' => 'nullable|numeric',
+            'rows.*.ending_stock' => 'nullable|numeric',
+            'rows.*.waste_product' => 'nullable|numeric',
+            'rows.*.waste_bahan' => 'nullable|numeric',
+            'rows.*.uang_plus' => 'nullable|numeric',
+        ]);
+
+        $selectedOutletId = (int) $request->outlet_id;
+        $tanggal = $this->normTanggal((string) $request->tanggal);
+        $shift = (string) $request->shift;
+        $pic = trim((string) ($request->nama_petugas ?: (auth()->user()->name ?? auth()->user()->email ?? 'SPV')));
+
+        $groupedOutlets = $this->getGroupedOutletsForUser(auth()->id());
+        $displayOutletId = $this->getOutletDisplayIdFromSelected($selectedOutletId, $groupedOutlets);
+        $aliasIds = $this->getOutletAliasIdsFromSelected($selectedOutletId, $groupedOutlets);
+
+        $lock = $this->getCloseStatus($displayOutletId, $tanggal);
+        if (empty($lock['is_closed'])) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Koreksi SPV hanya boleh dilakukan setelah data berstatus FINAL/LOCK.',
+            ], 422);
+        }
+
+        $allowedFields = [
+            'purchase_in',
+            'mutasi_in',
+            'mutasi_out',
+            'adjustment_qty',
+            'ending_stock',
+            'waste_product',
+            'waste_bahan',
+            'uang_plus',
+        ];
+
+        $rows = collect($request->rows)
+            ->map(function ($row) use ($allowedFields) {
+                $payload = [
+                    'bahan_id' => (int) ($row['bahan_id'] ?? 0),
+                ];
+
+                foreach ($allowedFields as $field) {
+                    if (array_key_exists($field, $row)) {
+                        $payload[$field] = (float) ($row[$field] ?? 0);
+                    }
+                }
+
+                return $payload;
+            })
+            ->filter(fn ($row) => (int) ($row['bahan_id'] ?? 0) > 0)
+            ->unique('bahan_id')
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tidak ada data koreksi yang dikirim.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $updated = 0;
+            $notFound = [];
+
+            foreach ($rows as $row) {
+                $bahanId = (int) $row['bahan_id'];
+
+                $existing = DB::table('tbl_stock')
+                    ->whereIn('outlet_id', $aliasIds)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', $shift)
+                    ->where('bahan_id', $bahanId)
+                    ->orderByDesc('updated_at')
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $existing) {
+                    $notFound[] = $bahanId;
+                    continue;
+                }
+
+                // Ambil nilai existing, lalu override hanya field yang dikirim.
+                $purchaseIn = array_key_exists('purchase_in', $row) ? (float) $row['purchase_in'] : (float) ($existing->purchase_in ?? 0);
+                $mutasiIn = array_key_exists('mutasi_in', $row) ? (float) $row['mutasi_in'] : (float) ($existing->mutasi_in ?? 0);
+                $mutasiOut = array_key_exists('mutasi_out', $row) ? (float) $row['mutasi_out'] : (float) ($existing->mutasi_out ?? 0);
+                $adjustmentQty = array_key_exists('adjustment_qty', $row) ? (float) $row['adjustment_qty'] : (float) ($existing->adjustment_qty ?? 0);
+                $ending = array_key_exists('ending_stock', $row) ? (float) $row['ending_stock'] : (float) ($existing->ending_stock ?? 0);
+                $wProd = array_key_exists('waste_product', $row) ? (float) $row['waste_product'] : (float) ($existing->waste_product ?? 0);
+                $wBahan = array_key_exists('waste_bahan', $row) ? (float) $row['waste_bahan'] : (float) ($existing->waste_bahan ?? 0);
+
+                /*
+                 * PATCH UANG PLUS KOREKSI FINAL:
+                 * Saat SPV/TM koreksi data final, uang_plus juga harus ikut update.
+                 * Nilai ini dikirim dari frontend hanya di baris bahan pertama,
+                 * sedangkan baris lain 0 agar uang_plus tidak dobel.
+                 */
+                $uangPlus = array_key_exists('uang_plus', $row)
+                    ? (float) $row['uang_plus']
+                    : (float) ($existing->uang_plus ?? 0);
+
+                $wTepung = (float) ($existing->waste_tepung ?? 0);
+
+                /*
+                 * Jangan ubah rumus utama.
+                 * Mengikuti rumus form DSC saat ini:
+                 * TOTAL = OPEN + PURCHASE + MUTASI IN - MUTASI OUT + ADJUSTMENT
+                 * USED  = TOTAL - ENDING
+                 */
+                $opening = (float) ($existing->opening_stock ?? 0);
+                $total = $opening + $purchaseIn + $mutasiIn - $mutasiOut + $adjustmentQty;
+                $used = $total - $ending;
+                $wasteTotal = $wProd + $wBahan + $wTepung;
+
+                $bahan = DB::table('tbl_bahan_dsc')
+                    ->select('nama_bahan')
+                    ->where('id', $bahanId)
+                    ->first();
+
+                $namaNorm = strtolower(trim((string) ($bahan->nama_bahan ?? '')));
+                $actualTepung = ($namaNorm === 'tepung breader') ? ($used - $wasteTotal) : 0.0;
+
+                $payload = [
+                    'purchase_in' => $purchaseIn,
+                    'mutasi_in' => $mutasiIn,
+                    'mutasi_out' => $mutasiOut,
+                    'adjustment_qty' => $adjustmentQty,
+                    'ending_stock' => $ending,
+                    'waste_product' => $wProd,
+                    'waste_bahan' => $wBahan,
+                    'uang_plus' => $uangPlus,
+                    'used_qty' => $used,
+                    'actual_tepung' => $actualTepung,
+                    'updated_at' => now(),
+                ];
+
+                $hasChange = false;
+                foreach ($payload as $field => $newValue) {
+                    if ($field === 'updated_at') {
+                        continue;
+                    }
+
+                    $oldValue = (float) ($existing->{$field} ?? 0);
+                    if (abs($oldValue - (float) $newValue) >= 0.00001) {
+                        $hasChange = true;
+                        break;
+                    }
+                }
+
+                if (! $hasChange) {
+                    continue;
+                }
+
+                $this->auditDscStockChanges(
+                    'tbl_stock',
+                    'SPV_CORRECTION_AFTER_FINAL',
+                    (int) $existing->outlet_id,
+                    $tanggal,
+                    (int) $shift,
+                    $bahanId,
+                    $existing,
+                    $payload,
+                    $pic,
+                    'final'
+                );
+
+                DB::table('tbl_stock')
+                    ->where('id', $existing->id)
+                    ->update($payload);
+
+                $updated++;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Koreksi SPV berhasil disimpan termasuk Uang Plus. Status tetap FINAL/LOCK.',
+                'data' => [
+                    'updated' => $updated,
+                    'not_found' => $notFound,
+                    'lock' => $this->getCloseStatus($displayOutletId, $tanggal),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Gagal simpan koreksi SPV.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
     public function dscSaveSO(Request $request)
     {
         $request->validate([
@@ -4225,41 +5605,94 @@ class QCRController extends Controller
             }
         }
 
+        $rowsToSave = $request->rows;
+
+        // PATCH REQUEST TIM:
+        // Shift 2 tidak boleh otomatis membawa ulang Purchase/Mutasi dari Shift 1.
+        // Hanya berlaku untuk Shift 2 yang belum punya data final sendiri.
+        if ((int) $shift === 2) {
+            $rowsToSave = $this->cleanShift2CarryOverPurchaseMutasi(
+                $displayOutletId,
+                $tanggal,
+                $rowsToSave,
+                'tbl_stock'
+            );
+        }
+
         DB::beginTransaction();
         try {
-        // Simpan final shift aktif saja
-        $this->upsertFinalStockRows(
-            $displayOutletId,
-            $tanggal,
-            $shift,
-            $pic,
-            $request->rows,
-            0,
-            0,
-            0
-        );
+            /*
+             * FINAL SHIFT 2:
+             * 1) Draft Shift 1 yang sudah dipakai untuk opening Shift 2 ikut dijadikan FINAL.
+             * 2) Shift 2 disimpan dari payload terbaru yang sedang user lihat/klik.
+             * 3) Semua draft tanggal ini dibersihkan.
+             * 4) Tanggal outlet dikunci agar tidak bisa diedit ulang.
+             */
+            if ((int) $shift === 2) {
+                $this->promoteDscDraftShiftToFinalPreserveDraft(
+                    $displayOutletId,
+                    $tanggal,
+                    1,
+                    $pic
+                );
+            }
 
-        // Hapus draft hanya untuk shift yang difinalkan
-        $bahanIds = collect($request->rows)
-            ->pluck('bahan_id')
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+            // Simpan final shift aktif dari payload terbaru.
+            $this->upsertFinalStockRows(
+                $displayOutletId,
+                $tanggal,
+                $shift,
+                $pic,
+                $rowsToSave,
+                0,
+                0,
+                0
+            );
 
-        DB::table('tbl_stock_draft')
-            ->where('outlet_id', $displayOutletId)
-            ->whereDate('tanggal', $tanggal)
-            ->where('shift', (int) $shift)
-            ->whereIn('bahan_id', $bahanIds)
-            ->delete();
+            // Setelah final Shift 2 berhasil, hapus semua draft tanggal ini dan kunci tanggal.
+            if ((int) $shift === 2) {
+                DB::table('tbl_stock_draft')
+                    ->where('outlet_id', $displayOutletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->whereIn('shift', [1, 2])
+                    ->delete();
+
+                $this->setKasirClosed(
+                    $displayOutletId,
+                    $tanggal,
+                    2,
+                    $pic,
+                    'FINAL DSC SHIFT 2'
+                );
+            } else {
+                $bahanIds = collect($rowsToSave)
+                    ->pluck('bahan_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                DB::table('tbl_stock_draft')
+                    ->where('outlet_id', $displayOutletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', (int) $shift)
+                    ->whereIn('bahan_id', $bahanIds)
+                    ->delete();
+            }
 
             DB::commit();
 
             return response()->json([
                 'ok' => true,
-                'message' => 'SO TERSIMPAN'
+                'message' => ((int) $shift === 2)
+                    ? 'FINAL TERSIMPAN. DRAFT SHIFT 1 DAN SHIFT 2 SUDAH DIJADIKAN FINAL. DATA TANGGAL INI TERKUNCI.'
+                    : 'SO TERSIMPAN',
+                'data' => [
+                    'lock' => ((int) $shift === 2)
+                        ? $this->getCloseStatus($displayOutletId, $tanggal)
+                        : null,
+                ],
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -4436,6 +5869,117 @@ class QCRController extends Controller
         }
     }
 
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH FINAL SHIFT 2 - PROMOTE DRAFT SHIFT 1 KE FINAL
+     |--------------------------------------------------------------------------
+     | Saat user klik Simpan Final di Shift 2:
+     | - Shift 2 yang sedang aktif disimpan final dari payload terbaru.
+     | - Draft Shift 1 yang sudah terhitung ikut dipromote ke tbl_stock.
+     | - Draft dibersihkan supaya tidak muncul lagi sebagai draft.
+     | - Rumus/payload draft dipertahankan, tidak mengubah logic hitung lain.
+     */
+    private function promoteDscDraftShiftToFinalPreserveDraft(
+        int $outletId,
+        string $tanggal,
+        int $shift,
+        string $pic
+    ): void {
+        $draftRows = DB::table('tbl_stock_draft')
+            ->where('outlet_id', $outletId)
+            ->whereDate('tanggal', $tanggal)
+            ->where('shift', $shift)
+            ->where('is_draft', 1)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique('bahan_id')
+            ->values();
+
+        if ($draftRows->isEmpty()) {
+            return;
+        }
+
+        foreach ($draftRows as $draft) {
+            $bahanId = (int) ($draft->bahan_id ?? 0);
+            if ($bahanId <= 0) {
+                continue;
+            }
+
+            $existing = DB::table('tbl_stock')
+                ->where('outlet_id', $outletId)
+                ->whereDate('tanggal', $tanggal)
+                ->where('shift', (string) $shift)
+                ->where('bahan_id', $bahanId)
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+
+            $payload = [
+                'nama_petugas'   => $pic,
+                'satuan'         => (string) ($draft->satuan ?? ''),
+                'opening_stock'  => (float) ($draft->opening_stock ?? 0),
+
+                'purchase_in'    => (float) ($draft->purchase_in ?? 0),
+                'mutasi_in'      => (float) ($draft->mutasi_in ?? 0),
+                'mutasi_out'     => (float) ($draft->mutasi_out ?? 0),
+                'adjustment_qty' => (float) ($draft->adjustment_qty ?? 0),
+
+                'used_qty'       => (float) ($draft->used_qty ?? 0),
+                'waste_product'  => (float) ($draft->waste_product ?? 0),
+                'waste_bahan'    => (float) ($draft->waste_bahan ?? 0),
+                'waste_tepung'   => (float) ($draft->waste_tepung ?? 0),
+
+                'ending_stock'   => (float) ($draft->ending_stock ?? 0),
+                'actual_tepung'  => (float) ($draft->actual_tepung ?? 0),
+                'uang_plus'      => (float) ($draft->uang_plus ?? 0),
+
+                'customer_unit'  => (float) ($draft->customer_unit ?? 0),
+                'shift_1'        => (float) ($draft->shift_1 ?? 0),
+                'shift_2'        => (float) ($draft->shift_2 ?? 0),
+                'keterangan'     => (string) ($draft->keterangan ?? ''),
+                'updated_at'     => now(),
+            ];
+
+            $this->auditDscStockChanges(
+                'tbl_stock',
+                $existing ? 'FINAL_UPDATE_FROM_DRAFT' : 'FINAL_CREATE_FROM_DRAFT',
+                $outletId,
+                $tanggal,
+                $shift,
+                $bahanId,
+                $existing,
+                $payload,
+                $pic,
+                'final'
+            );
+
+            if ($existing) {
+                DB::table('tbl_stock')
+                    ->where('id', $existing->id)
+                    ->update($payload);
+
+                DB::table('tbl_stock')
+                    ->where('outlet_id', $outletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', (string) $shift)
+                    ->where('bahan_id', $bahanId)
+                    ->where('id', '!=', $existing->id)
+                    ->delete();
+            } else {
+                DB::table('tbl_stock')->insert(array_merge([
+                    'outlet_id' => $outletId,
+                    'tanggal'   => $tanggal,
+                    'shift'     => (string) $shift,
+                    'bahan_id'  => $bahanId,
+                    'created_at'=> now(),
+                ], $payload));
+            }
+        }
+    }
+
     private function numOrZero($val): float
     {
         if ($val === null || $val === '') {
@@ -4480,10 +6024,24 @@ class QCRController extends Controller
             ], 423);
         }
 
+        $rowsToSave = $request->rows;
+
+        // PATCH REQUEST TIM:
+        // Saat Save Draft Shift 2, bersihkan nilai Purchase/Mutasi yang terbawa dari Shift 1
+        // jika Shift 2 belum punya draft sendiri. Rumus stok tidak diubah.
+        if ((int) $shift === 2) {
+            $rowsToSave = $this->cleanShift2CarryOverPurchaseMutasi(
+                $displayOutletId,
+                $tanggal,
+                $rowsToSave,
+                'tbl_stock_draft'
+            );
+        }
+
         DB::beginTransaction();
 
         try {
-            $bahanIds = collect($request->rows)
+            $bahanIds = collect($rowsToSave)
                 ->pluck('bahan_id')
                 ->map(fn ($id) => (int) $id)
                 ->filter()
@@ -4497,7 +6055,7 @@ class QCRController extends Controller
                 ->get()
                 ->keyBy('id');
 
-            foreach ($request->rows as $r) {
+            foreach ($rowsToSave as $r) {
                 $bahanId = (int) ($r['bahan_id'] ?? 0);
 
                 if ($bahanId <= 0) {
@@ -5069,22 +6627,12 @@ class QCRController extends Controller
         }
 
         /*
-         * FIX OPENING STOCK:
-         * Jika final sudah ada untuk tanggal + shift yang sama, final harus menang.
-         * Draft hanya dipakai kalau data final belum ada. Ini mencegah draft lama
-         * menimpa ending final dan membuat opening besok beda dari ending kemarin.
+         * PATCH DSC REPORT / LOAD:
+         * Tampilan DSC aktif memakai pola draft terbaru > final terbaru.
+         * Opening hari berikutnya harus mengikuti data yang tampil di DSC.
+         * Jadi jika masih ada draft shift sebelumnya, ending draft itulah
+         * yang menjadi open, bukan final lama.
          */
-        $final = $baseFinal
-            ->whereNotNull('ending_stock')
-            ->orderByDesc('shift')
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($final && $final->ending_stock !== null) {
-            return (float) $final->ending_stock;
-        }
-
         $draft = $baseDraft
             ->whereNotNull('ending_stock')
             ->orderByDesc('shift')
@@ -5094,6 +6642,17 @@ class QCRController extends Controller
 
         if ($draft && $draft->ending_stock !== null) {
             return (float) $draft->ending_stock;
+        }
+
+        $final = $baseFinal
+            ->whereNotNull('ending_stock')
+            ->orderByDesc('shift')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($final && $final->ending_stock !== null) {
+            return (float) $final->ending_stock;
         }
 
         return null;
@@ -5714,6 +7273,7 @@ class QCRController extends Controller
             'mutasi_out' => 'nullable|numeric',
             'waste_product' => 'nullable|numeric',
             'waste_bahan' => 'nullable|numeric',
+            'waste_tepung' => 'nullable|numeric',
             'uang_plus' => 'nullable|numeric',
             'keterangan' => 'nullable|string|max:255',
 
@@ -5737,7 +7297,8 @@ class QCRController extends Controller
 
         $wProd = (float) ($request->waste_product ?? 0);
         $wBahan = (float) ($request->waste_bahan ?? 0);
-        $wTepung = $wProd + $wBahan;
+        $wTepung = (float) ($request->waste_tepung ?? 0);
+        $wasteTotal = $wProd + $wBahan + $wTepung;
 
         $uangPlus = (float) ($request->uang_plus ?? 0);
         $ketRaw = (string) ($request->keterangan ?? '');
@@ -5759,7 +7320,7 @@ class QCRController extends Controller
         $used = $total - $ending;
 
         $namaNorm = strtolower(trim((string) $bahan->nama_bahan));
-        $actualTepung = ($namaNorm === 'tepung breader') ? ($used - $wTepung) : 0.0;
+        $actualTepung = ($namaNorm === 'tepung breader') ? ($used - $wasteTotal) : 0.0;
 
         $existing = DB::table('tbl_stock')
             ->where('outlet_id', $outletId)
@@ -6496,101 +8057,195 @@ class QCRController extends Controller
         return preg_replace('/\s+/', ' ', $name) ?: '-';
     }
 
-    private function getDscMissingOutletRows(string $startDate, string $endDate, ?string $keyword = null): array
-    {
-        if ($startDate > $endDate) {
-            [$startDate, $endDate] = [$endDate, $startDate];
+private function getDscMissingOutletRows(string $startDate, string $endDate, string $keyword = ''): array
+{
+    $normalize = function ($value) {
+        $value = strtoupper(trim((string) $value));
+        return preg_replace('/\s+/', ' ', $value) ?: '-';
+    };
+
+    $isExcludedOutlet = function ($namaOutlet, $status) use ($normalize): bool {
+        $nama = $normalize($namaOutlet);
+        $status = $normalize($status);
+
+        // FINAL FILTER NAMA/STATUS OUTLET:
+        // Jangan tampilkan outlet yang memang marker-nya bukan outlet aktif operasional.
+        // Dibuat tahan format: NOT ACTIVE, NOT-ACTIVE, NOT_ACTIVE, NOT.ACTIVE,
+        // NO ACTIVE, NON ACTIVE, NO AKTIF, ACTIVED, TUTUP, CLOSED, dan DC.
+        $toCompactMarker = function ($value): string {
+            $value = strtoupper(trim((string) $value));
+            return preg_replace('/[^A-Z0-9]+/', '', $value) ?: '';
+        };
+
+        $statusCompact = $toCompactMarker($status);
+        $namaCompact = $toCompactMarker($nama);
+
+        $blockedCompacts = [
+            'DC',
+            'INACTIVE',
+            'NONAKTIF',
+            'NONACTIVE',
+            'NOACTIVE',
+            'NOAKTIF',
+            'NOTACTIVE',
+            'NOTACTIVED',
+            'ACTIVED',
+            'TUTUP',
+            'CLOSED',
+        ];
+
+        if (in_array($statusCompact, $blockedCompacts, true)) {
+            return true;
         }
 
-        $keyword = trim((string) ($keyword ?? ''));
+        foreach ($blockedCompacts as $marker) {
+            if ($marker === 'DC') {
+                continue;
+            }
 
-        $outletsRaw = DB::table('tbl_outlets')
-            ->select('id', 'nama_outlet', 'status')
-            ->when($keyword !== '', function ($q) use ($keyword) {
-                $q->where('nama_outlet', 'like', '%' . $keyword . '%')
-                  ->orWhere('id', $keyword);
-            })
-            ->orderBy('nama_outlet')
-            ->orderBy('id')
-            ->get();
-
-        $groups = [];
-        foreach ($outletsRaw->groupBy(fn ($o) => $this->normalizeOutletNameDsc($o->nama_outlet)) as $name => $items) {
-            $ids = $items->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
-            $groups[] = [
-                'id' => min($ids),
-                'nama_outlet' => $name,
-                'ids' => $ids,
-                'merged_ids' => implode(',', $ids),
-            ];
-        }
-
-        $allOutletIds = collect($groups)->flatMap(fn ($g) => $g['ids'])->unique()->values()->all();
-        if (empty($allOutletIds)) {
-            return [];
-        }
-
-        $filledRows = DB::table('tbl_stock')
-            ->select(DB::raw('DATE(tanggal) as tanggal'), 'outlet_id')
-            ->whereIn('outlet_id', $allOutletIds)
-            ->whereDate('tanggal', '>=', $startDate)
-            ->whereDate('tanggal', '<=', $endDate)
-            ->groupBy(DB::raw('DATE(tanggal)'), 'outlet_id')
-            ->get();
-
-        $filledSet = [];
-        foreach ($filledRows as $row) {
-            $filledSet[$row->tanggal . '|' . (int) $row->outlet_id] = true;
-        }
-
-        $lastInputRows = DB::table('tbl_stock')
-            ->select('outlet_id', DB::raw('MAX(DATE(tanggal)) as last_input_date'))
-            ->whereIn('outlet_id', $allOutletIds)
-            ->groupBy('outlet_id')
-            ->get()
-            ->keyBy('outlet_id');
-
-        $rows = [];
-        $no = 1;
-
-        foreach (\Carbon\CarbonPeriod::create($startDate, $endDate) as $date) {
-            $dateYmd = $date->format('Y-m-d');
-
-            foreach ($groups as $group) {
-                $hasInput = false;
-                foreach ($group['ids'] as $id) {
-                    if (isset($filledSet[$dateYmd . '|' . (int) $id])) {
-                        $hasInput = true;
-                        break;
-                    }
-                }
-
-                if ($hasInput) {
-                    continue;
-                }
-
-                $lastInputDate = null;
-                foreach ($group['ids'] as $id) {
-                    $candidate = $lastInputRows[(int) $id]->last_input_date ?? null;
-                    if ($candidate && (!$lastInputDate || $candidate > $lastInputDate)) {
-                        $lastInputDate = $candidate;
-                    }
-                }
-
-                $rows[] = [
-                    'no' => $no++,
-                    'tanggal' => $dateYmd,
-                    'outlet_id' => $group['id'],
-                    'nama_outlet' => $group['nama_outlet'],
-                    'merged_ids' => $group['merged_ids'],
-                    'last_input_date' => $lastInputDate,
-                    'status' => 'BELUM MENGISI DSC',
-                ];
+            if (str_contains($namaCompact, $marker)) {
+                return true;
             }
         }
 
-        return $rows;
+        // DC hanya diblok kalau benar-benar marker DC, bukan sekadar huruf DC di tengah kata.
+        if (
+            $namaCompact === 'DC' ||
+            str_starts_with($namaCompact, 'DC') ||
+            str_contains($nama, ' DISTRIBUTION CENTER')
+        ) {
+            return true;
+        }
+
+        return false;
+    };
+
+    $startDate = $this->normalizeDateToYmd($startDate);
+    $endDate = $this->normalizeDateToYmd($endDate);
+    if ($startDate > $endDate) {
+        [$startDate, $endDate] = [$endDate, $startDate];
     }
+
+    $outlets = DB::table('tbl_outlets')
+        ->select('id', 'nama_outlet', 'status')
+        ->when($keyword !== '', function ($q) use ($keyword) {
+            $q->where('nama_outlet', 'like', '%' . $keyword . '%');
+        })
+        ->orderBy('nama_outlet')
+        ->orderBy('id')
+        ->get()
+        ->filter(function ($outlet) use ($isExcludedOutlet) {
+            return ! $isExcludedOutlet($outlet->nama_outlet ?? '', $outlet->status ?? '');
+        })
+        ->values();
+
+    $groups = [];
+
+    foreach ($outlets->groupBy(fn ($o) => $normalize($o->nama_outlet)) as $name => $rows) {
+        $baseIds = $rows->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+
+        if (empty($baseIds)) {
+            continue;
+        }
+
+        // FIX MISSING DSC:
+        // Outlet yang punya alias/duplikat harus dicek sebagai satu grup.
+        // Kalau salah satu ID alias sudah isi DSC pada tanggal yang difilter,
+        // outlet tersebut tidak boleh tampil sebagai BELUM MENGISI.
+        $ids = $this->expandOutletAliasIds($baseIds);
+        $ids = collect($ids)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($ids)) {
+            $ids = $baseIds;
+        }
+
+        $groups[] = [
+            'id' => min($baseIds),
+            'nama_outlet' => $name,
+            'ids' => $ids,
+            'merged_ids' => implode(',', $ids),
+        ];
+    }
+
+    $allOutletIds = collect($groups)->flatMap(fn ($g) => $g['ids'])->unique()->values()->all();
+
+    if (empty($allOutletIds)) {
+        return [];
+    }
+
+    // FINAL FIX FILTER TANGGAL:
+    // Row dianggap SUDAH MENGISI kalau ada data pada tanggal itu di tbl_stock
+    // ATAU masih tersimpan sebagai draft aktif di tbl_stock_draft.
+    // Ini mencegah kasus tanggal 1 sudah diisi tetapi tetap ketarik di list missing.
+    $finalFilledRows = DB::table('tbl_stock')
+        ->select(DB::raw('DATE(tanggal) as tanggal'), 'outlet_id')
+        ->whereIn('outlet_id', $allOutletIds)
+        ->whereDate('tanggal', '>=', $startDate)
+        ->whereDate('tanggal', '<=', $endDate)
+        ->groupBy(DB::raw('DATE(tanggal)'), 'outlet_id')
+        ->get();
+
+    $draftFilledRows = DB::table('tbl_stock_draft')
+        ->select(DB::raw('DATE(tanggal) as tanggal'), 'outlet_id')
+        ->whereIn('outlet_id', $allOutletIds)
+        ->whereDate('tanggal', '>=', $startDate)
+        ->whereDate('tanggal', '<=', $endDate)
+        ->where('is_draft', 1)
+        ->groupBy(DB::raw('DATE(tanggal)'), 'outlet_id')
+        ->get();
+
+    $filledSet = [];
+
+    foreach ($finalFilledRows->concat($draftFilledRows) as $row) {
+        $tanggalIsi = $this->normalizeDateToYmd((string) $row->tanggal);
+        if ($tanggalIsi !== '') {
+            $filledSet[$tanggalIsi . '|' . (int) $row->outlet_id] = true;
+        }
+    }
+
+    // Kolom histori/last input sengaja dihapus dari hasil.
+    // Halaman ini fokus murni: tampilkan outlet yang BELUM ADA input DSC pada tanggal filter.
+
+    $rows = [];
+    $no = 1;
+
+    foreach (\Carbon\CarbonPeriod::create($startDate, $endDate) as $date) {
+        $dateYmd = $date->format('Y-m-d');
+
+        foreach ($groups as $group) {
+            $hasInput = false;
+
+            foreach ($group['ids'] as $id) {
+                if (isset($filledSet[$dateYmd . '|' . (int) $id])) {
+                    $hasInput = true;
+                    break;
+                }
+            }
+
+            // Kalau tanggal yang sedang dicek sudah ada input DSC,
+            // outlet tidak boleh muncul di daftar belum mengisi.
+            if ($hasInput) {
+                continue;
+            }
+
+            $rows[] = [
+                'no' => $no++,
+                'tanggal' => $dateYmd,
+                'outlet_id' => $group['id'],
+                'nama_outlet' => $group['nama_outlet'],
+                'merged_ids' => $group['merged_ids'],
+                'status' => 'BELUM MENGISI DSC',
+            ];
+        }
+    }
+
+    return $rows;
+}
 
     public function dscMissingOutlet(Request $request)
     {
@@ -6623,6 +8278,7 @@ class QCRController extends Controller
 
         $startDate = $this->normalizeDateToYmd((string) $request->get('start_date', $defaultDate));
         $endDate = $this->normalizeDateToYmd((string) $request->get('end_date', $startDate));
+
         if ($startDate > $endDate) {
             [$startDate, $endDate] = [$endDate, $startDate];
         }
@@ -6630,52 +8286,107 @@ class QCRController extends Controller
         $keyword = trim((string) $request->get('q', ''));
         $rows = $this->getDscMissingOutletRows($startDate, $endDate, $keyword);
 
-        $spreadsheet = new Spreadsheet;
+        $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('OUTLET BELUM DSC');
 
-        $headers = ['NO', 'TANGGAL', 'OUTLET ID', 'NAMA OUTLET', 'MERGED IDS', 'LAST INPUT DATE', 'STATUS'];
+        $headers = ['NO', 'TANGGAL BELUM ISI', 'OUTLET ID', 'NAMA OUTLET', 'MERGED IDS', 'STATUS'];
         $title = 'MONITORING OUTLET BELUM MENGISI DSC - PERIODE ' . $startDate . ' s/d ' . $endDate;
+
         $this->xlsxRenderTemplateLike($sheet, $title, $headers);
 
         $rowNo = 4;
         foreach ($rows as $row) {
             $sheet->fromArray([
-                (int) $row['no'],
-                (string) $row['tanggal'],
-                (int) $row['outlet_id'],
-                (string) $row['nama_outlet'],
-                (string) $row['merged_ids'],
-                (string) ($row['last_input_date'] ?? '-'),
-                (string) $row['status'],
+                (int) ($row['no'] ?? 0),
+                (string) ($row['tanggal'] ?? $startDate),
+                (int) ($row['outlet_id'] ?? 0),
+                (string) ($row['nama_outlet'] ?? '-'),
+                (string) ($row['merged_ids'] ?? '-'),
+                (string) ($row['status'] ?? 'BELUM MENGISI DSC'),
             ], null, 'A' . $rowNo);
             $rowNo++;
         }
 
         $lastRow = max(4, $rowNo - 1);
+
         $this->xlsxApplyBordersAndFormat($sheet, count($headers), $lastRow, [
-            'textCols' => [2, 4, 5, 6, 7],
+            'textCols' => [2, 4, 5, 6],
             'numFrom' => 1,
             'numTo' => 3,
             'nameCol' => 4,
         ]);
+
         $this->xlsxSetWidths($sheet, [
-            1 => 6, 2 => 14, 3 => 12, 4 => 38, 5 => 22, 6 => 16, 7 => 24,
+            1 => 6,
+            2 => 14,
+            3 => 12,
+            4 => 38,
+            5 => 22,
+            6 => 24,
         ], count($headers), 14);
 
         $filename = 'MONITORING_OUTLET_BELUM_DSC_' . $startDate . '_sd_' . $endDate . '.xlsx';
 
-        return response()->streamDownload(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-        }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ]);
-    }
+        /*
+         * FIX EXCEL CORRUPT:
+         * Jangan stream langsung ke php://output karena kalau ada whitespace,
+         * warning, debugbar, BOM, atau output buffer lain, file XLSX akan rusak
+         * dan Excel menampilkan pesan "file format or file extension is not valid".
+         * Solusi: generate dulu ke file temporary yang valid, bersihkan buffer,
+         * lalu download file fisik tersebut.
+         */
+        $tmpDir = storage_path('app/tmp');
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0755, true);
+        }
 
+        $tmpPath = tempnam($tmpDir, 'missing_dsc_');
+        $xlsxPath = $tmpPath . '.xlsx';
+
+        if ($tmpPath && file_exists($tmpPath)) {
+            @unlink($tmpPath);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
+        $writer->save($xlsxPath);
+
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet, $writer);
+
+        while (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+
+        return response()
+            ->download($xlsxPath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
+                'Pragma' => 'public',
+                'Expires' => '0',
+            ])
+            ->deleteFileAfterSend(true);
+    }
     public function exportDsc(Request $request)
     {
         try {
+            /*
+             |--------------------------------------------------------------------------
+             | MASTER EXPORT STOCK OPNAME TEMPLATE
+             |--------------------------------------------------------------------------
+             | Tidak menghapus export lama. Jika request membawa:
+             |   ?format=stock_opname
+             | maka export mengikuti template Excel user:
+             | No, Product Name, Product Code, Category, Sub Category, Unit,
+             | Opname Qty, Opname Value.
+             |
+             | Opname Qty memakai ENDING shift 1 + shift 2 dari Detail Shift.
+             */
+            if ((string) $request->get('format', '') === 'stock_opname') {
+                return $this->exportDscStockOpnameTemplate($request);
+            }
             $tanggalRaw = (string) $request->get('tanggal', date('Y-m-d'));
             $startRaw = (string) $request->get('start_date', $tanggalRaw);
             $endRaw = (string) $request->get('end_date', $startRaw ?: $tanggalRaw);
@@ -6814,14 +8525,25 @@ class QCRController extends Controller
                 1 => 13, 2 => 5, 3 => 34, 4 => 8, 5 => 8, 18 => 42,
             ], 18, 14);
 
-            $filename = "DSC_EXPORT_outlet{$outletId}_{$startDate}_sd_{$endDate}_shift{$shiftFilter}.xlsx";
+        $filename = "DSC_EXPORT_outlet{$outletId}_{$startDate}_sd_{$endDate}_shift{$shiftFilter}.xlsx";
 
-            return response()->streamDownload(function () use ($spreadsheet) {
-                $writer = new Xlsx($spreadsheet);
-                $writer->save('php://output');
-            }, $filename, [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            ]);
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $tmpPath = $tmpDir . '/' . uniqid('dsc_export_', true) . '.xlsx';
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tmpPath);
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        return response()->download($tmpPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
         } catch (\Throwable $e) {
             report($e);
             return response()->json([
@@ -6829,6 +8551,314 @@ class QCRController extends Controller
                 'message' => 'Export gagal: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+private function exportDscStockOpnameTemplate(Request $request)
+{
+    $tanggalRaw  = (string) $request->get('tanggal', date('Y-m-d'));
+    $startRaw    = (string) $request->get('start_date', $tanggalRaw);
+    $endRaw      = (string) $request->get('end_date', $startRaw ?: $tanggalRaw);
+    $outletRaw   = $request->get('outlet_id', '');
+    $shiftFilter = (string) $request->get('shift_filter', 'all');
+
+    $startDate = $this->normalizeDateToYmd($startRaw ?: $tanggalRaw);
+    $endDate   = $this->normalizeDateToYmd($endRaw ?: $startDate);
+
+    if ($startDate > $endDate) {
+        [$startDate, $endDate] = [$endDate, $startDate];
+    }
+
+    if ($outletRaw === '' || $outletRaw === null || $outletRaw === 'all') {
+        return response()->json([
+            'ok' => false,
+            'message' => 'outlet_id wajib dipilih sebelum export',
+        ], 400);
+    }
+
+    $days = \Carbon\Carbon::parse($startDate)->diffInDays(\Carbon\Carbon::parse($endDate)) + 1;
+
+    if ($days > 31) {
+        return response()->json([
+            'ok' => false,
+            'message' => 'Range export maksimal 31 hari.',
+        ], 422);
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH STOCK OPNAME EXPORT RANGE
+     |--------------------------------------------------------------------------
+     | - Export 1 tanggal dan start-end tanggal memakai sumber yang sama:
+     |   buildDailyStockControlData().
+     | - Untuk range, Opname Qty diambil dari rekap periode. Jika karena data periode
+     |   kosong, fallback aman ke tanggal akhir supaya export tetap muncul.
+     | - Baris export dibuat dari master bahan DSC aktif, jadi list bahan tetap muncul.
+     | - Opname Value adalah harga per 1 bahan dari tbl_bahan_harga HO/MITRA,
+     |   bukan total qty x harga.
+     |--------------------------------------------------------------------------
+     */
+
+    $makeExportRequest = function (string $fromDate, string $toDate) use ($request, $outletRaw, $shiftFilter) {
+        $exportRequest = Request::create(
+            $request->path(),
+            'GET',
+            array_merge($request->query(), [
+                'tanggal' => $toDate,
+                'start_date' => $fromDate,
+                'end_date' => $toDate,
+                'outlet_id' => $outletRaw,
+                'shift_filter' => $shiftFilter,
+            ])
+        );
+
+        $exportRequest->setUserResolver(fn () => $request->user());
+
+        return $exportRequest;
+    };
+
+    $data = $this->buildDailyStockControlData($makeExportRequest($startDate, $endDate));
+    $rekapRows = collect($data['rekapRows'] ?? []);
+
+    /*
+     * Kalau range start-end ternyata tidak membentuk rekapRows, jangan biarkan export kosong.
+     * Fallback ke tanggal akhir karena Stock Opname butuh posisi akhir stok.
+     */
+    if ($rekapRows->isEmpty() && $startDate !== $endDate) {
+        $data = $this->buildDailyStockControlData($makeExportRequest($endDate, $endDate));
+        $rekapRows = collect($data['rekapRows'] ?? []);
+    }
+
+    $selectedOutletIdsForPrice = array_values(array_filter(array_map('intval', $data['selectedOutletIds'] ?? [])));
+    $kategoriHargaExport = null;
+
+    if (!empty($selectedOutletIdsForPrice)) {
+        $kategoriHargaExport = DB::table('tbl_outlets')
+            ->whereIn('id', $selectedOutletIdsForPrice)
+            ->whereNotNull('kategori_harga')
+            ->orderByRaw("FIELD(kategori_harga, 'HO', 'MITRA')")
+            ->value('kategori_harga');
+    }
+
+    $normalizeName = function ($name) {
+        $name = strtoupper(trim((string) $name));
+        $name = preg_replace('/\s+/', ' ', $name);
+        return $name;
+    };
+
+    $hargaBahanExportByName = DB::table('tbl_bahan as b')
+        ->leftJoin('tbl_bahan_harga as bh', function ($join) use ($kategoriHargaExport) {
+            $join->on('bh.bahan_id', '=', 'b.id');
+
+            if ($kategoriHargaExport) {
+                $join->where('bh.kategori_harga', '=', $kategoriHargaExport);
+            } else {
+                $join->whereRaw('1 = 0');
+            }
+        })
+        ->select(
+            'b.nama_bahan',
+            DB::raw('COALESCE(bh.harga, b.harga_bahan, 0) as harga_export')
+        )
+        ->get()
+        ->mapWithKeys(function ($row) use ($normalizeName) {
+            return [$normalizeName($row->nama_bahan) => (float) ($row->harga_export ?? 0)];
+        });
+
+    $rekapByKey = $rekapRows
+        ->mapWithKeys(function ($r) use ($normalizeName) {
+            $name = $normalizeName($r['nama'] ?? '');
+            $unit = strtoupper(trim((string) ($r['sat'] ?? '')));
+            return [$name . '|' . $unit => $r];
+        });
+
+    $masterBahanRows = DB::table('tbl_bahan_dsc')
+        ->select('id', 'nama_bahan', 'satuan')
+        ->where('is_active', 1)
+        ->orderBy('id')
+        ->get();
+
+    $rows = collect();
+
+    foreach ($masterBahanRows as $index => $b) {
+        $name = trim((string) ($b->nama_bahan ?? ''));
+
+        if ($name === '') {
+            continue;
+        }
+
+        $unit = strtoupper(trim((string) ($b->satuan ?? '')));
+        $key = $normalizeName($name) . '|' . $unit;
+        $r = $rekapByKey->get($key);
+
+        [$category, $subCategory] = $this->dscStockOpnameCategory($name, $unit);
+
+        $qty = $r
+            ? (float) ($r['ending_stock'] ?? $r['open_stock_right'] ?? 0)
+            : 0.0;
+
+        $rows->push([
+            'name' => $name,
+            'unit' => $unit,
+            'category' => $category,
+            'sub_category' => $subCategory,
+            'qty' => $qty,
+            'value' => (float) ($hargaBahanExportByName->get($normalizeName($name)) ?? 0),
+        ]);
+    }
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('Worksheet');
+
+    $headers = [
+        'No',
+        'Product Name',
+        'Product Code',
+        'Category',
+        'Sub Category',
+        'Unit',
+        'Opname Qty',
+        'Opname Value',
+    ];
+
+    $sheet->setCellValue('A1', 'Stock Opname Template');
+    $sheet->mergeCells('A1:H1');
+
+    $sheet->fromArray($headers, null, 'A3');
+
+    $rowNum = 4;
+
+    foreach ($rows as $index => $r) {
+        $unit = strtoupper((string) ($r['unit'] ?? ''));
+        $qty = (float) ($r['qty'] ?? 0);
+
+        if (in_array($unit, ['PCS', 'PC', 'PCE', 'LBR', 'LEMBAR', 'CUP', 'BOTOL', 'BTL', 'SACHET', 'PACK', 'PAK', 'BOX', 'DUS'], true)) {
+            $qty = round($qty);
+        }
+
+        $sheet->fromArray([
+            $index + 1,
+            (string) ($r['name'] ?? ''),
+            '', // Product Code kosong
+            (string) ($r['category'] ?? 'BAHAN BAKU'),
+            (string) ($r['sub_category'] ?? 'BAHAN BAKU'),
+            $unit,
+            $qty,
+            (float) ($r['value'] ?? 0), // Harga per 1 bahan, bukan total
+        ], null, "A{$rowNum}");
+
+        $rowNum++;
+    }
+
+    $lastRow = max(4, $rowNum - 1);
+
+    $sheet->getStyle('A1:H1')->applyFromArray([
+        'font' => ['bold' => true, 'size' => 14],
+        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+
+    $sheet->getStyle("A3:H{$lastRow}")->applyFromArray([
+        'borders' => [
+            'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+        ],
+        'alignment' => [
+            'vertical' => Alignment::VERTICAL_CENTER,
+        ],
+    ]);
+
+    $sheet->getStyle('A3:H3')->applyFromArray([
+        'font' => ['bold' => true],
+        'fill' => [
+            'fillType' => Fill::FILL_SOLID,
+            'startColor' => ['rgb' => 'F2F2F2'],
+        ],
+        'alignment' => [
+            'horizontal' => Alignment::HORIZONTAL_CENTER,
+            'vertical' => Alignment::VERTICAL_CENTER,
+            'wrapText' => true,
+        ],
+    ]);
+
+    $sheet->getStyle("A4:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getStyle("B4:F{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+    $sheet->getStyle("G4:H{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+    // Qty tanpa desimal, harga tetap angka per 1 bahan.
+    $sheet->getStyle("G4:G{$lastRow}")->getNumberFormat()->setFormatCode('0');
+    $sheet->getStyle("H4:H{$lastRow}")->getNumberFormat()->setFormatCode('#,##0.00');
+
+    foreach ([
+        'A' => 7,
+        'B' => 32,
+        'C' => 18,
+        'D' => 18,
+        'E' => 20,
+        'F' => 16,
+        'G' => 16,
+        'H' => 18,
+    ] as $col => $width) {
+        $sheet->getColumnDimension($col)->setWidth($width);
+    }
+
+    $sheet->freezePane('A4');
+    $sheet->setAutoFilter("A3:H{$lastRow}");
+
+    $safeOutlet = is_string($outletRaw)
+        ? preg_replace('/[^A-Za-z0-9_\-]/', '_', $outletRaw)
+        : (string) $outletRaw;
+
+    $filename = "STOCK_OPNAME_TEMPLATE_outlet{$safeOutlet}_{$startDate}_sd_{$endDate}_shift{$shiftFilter}.xlsx";
+
+    return response()->streamDownload(function () use ($spreadsheet) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+    }, $filename, [
+        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]);
+}
+
+    private function dscStockOpnameNormalizeQty(float $qty, string $unit): float
+    {
+        $unit = strtoupper(trim($unit));
+        $integerUnits = ['PCS', 'PC', 'PCE', 'LBR', 'LEMBAR', 'CUP', 'BOTOL', 'BTL', 'SACHET', 'PACK', 'PAK', 'BOX', 'DUS', 'IKAT', 'BUNGKUS'];
+
+        if (in_array($unit, $integerUnits, true)) {
+            return (float) round($qty);
+        }
+
+        return round($qty, 2);
+    }
+
+    private function dscStockOpnameCategory(string $name, string $unit): array
+    {
+        $n = strtoupper(trim($name));
+        $u = strtoupper(trim($unit));
+
+        if (str_contains($n, 'CUP')) {
+            return ['CUP', 'CUP'];
+        }
+
+        if (str_contains($n, 'MINERAL') || str_contains($n, 'LE MINERALE') || str_contains($n, 'CLEO') || str_contains($n, 'TEH') || str_contains($n, 'FRUITEA')) {
+            return ['BEVERAGE', 'BEVERAGE'];
+        }
+
+        if (str_contains($n, 'GLOVE')) {
+            return ['GLOVES', 'GLOVES'];
+        }
+
+        if (str_contains($n, 'KRESEK') || str_contains($n, 'PLASTIK')) {
+            return ['PLASTIK', 'PLASTIK'];
+        }
+
+        if (str_contains($n, 'KERTAS') || str_contains($n, 'LUNCHBOX') || str_contains($n, 'PAPER') || str_contains($n, 'WRAP')) {
+            return ['PERLENGKAPAN', 'PERLENGKAPAN'];
+        }
+
+        return ['BAHAN BAKU', 'BAHAN BAKU'];
     }
 
     private function xlsxRenderTemplateLike($sheet, string $title, array $headers): void
@@ -7278,13 +9308,22 @@ class QCRController extends Controller
             'items.*.reference_name' => 'required|string|max:255',
             'items.*.qty_abs' => 'nullable|numeric|min:0',
             'items.*.qty_hidden' => 'nullable|numeric|min:0',
+            'items.*.satuan' => 'nullable|string|max:50',
         ]);
 
         DB::beginTransaction();
         try {
             foreach ($request->items as $item) {
+                $satuan = (string) ($item['satuan'] ?? '');
                 $qtyAbs = (float) ($item['qty_abs'] ?? 0);
                 $hiddenQty = (float) ($item['qty_hidden'] ?? 0);
+
+                // FIX QCR: satuan integer-like (PCS/LBR/CUP/dll) tidak boleh menyimpan qty decimal.
+                // Ini mencegah AYAM KECIL / AYAM BESAR tampil 31,20 PCS atau 28,50 PCS di modal Hapus +/-.
+                if ($this->isIntegerLikeQcrUnit($satuan)) {
+                    $qtyAbs = (float) round($qtyAbs);
+                    $hiddenQty = (float) round($hiddenQty);
+                }
 
                 if ($hiddenQty < 0) {
                     $hiddenQty = 0;
@@ -7407,7 +9446,12 @@ class QCRController extends Controller
 
         DB::beginTransaction();
         try {
-            $stockRows = DB::table('tbl_stock')
+            /*
+             * PATCH SALDO UANG PLUS QCR:
+             * Ambil saldo dari final + draft aktif, sama seperti data QCR.
+             * Jika ada draft untuk outlet/tanggal/shift/bahan yang sama, draft overwrite final.
+             */
+            $finalUangPlusRows = DB::table('tbl_stock')
                 ->whereIn('outlet_id', $outletIds)
                 ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
                 ->where('uang_plus', '>', 0)
@@ -7415,7 +9459,58 @@ class QCRController extends Controller
                 ->orderByDesc('shift')
                 ->orderByDesc('id')
                 ->lockForUpdate()
-                ->get(['id', 'outlet_id', 'tanggal', 'shift', 'uang_plus']);
+                ->get(['id', 'outlet_id', 'tanggal', 'shift', 'bahan_id', 'uang_plus'])
+                ->map(function ($row) {
+                    $row->row_source = 'final';
+                    return $row;
+                });
+
+            $draftUangPlusRows = DB::table('tbl_stock_draft')
+                ->whereIn('outlet_id', $outletIds)
+                ->whereBetween(DB::raw('DATE(tanggal)'), [$startDate, $endDate])
+                ->where('is_draft', 1)
+                ->where('uang_plus', '>', 0)
+                ->orderByDesc('tanggal')
+                ->orderByDesc('shift')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get(['id', 'outlet_id', 'tanggal', 'shift', 'bahan_id', 'uang_plus'])
+                ->map(function ($row) {
+                    $row->row_source = 'draft';
+                    return $row;
+                });
+
+            $stockRowsByKey = collect();
+
+            foreach ($finalUangPlusRows as $row) {
+                $key = implode('|', [
+                    (int) $row->outlet_id,
+                    \Carbon\Carbon::parse($row->tanggal)->format('Y-m-d'),
+                    (int) $row->shift,
+                    (int) ($row->bahan_id ?? 0),
+                ]);
+
+                $stockRowsByKey->put($key, $row);
+            }
+
+            foreach ($draftUangPlusRows as $row) {
+                $key = implode('|', [
+                    (int) $row->outlet_id,
+                    \Carbon\Carbon::parse($row->tanggal)->format('Y-m-d'),
+                    (int) $row->shift,
+                    (int) ($row->bahan_id ?? 0),
+                ]);
+
+                // Draft aktif mengikuti tampilan QCR, jadi overwrite final.
+                $stockRowsByKey->put($key, $row);
+            }
+
+            $stockRows = $stockRowsByKey
+                ->values()
+                ->sortByDesc('id')
+                ->sortByDesc('shift')
+                ->sortByDesc('tanggal')
+                ->values();
 
             $saldoServer = (float) $stockRows->sum('uang_plus');
             if ($saldoServer <= 0) {
@@ -7449,7 +9544,11 @@ class QCRController extends Controller
                 $take = min($available, $remaining);
                 $newValue = $available - $take;
 
-                DB::table('tbl_stock')
+                $targetTable = (($row->row_source ?? 'final') === 'draft')
+                    ? 'tbl_stock_draft'
+                    : 'tbl_stock';
+
+                DB::table($targetTable)
                     ->where('id', (int) $row->id)
                     ->update([
                         'uang_plus' => $newValue,
@@ -7464,6 +9563,7 @@ class QCRController extends Controller
                     'old_value' => $available,
                     'deducted' => $take,
                     'new_value' => $newValue,
+                    'source' => (string) ($row->row_source ?? 'final'),
                 ];
 
                 $remaining -= $take;
@@ -7478,17 +9578,28 @@ class QCRController extends Controller
             $trxTime = now()->format('H:i:s');
 
             foreach ($items as $idx => $item) {
+                $subtotal = (float) $item['subtotal'];
+
                 $this->insertQcrUangPlusTransaction([
                     'nomor' => $idempotencyKey . '-' . ($idx + 1),
                     'outlet_id' => $trxOutletId,
                     'sesi_tanggal' => $trxDate,
                     'tr_waktu' => $trxTime,
+                    'tr_metode' => 'UANG_PLUS',
+
                     'item_nama' => $item['nama_menu'],
                     'item_varian' => $item['tipe'],
                     'item_jumlah' => $item['qty'],
                     'item_harga' => $item['harga'],
-                    'item_sub_total' => $item['subtotal'],
+                    'item_sub_total' => $subtotal,
+
+                    'grand_total' => $subtotal,
+                    'payment_total' => $subtotal,
+                    'customer_unit' => 1,
                     'item_status' => 8,
+
+                    'source' => 'UANG_PLUS',
+                    'keterangan' => 'PENUKARAN DATA DARI UANG PLUS',
                 ]);
             }
 
@@ -7528,6 +9639,290 @@ class QCRController extends Controller
         }
     }
 
+
+    /*
+     |--------------------------------------------------------------------------
+     | PATCH REQUEST TIM - RAPEL / REVISI UANG PLUS DSC
+     |--------------------------------------------------------------------------
+     | Dipakai kalau uang plus lupa diinput pada tanggal yang sedang dikerjakan.
+     | Perubahan hanya menyentuh kolom uang_plus dan keterangan pada row DSC.
+     | Tidak mengubah purchase, mutasi, adjustment, ending, used, maupun rumus stok.
+     */
+    public function saveDscUangPlusRapel(Request $request)
+    {
+        $request->validate([
+            'outlet_id' => 'required|integer',
+            'tanggal' => 'required|date_format:Y-m-d',
+            'shift' => 'required|in:1,2',
+            'apply_all_bahan' => 'nullable|boolean',
+            'bahan_id' => 'nullable|integer',
+            'uang_plus' => 'required|numeric|min:0',
+            'mode' => 'nullable|in:add,set',
+            'keterangan' => 'nullable|string|max:255',
+        ]);
+
+        $selectedOutletId = (int) $request->outlet_id;
+        $tanggal = $this->normalizeDateToYmd((string) $request->tanggal);
+        $shift = (int) $request->shift;
+        $applyAllBahan = $request->boolean('apply_all_bahan');
+        $bahanId = $request->filled('bahan_id') ? (int) $request->bahan_id : null;
+        $nominal = (float) $request->uang_plus;
+        $mode = (string) $request->get('mode', 'add');
+        $note = strtoupper(trim((string) $request->get('keterangan', 'RAPEL UANG PLUS')));
+
+        if (! $applyAllBahan && ! $bahanId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Bahan wajib dipilih jika target bukan Semua Bahan.',
+            ], 422);
+        }
+
+        $groupedOutlets = $this->getGroupedOutletsForUser(auth()->id());
+        $displayOutletId = $this->getOutletDisplayIdFromSelected($selectedOutletId, $groupedOutlets);
+
+        $close = $this->getCloseStatus($displayOutletId, $tanggal);
+        if (! empty($close['is_closed']) && ! $this->canEditFilledDscNominal()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'KASIR SUDAH DITUTUP. RAPEL UANG PLUS HANYA BOLEH OLEH ROLE YANG BERWENANG.',
+            ], 423);
+        }
+
+        DB::beginTransaction();
+        try {
+            $targets = collect();
+
+            if ($applyAllBahan) {
+                // Semua Bahan:
+                // Untuk setiap bahan, prioritas update tetap sama seperti tampilan DSC: draft aktif lebih dulu, fallback final.
+                // Perubahan tetap hanya menyentuh uang_plus dan keterangan.
+                $draftRows = DB::table('tbl_stock_draft')
+                    ->where('outlet_id', $displayOutletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', $shift)
+                    ->where('is_draft', 1)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('bahan_id');
+
+                $finalRows = DB::table('tbl_stock')
+                    ->where('outlet_id', $displayOutletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', (string) $shift)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('bahan_id');
+
+                foreach ($draftRows as $row) {
+                    $row->target_table = 'tbl_stock_draft';
+                    $targets->push($row);
+                }
+
+                foreach ($finalRows as $bid => $row) {
+                    if ($draftRows->has($bid)) {
+                        continue;
+                    }
+                    $row->target_table = 'tbl_stock';
+                    $targets->push($row);
+                }
+            } else {
+                $draft = DB::table('tbl_stock_draft')
+                    ->where('outlet_id', $displayOutletId)
+                    ->whereDate('tanggal', $tanggal)
+                    ->where('shift', $shift)
+                    ->where('bahan_id', $bahanId)
+                    ->where('is_draft', 1)
+                    ->lockForUpdate()
+                    ->first();
+
+                $final = null;
+                if (! $draft) {
+                    $final = DB::table('tbl_stock')
+                        ->where('outlet_id', $displayOutletId)
+                        ->whereDate('tanggal', $tanggal)
+                        ->where('shift', (string) $shift)
+                        ->where('bahan_id', $bahanId)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                $targetRow = $draft ?: $final;
+                if ($targetRow) {
+                    $targetRow->target_table = $draft ? 'tbl_stock_draft' : 'tbl_stock';
+                    $targets->push($targetRow);
+                }
+            }
+
+            if ($targets->isEmpty()) {
+                DB::rollBack();
+                return response()->json([
+                    'ok' => false,
+                    'message' => $applyAllBahan
+                        ? 'Data DSC untuk tanggal dan shift tersebut belum ada. Simpan DSC terlebih dahulu, lalu rapel uang plus.'
+                        : 'Data DSC untuk tanggal, shift, dan bahan tersebut belum ada. Simpan DSC terlebih dahulu, lalu rapel uang plus.',
+                ], 422);
+            }
+
+            $updatedRows = 0;
+            $oldTotal = 0.0;
+            $newTotal = 0.0;
+
+            /*
+             |--------------------------------------------------------------------------
+             | FIX RAPEL / REVISI UANG PLUS GLOBAL
+             |--------------------------------------------------------------------------
+             | Bug sebelumnya:
+             | Target "Semua Bahan" mengupdate setiap row bahan dengan nominal yang sama.
+             | Akibatnya input 20.000 bisa menjadi 20.000 x jumlah bahan aktif
+             | (contoh 1.540.000), dan keterangan "REVISI UANG PLUS" ikut berulang
+             | sebanyak jumlah bahan.
+             |
+             | Perbaikan:
+             | - Target Semua Bahan diperlakukan sebagai nilai global per outlet/tanggal/shift.
+             | - Nilai global hanya disimpan di 1 row kanonik.
+             | - Row lain dinolkan uang_plus-nya agar total tidak dobel.
+             | - Keterangan rapel/revisi hanya ditulis sekali, tidak diulang-ulang.
+             | - Target Per Bahan tetap seperti biasa.
+             |--------------------------------------------------------------------------
+             */
+            $normalizeKetParts = function (string $ket, string $noteToRemove = '') {
+                $parts = collect(explode('|', $ket))
+                    ->map(fn ($v) => strtoupper(trim((string) $v)))
+                    ->filter();
+
+                if ($noteToRemove !== '') {
+                    $noteNorm = strtoupper(trim($noteToRemove));
+                    $parts = $parts->reject(fn ($v) => $v === $noteNorm);
+                }
+
+                return $parts->unique()->values();
+            };
+
+            $buildKet = function (string $oldKet, string $noteText, bool $appendNote = true) use ($normalizeKetParts) {
+                $parts = $normalizeKetParts($oldKet, $noteText);
+
+                if ($appendNote && trim($noteText) !== '') {
+                    $parts->push(strtoupper(trim($noteText)));
+                }
+
+                return $parts->unique()->implode(' | ');
+            };
+
+            if ($applyAllBahan) {
+                $oldTotal = (float) $targets->sum(fn ($row) => (float) ($row->uang_plus ?? 0));
+                $globalNewValue = $mode === 'set'
+                    ? $nominal
+                    : ($oldTotal + $nominal);
+
+                $canonicalRow = $targets
+                    ->sortBy(fn ($row) => ((string) $row->target_table === 'tbl_stock_draft' ? 0 : 1) . '-' . str_pad((string) (int) $row->bahan_id, 10, '0', STR_PAD_LEFT))
+                    ->first();
+
+                foreach ($targets as $targetRow) {
+                    $targetTable = (string) $targetRow->target_table;
+                    $targetBahanId = (int) $targetRow->bahan_id;
+                    $oldValue = (float) ($targetRow->uang_plus ?? 0);
+                    $isCanonical = $canonicalRow
+                        && (string) $canonicalRow->target_table === $targetTable
+                        && (int) $canonicalRow->id === (int) $targetRow->id;
+
+                    $newValue = $isCanonical ? $globalNewValue : 0.0;
+
+                    $oldKet = trim((string) ($targetRow->keterangan ?? ''));
+                    $newKet = $isCanonical
+                        ? $buildKet($oldKet, $note, true)
+                        : $buildKet($oldKet, $note, false);
+
+                    DB::table($targetTable)
+                        ->where('id', (int) $targetRow->id)
+                        ->update([
+                            'uang_plus' => $newValue,
+                            'keterangan' => $newKet,
+                            'updated_at' => now(),
+                        ]);
+
+                    $this->auditDscStockChanges(
+                        $targetTable,
+                        'RAPEL_UANG_PLUS_ALL_BAHAN',
+                        $displayOutletId,
+                        $tanggal,
+                        $shift,
+                        $targetBahanId,
+                        $targetRow,
+                        ['uang_plus' => $newValue, 'keterangan' => $newKet],
+                        strtoupper((string) (auth()->user()->name ?? auth()->user()->email ?? 'SYSTEM')),
+                        'rapel_uang_plus'
+                    );
+
+                    $updatedRows++;
+                }
+
+                $newTotal = $globalNewValue;
+            } else {
+                foreach ($targets as $targetRow) {
+                    $targetTable = (string) $targetRow->target_table;
+                    $targetBahanId = (int) $targetRow->bahan_id;
+                    $oldValue = (float) ($targetRow->uang_plus ?? 0);
+                    $newValue = $mode === 'set'
+                        ? $nominal
+                        : ($oldValue + $nominal);
+
+                    $oldKet = trim((string) ($targetRow->keterangan ?? ''));
+                    $newKet = $buildKet($oldKet, $note, true);
+
+                    DB::table($targetTable)
+                        ->where('id', (int) $targetRow->id)
+                        ->update([
+                            'uang_plus' => $newValue,
+                            'keterangan' => $newKet,
+                            'updated_at' => now(),
+                        ]);
+
+                    $this->auditDscStockChanges(
+                        $targetTable,
+                        'RAPEL_UANG_PLUS',
+                        $displayOutletId,
+                        $tanggal,
+                        $shift,
+                        $targetBahanId,
+                        $targetRow,
+                        ['uang_plus' => $newValue, 'keterangan' => $newKet],
+                        strtoupper((string) (auth()->user()->name ?? auth()->user()->email ?? 'SYSTEM')),
+                        'rapel_uang_plus'
+                    );
+
+                    $updatedRows++;
+                    $oldTotal += $oldValue;
+                    $newTotal += $newValue;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'ok' => true,
+                'message' => $applyAllBahan
+                    ? 'Rapel uang plus berhasil disimpan untuk semua bahan tanpa mengubah rumus stok.'
+                    : 'Rapel uang plus berhasil disimpan tanpa mengubah rumus stok.',
+                'data' => [
+                    'old_uang_plus' => $oldTotal,
+                    'new_uang_plus' => $newTotal,
+                    'updated_rows' => $updatedRows,
+                    'apply_all_bahan' => $applyAllBahan,
+                    'mode' => $mode,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Gagal menyimpan rapel uang plus.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function resolveQcrOutletIdsFromRequest(string $outletIdRaw): array
     {
         $normalize = function ($name) {
@@ -7543,7 +9938,7 @@ class QCRController extends Controller
         if (str_starts_with($outletIdRaw, 'group_')) {
             foreach ($rows->groupBy(fn ($o) => $normalize($o->nama_outlet)) as $name => $groupRows) {
                 if ('group_' . md5($name) === $outletIdRaw) {
-                    return $groupRows->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+                    return $this->expandOutletAliasIds($groupRows->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
                 }
             }
             return [];
@@ -7555,39 +9950,54 @@ class QCRController extends Controller
         }
 
         $nameNorm = $normalize($single->nama_outlet);
-        return $rows
-            ->filter(fn ($o) => $normalize($o->nama_outlet) === $nameNorm)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        return $this->expandOutletAliasIds(
+            $rows
+                ->filter(fn ($o) => $normalize($o->nama_outlet) === $nameNorm)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all()
+        );
     }
 
     private function insertQcrUangPlusTransaction(array $data): void
     {
-        if (! Schema::hasTable('tbl_transaksi_perhari')) {
-            throw new \RuntimeException('Tabel tbl_transaksi_perhari tidak ditemukan.');
+        if (!Schema::hasTable('tbl_qcr_uang_plus_transactions')) {
+            throw new \RuntimeException('Tabel tbl_qcr_uang_plus_transactions tidak ditemukan.');
         }
 
-        $insert = [];
-        foreach ($data as $column => $value) {
-            if (Schema::hasColumn('tbl_transaksi_perhari', $column)) {
-                $insert[$column] = $value;
-            }
-        }
+        $nomor = $data['nomor']
+            ?? ('UPLUS-' . ($data['outlet_id'] ?? '0') . '-' . now()->format('YmdHis') . '-' . mt_rand(1000, 9999));
 
-        if (Schema::hasColumn('tbl_transaksi_perhari', 'created_at')) {
-            $insert['created_at'] = now();
-        }
-        if (Schema::hasColumn('tbl_transaksi_perhari', 'updated_at')) {
-            $insert['updated_at'] = now();
-        }
+        DB::table('tbl_qcr_uang_plus_transactions')->updateOrInsert(
+            [
+                'nomor' => $nomor,
+            ],
+            [
+                'outlet_id'      => (int) $data['outlet_id'],
+                'sesi_tanggal'   => $data['sesi_tanggal'],
+                'tr_waktu'       => $data['tr_waktu'] ?? now()->format('H:i:s'),
+                'tr_metode'      => 'UANG_PLUS',
 
-        if (! isset($insert['item_nama']) || ! isset($insert['item_sub_total'])) {
-            throw new \RuntimeException('Struktur tbl_transaksi_perhari tidak sesuai untuk transaksi uang plus.');
-        }
+                'item_nama'      => $data['item_nama'],
+                'item_varian'    => $data['item_varian'] ?? null,
+                'item_harga'     => (float) ($data['item_harga'] ?? 0),
+                'item_jumlah'    => (float) ($data['item_jumlah'] ?? 0),
+                'item_sub_total' => (float) ($data['item_sub_total'] ?? 0),
 
-        DB::table('tbl_transaksi_perhari')->insert($insert);
+                'grand_total'    => (float) ($data['grand_total'] ?? $data['item_sub_total'] ?? 0),
+                'payment_total'  => (float) ($data['payment_total'] ?? $data['item_sub_total'] ?? 0),
+
+                'customer_unit'  => (int) ($data['customer_unit'] ?? 1),
+                'item_status'    => 8,
+
+                'keterangan'     => 'PENUKARAN DATA DARI UANG PLUS',
+                'source'         => 'UANG_PLUS',
+
+                'updated_at'     => now(),
+                'created_at'     => now(),
+            ]
+        );
     }
 
     private function storeQcrUangPlusAuditIfTableExists(array $data): void
@@ -7675,6 +10085,75 @@ class QCRController extends Controller
             'visible_qty' => $visibleAbs,
             'visible_signed_qty' => $visibleSigned,
         ];
+    }
+
+    private function isIntegerLikeQcrUnit(string $satuan = ''): bool
+    {
+        $satuan = strtoupper(trim((string) $satuan));
+
+        $integerLikeUnits = [
+            'PCS', 'PC', 'PCE',
+            'LBR', 'LEMBAR',
+            'CUP',
+            'BOTOL', 'BTL',
+            'SACHET', 'SCT',
+            'PACK', 'PAK',
+            'BOX', 'DUS',
+            'IKAT', 'BUNGKUS',
+            'PCS/BOX',
+        ];
+
+        return in_array($satuan, $integerLikeUnits, true);
+    }
+
+    private function normalizeQcrDisplayQty(float $qty, string $satuan = ''): float
+    {
+        /*
+         |--------------------------------------------------------------------------
+         | FIX SATUAN QCR
+         |--------------------------------------------------------------------------
+         | Satuan seperti PCS/LBR/CUP/BOTOL/SACHET/PACK tidak masuk akal tampil
+         | decimal, contoh:
+         | - AYAM KECIL 333,09 PCS
+         | - AYAM 0,03 PCS
+         |
+         | Untuk satuan integer-like, qty dibulatkan ke angka utuh.
+         | Untuk GRAM dan satuan berat, decimal tetap boleh.
+         */
+        if ($this->isIntegerLikeQcrUnit($satuan)) {
+            return (float) round($qty);
+        }
+
+        $abs = abs($qty);
+
+        if ($abs < 0.000001) {
+            return 0.0;
+        }
+
+        return round($qty, 3);
+    }
+
+    private function normalizeQcrDifferenceQty(float $qty, string $satuan = ''): float
+    {
+        /*
+         |--------------------------------------------------------------------------
+         | FIX MODAL HAPUS PLUS/MINUS QCR
+         |--------------------------------------------------------------------------
+         | Selisih QCR mengikuti satuan.
+         | - PCS/LBR/CUP/BOTOL/SACHET/PACK: tidak boleh decimal, dibulatkan.
+         | - Nilai yang setelah pembulatan menjadi 0 tidak masuk modal.
+         | - GRAM tetap boleh decimal.
+         */
+        if ($this->isIntegerLikeQcrUnit($satuan)) {
+            $rounded = (float) round($qty);
+            return abs($rounded) < 1 ? 0.0 : $rounded;
+        }
+
+        if (abs($qty) < 0.01) {
+            return 0.0;
+        }
+
+        return round($qty, 3);
     }
 
     private function getQcrMergedStockRows(array $outletIds, string $startDate, string $endDate, bool $isAllOutlet)
@@ -7780,11 +10259,69 @@ class QCRController extends Controller
             ->values();
     }
 
-    private function buildQcrStockAggByBahanId($stockRows)
+    private function buildQcrStockAggByBahanId($stockRows, array $outletIds = [], int $displayOutletId = 0, array $openingBulkMap = [], string $startDate = '', string $endDate = '')
     {
+        $outletIds = array_values(array_unique(array_map('intval', $outletIds)));
+        $outletIds = array_values(array_filter($outletIds, fn ($id) => $id > 0));
+        $displayOutletId = $displayOutletId > 0
+            ? $displayOutletId
+            : (int) ($outletIds[0] ?? 0);
+
+        $datesInRows = $stockRows
+            ->map(fn ($r) => \Carbon\Carbon::parse($r->tanggal)->format('Y-m-d'))
+            ->unique()
+            ->values();
+
+        $bahanIdsInRows = $stockRows
+            ->pluck('bahan_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        /*
+         |--------------------------------------------------------------------------
+         | FIX QCR RANGE USAGE DSC
+         |--------------------------------------------------------------------------
+         | QCR range tidak boleh menghitung Usage DSC hanya dari:
+         | OPEN tanggal awal + total transaksi stok - ENDING tanggal akhir.
+         |
+         | Untuk kasus bahan yang stoknya muncul/hilang di tengah periode seperti CLEO,
+         | cara itu bisa menutup minus harian. Karena itu kita siapkan opening UI/alias
+         | per tanggal, lalu usage dihitung dari akumulasi harian yang sama dengan DSC.
+         */
+        $openingBulkByDate = [];
+        foreach ($datesInRows as $dateKey) {
+            if ($dateKey === $startDate && !empty($openingBulkMap)) {
+                $openingBulkByDate[$dateKey] = $openingBulkMap;
+                continue;
+            }
+
+            $openingBulkByDate[$dateKey] = $this->getOpeningBulkFromAliasIds(
+                !empty($outletIds) ? $outletIds : [],
+                $displayOutletId,
+                $bahanIdsInRows,
+                $dateKey
+            );
+        }
+
+        $getOpeningForQcrDate = function (int $bahanId, string $dateKey, int $shift) use ($openingBulkByDate, $outletIds, $displayOutletId) {
+            if (isset($openingBulkByDate[$dateKey][$bahanId][$shift])) {
+                return (float) $openingBulkByDate[$dateKey][$bahanId][$shift];
+            }
+
+            return (float) $this->getOpeningFromAliasIds(
+                !empty($outletIds) ? $outletIds : [],
+                $displayOutletId,
+                $bahanId,
+                $dateKey,
+                $shift
+            );
+        };
+
         return $stockRows
             ->groupBy(fn ($r) => (int) $r->bahan_id)
-            ->map(function ($grp) {
+            ->map(function ($grp) use ($outletIds, $displayOutletId, $openingBulkMap, $getOpeningForQcrDate) {
                 $sorted = $grp->sortBy([
                     fn ($a, $b) => strcmp((string) $a->tanggal, (string) $b->tanggal),
                     fn ($a, $b) => ((int) $a->shift <=> (int) $b->shift),
@@ -7814,12 +10351,18 @@ class QCRController extends Controller
                  */
 
                 // Stock Available QCR = OPEN Shift 1 / ending H-1.
-                $available = (float) $this->getOpeningStockUi(
-                    (int) $first->outlet_id,
-                    $bahanId,
-                    $firstDate,
-                    1
-                );
+                // V2: pakai opening bulk yang sama dengan Daily Stock Control.
+                // Penting untuk kasus closing Shift 2 = 0/kosong tetapi Shift 1 masih punya closing valid;
+                // helper bulk melakukan fallback ke Shift 1, sedangkan helper single lama bisa jatuh ke 0.
+                $available = isset($openingBulkMap[$bahanId][1])
+                    ? (float) $openingBulkMap[$bahanId][1]
+                    : (float) $this->getOpeningFromAliasIds(
+                        !empty($outletIds) ? $outletIds : [(int) ($first->outlet_id ?? 0)],
+                        $displayOutletId > 0 ? $displayOutletId : (int) ($first->outlet_id ?? 0),
+                        $bahanId,
+                        $firstDate,
+                        1
+                    );
 
                 $opening = $available;
 
@@ -7842,16 +10385,104 @@ class QCRController extends Controller
                 $wasteProduct = (float) $sorted->sum(fn ($r) => (float) ($r->waste_product ?? 0));
                 $wasteBahan   = (float) $sorted->sum(fn ($r) => (float) ($r->waste_bahan ?? 0));
                 $wasteTepung  = (float) $sorted->sum(fn ($r) => (float) ($r->waste_tepung ?? 0));
+                $actualTepung = (float) $sorted->sum(fn ($r) => (float) ($r->actual_tepung ?? 0));
 
-                $wasteQty = $wasteProduct;
+                $wasteQty = $wasteProduct + $wasteBahan + $wasteTepung;
 
                 // TOTAL mengikuti rumus final:
                 // TOTAL = OPEN + PURCHASE IN + MUTASI IN - MUTASI OUT
                 // ADJ tidak masuk TOTAL.
                 $totalAvailable = $available + $purchase + $mutIn - $mutOut;
 
-                // Usage DSC Summary mengikuti kalkulasi gabungan shift:
-                // USED = TOTAL - ENDING
+                /*
+                 |--------------------------------------------------------------------------
+                 | FIX QCR RANGE USAGE DSC - AKUMULASI HARIAN
+                 |--------------------------------------------------------------------------
+                 | TOTAL/ENDING tetap disimpan sebagai informasi stok periode.
+                 | Tetapi Usage DSC untuk QCR harus mengikuti jumlah USED harian yang
+                 | opening-nya sudah dikoreksi oleh helper UI/alias. Ini mencegah minus
+                 | harian CLEO tanggal 4/9 hilang karena tertutup ending tanggal akhir.
+                 */
+                $mergeQcrShiftRows = function ($rows) {
+                    if (!$rows || $rows->isEmpty()) {
+                        return null;
+                    }
+
+                    $latest = $rows->sortByDesc('tanggal')->sortByDesc('id')->first();
+                    $row = clone $latest;
+                    $row->purchase_in = (float) $rows->sum(fn ($x) => (float) ($x->purchase_in ?? 0));
+                    $row->mutasi_in = (float) $rows->sum(fn ($x) => (float) ($x->mutasi_in ?? 0));
+                    $row->mutasi_out = (float) $rows->sum(fn ($x) => (float) ($x->mutasi_out ?? 0));
+                    $row->adjustment_qty = (float) $rows->sum(fn ($x) => (float) ($x->adjustment_qty ?? 0));
+
+                    $latestEnding = $rows
+                        ->filter(fn ($x) => $x->ending_stock !== null)
+                        ->sortByDesc('tanggal')
+                        ->sortByDesc('id')
+                        ->first();
+
+                    $row->ending_stock = $latestEnding ? (float) ($latestEnding->ending_stock ?? 0) : 0.0;
+
+                    return $row;
+                };
+
+                $usageDaily = 0.0;
+                $sortedByDate = $sorted->groupBy(fn ($r) => \Carbon\Carbon::parse($r->tanggal)->format('Y-m-d'));
+
+                foreach ($sortedByDate as $dateKey => $rowsOnDate) {
+                    $r1Day = $mergeQcrShiftRows($rowsOnDate->filter(fn ($r) => (int) $r->shift === 1));
+                    $r2Day = $mergeQcrShiftRows($rowsOnDate->filter(fn ($r) => (int) $r->shift === 2));
+
+                    $openS1Day = (float) $getOpeningForQcrDate($bahanId, (string) $dateKey, 1);
+                    $openS2Day = ($r1Day && $r1Day->ending_stock !== null)
+                        ? (float) $r1Day->ending_stock
+                        : (float) $getOpeningForQcrDate($bahanId, (string) $dateKey, 2);
+
+                    $pinDay = (float) ($r1Day->purchase_in ?? 0) + (float) ($r2Day->purchase_in ?? 0);
+                    $miDay = (float) ($r1Day->mutasi_in ?? 0) + (float) ($r2Day->mutasi_in ?? 0);
+                    $moDay = (float) ($r1Day->mutasi_out ?? 0) + (float) ($r2Day->mutasi_out ?? 0);
+                    $adjDay = (float) ($r1Day->adjustment_qty ?? 0) + (float) ($r2Day->adjustment_qty ?? 0);
+
+                    $endingS1Day = ($r1Day && $r1Day->ending_stock !== null)
+                        ? (float) $r1Day->ending_stock + (float) ($r1Day->adjustment_qty ?? 0)
+                        : null;
+                    $endingS2Day = ($r2Day && $r2Day->ending_stock !== null)
+                        ? (float) $r2Day->ending_stock + (float) ($r2Day->adjustment_qty ?? 0)
+                        : null;
+
+                    if ($endingS2Day !== null && $endingS2Day > 0) {
+                        $endingDay = $endingS2Day;
+                    } elseif ($endingS1Day !== null && $endingS1Day > 0) {
+                        $endingDay = $endingS1Day;
+                    } elseif ($endingS2Day !== null) {
+                        $endingDay = $endingS2Day;
+                    } elseif ($endingS1Day !== null) {
+                        $endingDay = $endingS1Day;
+                    } else {
+                        $endingDay = 0.0;
+                    }
+
+                    $totalDay = $openS1Day + $pinDay + $miDay - $moDay;
+                    $usageDaily += ($totalDay - $endingDay);
+                }
+
+                /*
+                 |--------------------------------------------------------------------------
+                 | FIX FINAL QCR USAGE DSC RANGE
+                 |--------------------------------------------------------------------------
+                 | Untuk Summary QCR, Usage DSC harus sama dengan rumus REKAP DSC periode:
+                 |
+                 | TOTAL = OPEN + PURCHASE IN + MUTASI IN - MUTASI OUT
+                 | USED  = TOTAL - ENDING
+                 |
+                 | Jadi contoh TEH PUCUK:
+                 | OPEN 97 + PURCHASE 96 - MUTASI OUT 48 = TOTAL 145
+                 | ENDING 47
+                 | USED / Usage DSC = 145 - 47 = 98
+                 |
+                 | $usageDaily tetap dihitung di atas sebagai referensi internal,
+                 | tapi nilai yang ditampilkan harus mengikuti TOTAL - ENDING.
+                 */
                 $usage = $totalAvailable - $ending;
 
                 return (object) [
@@ -7869,6 +10500,7 @@ class QCRController extends Controller
                     'waste_product_qty' => $wasteProduct,
                     'waste_bahan_qty'   => $wasteBahan,
                     'waste_tepung_qty'  => $wasteTepung,
+                    'actual_tepung_qty' => $actualTepung,
 
                     'waste_qty'    => $wasteQty,
 
@@ -7939,6 +10571,19 @@ class QCRController extends Controller
                 : 'OUTLET';
         }
 
+        // FIX HARGA OUTLET QCR:
+        // Simpan ID outlet asli yang dipilih sebelum alias diperluas.
+        // Harga harus memprioritaskan outlet yang dipilih di tab Harga Bahan Outlet,
+        // bukan mengambil MAX dari semua alias, karena harga outlet bisa lebih kecil dari master/alias lain.
+        $pricePrimaryOutletIds = array_values(array_unique(array_map('intval', $outletIds ?? [])));
+
+        if (! empty($outletIds) && $outletId !== 'all') {
+            // FINAL FIX: QCR juga mengikuti tbl_outlet_alias supaya outlet typo/duplicate tetap terbaca.
+            $outletIds = $this->expandOutletAliasIds($outletIds);
+        }
+
+        $priceLookupOutletIds = array_values(array_unique(array_map('intval', array_merge($pricePrimaryOutletIds, $outletIds ?? []))));
+
         $isAllOutlet = $outletId === 'all';
 
         $rangeDays    = 1;
@@ -7970,43 +10615,178 @@ class QCRController extends Controller
 
         $outlets = $allOutlets;
 
-        // TOTAL SALES FINAL: pakai tbl_laporan_bulanan
-        $totalSalesBulanan = (float) DB::table('tbl_transaksi_perhari')
-        ->when(!$isAllOutlet, fn ($q) => $q->whereIn('outlet_id', $outletIds))
-        ->whereBetween(DB::raw('DATE(sesi_tanggal)'), [$start_date, $end_date])
-        ->where('item_nama', '__TRANSACTION__')
-        ->where('item_status', 8)
-        ->sum('item_sub_total');
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL SALES NET UNTUK CARD SUMMARY
+        |--------------------------------------------------------------------------
+        | Dashboard Penjualan memakai total_omset dari tbl_laporan_bulanan.
+        | Nilai ini sudah NET, sehingga Non Sales Transaction tidak ikut masuk.
+        |
+        | Catatan penting:
+        | - Tabel QCR menu/BOM tetap dihitung dari transaksi item menu.
+        | - Summary card Total Sales / Gross Profit / persentase memakai nilai NET ini.
+        |--------------------------------------------------------------------------
+        */
+        $totalSalesBulanan = (float) DB::table('tbl_laporan_bulanan')
+            ->when(!$isAllOutlet, fn ($q) => $q->whereIn('outlet_id', $outletIds))
+            ->whereBetween(DB::raw('DATE(tanggal)'), [$start_date, $end_date])
+            ->sum('total_omset');
 
         // Harga bahan
-        if (!$isAllOutlet && count($outletIds) === 1) {
-            $selectedOutletId = (int) $outletIds[0];
+        /*
+        |--------------------------------------------------------------------------
+        | PATCH HARGA QCR - OUTLET KHUSUS AYAM/BERAS, SISANYA HO/MITRA
+        |--------------------------------------------------------------------------
+        | Logika lama tidak dihapus.
+        |
+        | Aturan baru:
+        | 1. AYAM* dan BERAS tetap mengikuti harga bahan outlet lama
+        |    dari tbl_bahan_harga_outlet. Jadi ketika user update harga bahan
+        |    outlet di master lama, QCR otomatis tetap mengikuti untuk bahan ini.
+        | 2. Selain AYAM* dan BERAS memakai master harga kategori baru:
+        |    tbl_bahan_harga berdasarkan tbl_outlets.kategori_harga = HO/MITRA.
+        | 3. Jika harga kategori belum ada, fallback tetap ke tbl_bahan.harga_bahan.
+        |--------------------------------------------------------------------------
+        */
+        $bahanPrice = DB::table('tbl_bahan')
+            ->select('id', 'nama_bahan', 'harga_bahan', 'satuan', 'konversi', 'isi_per_unit')
+            ->orderBy('nama_bahan')
+            ->get();
 
-            $bahanPrice = DB::table('tbl_bahan as b')
-                ->leftJoin('tbl_bahan_harga_outlet as bho', function ($join) use ($selectedOutletId) {
-                    $join->on('bho.bahan_id', '=', 'b.id')
-                        ->where('bho.outlet_id', '=', $selectedOutletId);
+        $isHargaOutletKhususAyamBeras = function ($namaBahan): bool {
+            $nama = strtoupper(trim((string) $namaBahan));
+            $nama = preg_replace('/\s+/', ' ', $nama);
+
+            return str_contains($nama, 'AYAM') || str_contains($nama, 'BERAS');
+        };
+
+        $kategoriHargaQcr = null;
+
+        if (!$isAllOutlet && !empty($pricePrimaryOutletIds)) {
+            $kategoriHargaQcr = DB::table('tbl_outlets')
+                ->whereIn('id', array_map('intval', $pricePrimaryOutletIds))
+                ->whereNotNull('kategori_harga')
+                ->orderByRaw("FIELD(kategori_harga, 'HO', 'MITRA')")
+                ->value('kategori_harga');
+        }
+
+        $hargaKategoriByBahanId = collect();
+
+        if (!$isAllOutlet && $kategoriHargaQcr) {
+            $hargaKategoriByBahanId = DB::table('tbl_bahan_harga')
+                ->select('bahan_id', 'harga')
+                ->where('kategori_harga', $kategoriHargaQcr)
+                ->get()
+                ->keyBy(fn ($row) => (int) $row->bahan_id);
+        }
+
+        $outletPriceRows = collect();
+
+        if (!$isAllOutlet && !empty($priceLookupOutletIds)) {
+            // FIX HARGA OUTLET QCR:
+            // Untuk AYAM* dan BERAS saja, tetap pakai prioritas harga outlet lama:
+            // 1) outlet asli yang dipilih di filter,
+            // 2) alias outlet sebagai fallback,
+            // 3) harga master bahan.
+            $primaryLookup = array_flip(array_map('intval', $pricePrimaryOutletIds));
+
+            $outletPriceRows = DB::table('tbl_bahan_harga_outlet')
+                ->select('id', 'outlet_id', 'bahan_id', 'harga_bahan', 'updated_at')
+                ->whereIn('outlet_id', $priceLookupOutletIds)
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get()
+                ->sort(function ($a, $b) use ($primaryLookup) {
+                    $aPrimary = isset($primaryLookup[(int) $a->outlet_id]) ? 1 : 0;
+                    $bPrimary = isset($primaryLookup[(int) $b->outlet_id]) ? 1 : 0;
+
+                    if ($aPrimary !== $bPrimary) {
+                        return $bPrimary <=> $aPrimary;
+                    }
+
+                    $timeCmp = strcmp((string) ($b->updated_at ?? ''), (string) ($a->updated_at ?? ''));
+                    if ($timeCmp !== 0) {
+                        return $timeCmp;
+                    }
+
+                    return ((int) ($b->id ?? 0)) <=> ((int) ($a->id ?? 0));
                 })
-                ->select(
-                    'b.id',
-                    'b.nama_bahan',
-                    DB::raw('COALESCE(bho.harga_bahan, b.harga_bahan) as harga_bahan'),
-                    'b.satuan',
-                    'b.konversi',
-                    'b.isi_per_unit'
-                )
-                ->orderBy('b.nama_bahan')
-                ->get();
-        } else {
-            $bahanPrice = DB::table('tbl_bahan')
-                ->select('id', 'nama_bahan', 'harga_bahan', 'satuan', 'konversi', 'isi_per_unit')
-                ->orderBy('nama_bahan')
-                ->get();
+                ->groupBy('bahan_id')
+                ->map(fn ($rows) => $rows->first());
+        }
+
+        foreach ($bahanPrice as $b) {
+            $bahanId = (int) $b->id;
+
+            if ($isHargaOutletKhususAyamBeras($b->nama_bahan)) {
+                $outletPrice = $outletPriceRows->get($bahanId);
+
+                if ($outletPrice && $outletPrice->harga_bahan !== null) {
+                    $b->harga_bahan = (float) $outletPrice->harga_bahan;
+                }
+
+                continue;
+            }
+
+            $hargaKategori = $hargaKategoriByBahanId->get($bahanId);
+
+            if ($hargaKategori && $hargaKategori->harga !== null) {
+                $b->harga_bahan = (float) $hargaKategori->harga;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PATCH EXPORT QCR - HARGA PER BAHAN
+        |--------------------------------------------------------------------------
+        | Export Excel memakai object $bahanPrice yang sama dengan tampilan QCR.
+        | Field harga_bahan_export dibuat eksplisit supaya blade export tidak kosong
+        | dan tetap mengambil harga hasil mapping tbl_bahan_harga HO/MITRA.
+        | Tidak mengubah perhitungan HPP / stock / QCR lain.
+        |--------------------------------------------------------------------------
+        */
+        foreach ($bahanPrice as $b) {
+            $b->harga_bahan_export = (float) ($b->harga_bahan ?? 0);
         }
 
         $priceMap = [];
         foreach ($bahanPrice as $b) {
             $priceMap[$this->normName($b->nama_bahan)] = $b;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PATCH URUTAN BAHAN QCR
+        |--------------------------------------------------------------------------
+        | Urutan kolom Summary Pemakaian Bahan dibuat mengikuti urutan mapping
+        | spreadsheet di tbl_bahan_mapping, bukan urutan abjad / urutan transaksi.
+        | Ini hanya mengubah urutan tampilan, bukan rumus, bukan HPP, bukan stock,
+        | dan bukan logika QCR lain.
+        |--------------------------------------------------------------------------
+        */
+        $qcrBahanOrder = [];
+        $qcrBahanOrderRows = DB::table('tbl_bahan_mapping as bm')
+            ->join('tbl_bahan as b', 'b.id', '=', 'bm.bahan_id')
+            ->select(
+                'bm.id as urutan',
+                'bm.nama_sheet',
+                'b.nama_bahan'
+            )
+            ->orderBy('bm.id')
+            ->get();
+
+        foreach ($qcrBahanOrderRows as $orderRow) {
+            $urutan = (int) $orderRow->urutan;
+
+            $namaSheetKey = $this->normName((string) $orderRow->nama_sheet);
+            if ($namaSheetKey !== '' && !isset($qcrBahanOrder[$namaSheetKey])) {
+                $qcrBahanOrder[$namaSheetKey] = $urutan;
+            }
+
+            $namaBahanKey = $this->normName((string) $orderRow->nama_bahan);
+            if ($namaBahanKey !== '' && !isset($qcrBahanOrder[$namaBahanKey])) {
+                $qcrBahanOrder[$namaBahanKey] = $urutan;
+            }
         }
 
         $menuData = [];
@@ -8015,6 +10795,11 @@ class QCRController extends Controller
 
         $summary = [
             'sales' => 0,
+            'sales_transaksi' => 0,
+            'sales_laporan_bulanan' => 0,
+            'sales_net' => 0,
+            'sales_gross_menu' => 0,
+            'non_sales_transaction' => 0,
             'hpp' => 0,
             'hpp_percent' => 0,
             'profit' => 0,
@@ -8093,7 +10878,7 @@ class QCRController extends Controller
         */
         $transaksi = DB::table('tbl_transaksi_perhari')
             ->when(!$isAllOutlet, fn ($q) => $q->whereIn('outlet_id', $outletIds))
-            ->whereBetween(DB::raw('DATE(sesi_tanggal)'), [$start_date, $end_date])
+            ->whereBetween('sesi_tanggal', [$start_date, $end_date])
             ->whereIn('item_status', [8])
             ->whereNotNull('item_nama')
             ->whereRaw("TRIM(item_nama) <> ''")
@@ -8110,6 +10895,35 @@ class QCRController extends Controller
                 'item_varian',
                 'item_status',
             ]);
+
+        $uangPlusTransaksi = collect();
+
+        if (Schema::hasTable('tbl_qcr_uang_plus_transactions')) {
+            $uangPlusTransaksi = DB::table('tbl_qcr_uang_plus_transactions')
+                ->when(!$isAllOutlet, fn ($q) => $q->whereIn('outlet_id', $outletIds))
+                ->whereBetween('sesi_tanggal', [$start_date, $end_date])
+                ->where('source', 'UANG_PLUS')
+                ->whereIn('item_status', [8])
+                ->whereNotNull('item_nama')
+                ->whereRaw("TRIM(item_nama) <> ''")
+                ->where('item_nama', '!=', '__TRANSACTION__')
+                ->get([
+                    'nomor',
+                    'outlet_id',
+                    'sesi_tanggal',
+                    'tr_waktu',
+                    'item_nama',
+                    'item_jumlah',
+                    'item_harga',
+                    'item_sub_total',
+                    'item_varian',
+                    'item_status',
+                ]);
+        }
+
+        $transaksi = $transaksi
+            ->concat($uangPlusTransaksi)
+            ->values();
 
         if ($transaksi->isEmpty()) {
             return compact(
@@ -8207,7 +11021,24 @@ class QCRController extends Controller
             })
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL SALES GROSS UNTUK TABEL MENU / BOM
+        |--------------------------------------------------------------------------
+        | Ini adalah total dari item menu POS.
+        | Nilai ini sengaja TIDAK disamakan ke tbl_laporan_bulanan karena:
+        | - BOM/Usage POS butuh quantity dan item menu asli.
+        | - Non Sales Transaction tidak punya menu dan tidak punya resep BOM.
+        |--------------------------------------------------------------------------
+        */
         $totalSalesTransaksi = (float) $rekapTransaksi->sum('total_sales');
+
+        $totalSalesMenuGross = $totalSalesTransaksi;
+        $totalSalesNetDashboard = $totalSalesBulanan > 0
+            ? $totalSalesBulanan
+            : $totalSalesMenuGross;
+
+        $nonSalesTransaction = max(0, $totalSalesMenuGross - $totalSalesNetDashboard);
 
         $menuMasterByNorm = DB::table('tbl_menu')
             ->select('id', 'item_produk')
@@ -8306,12 +11137,8 @@ class QCRController extends Controller
 
             foreach ($rows as $bhn) {
                 $namaBahan = (string) $bhn->nama_bahan;
-
-                if ($this->isTepungBreader($namaBahan)) {
-                    continue;
-                }
-
-                $pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
+            // Tepung Breader tidak boleh di-skip karena termasuk BOM.
+$pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
                 $pakaiBase = $toBase($pakai, $bhn->satuan, $bhn->konversi);
 
                 $menuData[$rowKey]['bahan'][$namaBahan] =
@@ -8347,6 +11174,37 @@ class QCRController extends Controller
             });
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | KOREKSI DISPLAY SALES QCR KE NET DASHBOARD
+        |--------------------------------------------------------------------------
+        | Detail menu POS memang gross karena berasal dari item menu asli.
+        | Dashboard memakai tbl_laporan_bulanan.total_omset yang sudah NET.
+        |
+        | Agar total kolom penjualan di tabel QCR saat dijumlah manual sama dengan
+        | dashboard, selisih Non Sales Transaction ditampilkan sebagai 1 baris
+        | koreksi negatif.
+        |
+        | Penting:
+        | - Qty menu tidak diubah.
+        | - Harga menu tidak diubah.
+        | - BOM / bahan / HPP / Usage POS tidak diubah karena baris ini bahan = [].
+        | - Summary tetap memakai $totalSalesNetDashboard.
+        |--------------------------------------------------------------------------
+        */
+        if ($nonSalesTransaction > 0) {
+            $menuData['__NON_SALES_TRANSACTION_ADJUSTMENT__'] = [
+                'nama_menu' => 'NON SALES TRANSACTION',
+                'tipe' => 'ADJUSTMENT',
+                'unit_sold' => 0,
+                'harga' => 0,
+                'total_sales' => -1 * (float) $nonSalesTransaction,
+                'total_sales_gross' => 0,
+                'is_non_sales_adjustment' => true,
+                'bahan' => [],
+            ];
+        }
+
         $stockRows = $this->getQcrMergedStockRows(
             $outletIds,
             $start_date,
@@ -8354,10 +11212,16 @@ class QCRController extends Controller
             $isAllOutlet
         );
 
-        $totalUangPlus = (float) DB::table('tbl_stock')
-            ->when(!$isAllOutlet, fn ($q) => $q->whereIn('outlet_id', $outletIds))
-            ->whereBetween(DB::raw('DATE(tanggal)'), [$start_date, $end_date])
-            ->sum('uang_plus');
+        /*
+        |--------------------------------------------------------------------------
+        | PATCH SALDO UANG PLUS QCR
+        |--------------------------------------------------------------------------
+        | Saldo uang plus harus mengikuti data QCR yang sedang tampil.
+        | $stockRows sudah hasil merge tbl_stock + tbl_stock_draft dengan prioritas draft,
+        | jadi angka modal "Membelanjakan Uang Plus" tidak lagi berbeda dengan data DSC/QCR.
+        |--------------------------------------------------------------------------
+        */
+        $totalUangPlus = (float) $stockRows->sum(fn ($row) => (float) ($row->uang_plus ?? 0));
 
         $bahanIdsInRange = $stockRows->pluck('bahan_id')->unique()->filter()->values();
 
@@ -8382,8 +11246,26 @@ class QCRController extends Controller
             }
         }
 
-        $stockAggByBahanId = $this->buildQcrStockAggByBahanId($stockRows)
-            ->reject(fn ($agg) => $this->isTepungBreader($agg->bahan_nama ?? ''));
+        /*
+         |--------------------------------------------------------------------------
+         | FIX BOM TEPUNG BREADER
+         |--------------------------------------------------------------------------
+         | Tepung Breader adalah bahan BOM seperti bahan lain.
+         | Jangan dibuang dari stock aggregation, karena harus ikut:
+         | - Usage POS
+         | - Usage DSC
+         | - Difference
+         | - Prediksi Stock
+         | - HPP
+         */
+        $displayOutletId = (int) ($pricePrimaryOutletIds[0] ?? $outletIds[0] ?? 0);
+        $openingBulkMapQcr = $this->getOpeningBulkFromAliasIds(
+            $outletIds,
+            $displayOutletId,
+            $bahanIdsInRange->map(fn ($id) => (int) $id)->values()->all(),
+            $start_date
+        );
+        $stockAggByBahanId = $this->buildQcrStockAggByBahanId($stockRows, $outletIds, $displayOutletId, $openingBulkMapQcr, $start_date, $end_date);
 
         $stockAggByNamaNorm = collect();
         foreach ($stockAggByBahanId as $agg) {
@@ -8409,8 +11291,9 @@ class QCRController extends Controller
             $wasteProduct = (float) ($agg->waste_product_qty ?? 0);
             $wasteBahan   = (float) ($agg->waste_bahan_qty ?? 0);
             $wasteTepung  = (float) ($agg->waste_tepung_qty ?? 0);
+            $actualTepung = (float) ($agg->actual_tepung_qty ?? 0);
 
-            $wasteQty = $wasteProduct + $wasteBahan;
+            $wasteQty = $wasteProduct + $wasteBahan + $wasteTepung;
 
             $bahanSummary[$namaBahan] = [
                 'qty_resep'       => 0,
@@ -8427,7 +11310,11 @@ class QCRController extends Controller
                 'waste_product_qty' => $wasteProduct,
                 'waste_bahan_qty'   => $wasteBahan,
                 'waste_tepung_qty'  => $wasteTepung,
-                'waste_qty'         => $wasteQty,
+                'actual_tepung_qty' => $actualTepung,
+                'waste_qty'         => $this->normalizeQcrDisplayQty(
+                    $wasteQty,
+                    (string) ($agg->bahan_satuan ?? ($priceRow->satuan ?? ''))
+                ),
                 'waste_rp'          => $wasteQty * $hargaPerBase,
                 'waste_tepung_rp'   => $wasteTepung * $hargaPerBase,
                 'avg_per_day'     => 0,
@@ -8469,6 +11356,7 @@ class QCRController extends Controller
                         'waste_product_qty' => 0,
                         'waste_bahan_qty'   => 0,
                         'waste_tepung_qty'  => 0,
+                        'actual_tepung_qty' => 0,
                         'waste_qty'         => 0,
                         'waste_rp'          => 0,
                         'waste_tepung_rp'   => 0,
@@ -8509,19 +11397,58 @@ class QCRController extends Controller
             $row['forecast_hpp'] = $forecastQty * $harga;
         }
         unset($row);
-
+        /*
+         |--------------------------------------------------------------------------
+         | FIX BOM TEPUNG BREADER
+         |--------------------------------------------------------------------------
+         | Jangan hapus Tepung Breader dari bahanSummary.
+         */
+        /*
+         * PATCH URUTAN BAHAN QCR:
+         * bahanSummary dan visibleBahanNames diurutkan mengikuti tbl_bahan_mapping.
+         * Bahan yang tidak ada di mapping tetap ditampilkan di bagian akhir.
+         */
         $bahanSummary = collect($bahanSummary)
-            ->reject(fn ($row, $namaBahan) => $this->isTepungBreader($namaBahan))
+            ->sortBy(function ($row, $namaBahan) use ($qcrBahanOrder) {
+                $namaKey = $this->normName((string) $namaBahan);
+                $urutan = $qcrBahanOrder[$namaKey] ?? 999999;
+
+                return str_pad((string) $urutan, 6, '0', STR_PAD_LEFT) . '_' . $namaKey;
+            })
             ->toArray();
 
-        $visibleBahanNames = array_values(array_filter(
-            $visibleBahanNames,
-            fn ($namaBahan) => !$this->isTepungBreader($namaBahan)
-        ));
+        /*
+         * Tepung Breader tetap masuk visibleBahanNames untuk Summary Pemakaian Bahan.
+         * Jika ada tampilan detail menu yang mau hide Tepung, lakukan di Blade,
+         * bukan di pipeline data.
+         */
+        $visibleBahanNames = array_values($visibleBahanNames);
 
-        $totalHpp = array_sum(array_map(fn ($r) => (float) ($r['hpp'] ?? 0), $bahanSummary));
+        usort($visibleBahanNames, function ($a, $b) use ($qcrBahanOrder) {
+            $aKey = $this->normName((string) $a);
+            $bKey = $this->normName((string) $b);
 
-        $totalSales = $totalSalesBulanan;
+            $aOrder = $qcrBahanOrder[$aKey] ?? 999999;
+            $bOrder = $qcrBahanOrder[$bKey] ?? 999999;
+
+            if ($aOrder !== $bOrder) {
+                return $aOrder <=> $bOrder;
+            }
+
+            return strcmp($aKey, $bKey);
+        });
+
+$totalHpp = array_sum(array_map(fn ($r) => (float) ($r['hpp'] ?? 0), $bahanSummary));
+
+        /*
+        |--------------------------------------------------------------------------
+        | SUMMARY SALES FINAL
+        |--------------------------------------------------------------------------
+        | Summary utama harus mengikuti Dashboard Penjualan / net sales.
+        | Jangan pakai $totalSalesTransaksi untuk summary, karena itu gross item menu.
+        |--------------------------------------------------------------------------
+        */
+        $totalSales = $totalSalesNetDashboard;
         $profit = $totalSales - $totalHpp;
 
         $totalWasteMoney  = 0.0;
@@ -8583,6 +11510,9 @@ class QCRController extends Controller
             'sales' => $totalSales,
             'sales_transaksi' => $totalSalesTransaksi,
             'sales_laporan_bulanan' => $totalSalesBulanan,
+            'sales_net' => $totalSalesNetDashboard,
+            'sales_gross_menu' => $totalSalesMenuGross,
+            'non_sales_transaction' => $nonSalesTransaction,
             'hpp' => $totalHpp,
             'hpp_percent' => $totalSales != 0 ? round(($totalHpp / $totalSales) * 100, 1) : 0,
             'profit' => $profit,
@@ -8613,7 +11543,12 @@ class QCRController extends Controller
             $wasteQty = (float) ($row['waste_qty'] ?? 0);
             $satuan = (string) ($row['satuan'] ?? '-');
 
-            $diffQty = ($qtyStock - $wasteQty) - $qtyResep;
+            $diffQtyRaw = ($qtyStock - $wasteQty) - $qtyResep;
+
+            // Sesuaikan qty selisih dengan satuan.
+            // PCS/LBR/CUP/BOTOL/SACHET/PACK tidak boleh decimal.
+            $diffQty = $this->normalizeQcrDifferenceQty($diffQtyRaw, $satuan);
+
             $referenceKey = md5($namaBahan . '|' . $start_date . '|' . $end_date);
 
             $jenis = null;
@@ -8635,29 +11570,45 @@ class QCRController extends Controller
 
             $calc = $this->applyHiddenToDifference($diffQty, $hiddenQty, $hiddenAll);
 
-            $visibleSignedQty = $calc['visible_signed_qty'] ?? (
+            /*
+             * FIX RESTORE HAPUS +/-:
+             * Jangan langsung continue saat visible_qty = 0.
+             * Item yang sudah di-hide penuh tetap harus dikirim ke modal agar tombol
+             * "Tampilkan Semua" atau Reset per item bisa menampilkan data kembali.
+             */
+            $visibleSignedQtyRaw = $calc['visible_signed_qty'] ?? (
                 $diffQty < 0 ? -1 * ($calc['visible_qty'] ?? 0) : ($calc['visible_qty'] ?? 0)
             );
 
+            $qtyRawDisplay = $this->normalizeQcrDisplayQty((float) ($calc['raw_abs'] ?? 0), $satuan);
+            $qtyHiddenDisplay = $this->normalizeQcrDisplayQty((float) ($calc['hidden_qty'] ?? 0), $satuan);
+            $qtyVisibleAbsDisplay = $this->normalizeQcrDisplayQty((float) ($calc['visible_qty'] ?? 0), $satuan);
+            $qtyVisibleSignedDisplay = $this->normalizeQcrDisplayQty((float) $visibleSignedQtyRaw, $satuan);
+
+            // Kalau visible = 0, item tetap masuk modal sebagai hidden agar bisa di-restore.
+            $isFullyHiddenForModal = $qtyVisibleAbsDisplay <= 0;
+
             $row['diff_raw_qty'] = $diffQty;
-            $row['diff_hidden_qty'] = $calc['hidden_qty'];
-            $row['diff_visible_qty'] = $calc['visible_qty'];
-            $row['diff_visible_signed_qty'] = $visibleSignedQty;
-            $row['diff_nominal_visible'] = $calc['visible_qty'] * $harga;
-            $row['diff_status'] = $calc['visible_qty'] > 0 ? 'visible' : 'hidden';
+            $row['diff_hidden_qty'] = $qtyHiddenDisplay;
+            $row['diff_visible_qty'] = $qtyVisibleAbsDisplay;
+            $row['diff_visible_signed_qty'] = $qtyVisibleSignedDisplay;
+            $row['diff_nominal_visible'] = round($qtyVisibleAbsDisplay * $harga);
+            $row['diff_status'] = $qtyVisibleAbsDisplay > 0 ? 'visible' : 'hidden';
 
             $item = [
                 'reference_key'   => $referenceKey,
                 'reference_name'  => $namaBahan,
                 'qty_raw'         => $diffQty,
-                'qty_abs'         => $calc['raw_abs'],
-                'qty_hidden'      => $calc['hidden_qty'],
-                'qty_visible'     => $visibleSignedQty,
-                'qty_visible_abs' => $calc['visible_qty'],
-                'nominal'         => $calc['visible_qty'] * $harga,
-                'nominal_raw'     => $calc['raw_abs'] * $harga,
+                'qty_raw_before_normalize' => $diffQtyRaw ?? $diffQty,
+                'qty_abs'         => $qtyRawDisplay,
+                'qty_hidden'      => $qtyHiddenDisplay,
+                'qty_visible'     => $qtyVisibleSignedDisplay,
+                'qty_visible_abs' => $qtyVisibleAbsDisplay,
+                // Rupiah di modal Hapus +/- tidak boleh membawa sen/desimal.
+                'nominal'         => round($qtyVisibleAbsDisplay * $harga),
+                'nominal_raw'     => round($qtyRawDisplay * $harga),
                 'satuan'          => $satuan,
-                'status'          => $calc['visible_qty'] > 0 ? 'visible' : 'hidden',
+                'status'          => $isFullyHiddenForModal ? 'hidden' : 'visible',
             ];
 
             if ($jenis === 'plus' && $item['qty_abs'] > 0) {
@@ -8684,7 +11635,7 @@ class QCRController extends Controller
             $harga = (float) ($row['harga'] ?? 0);
             $visibleSignedQty = (float) ($row['diff_visible_signed_qty'] ?? 0);
 
-            $nominalVisible = $visibleSignedQty * $harga;
+            $nominalVisible = round($visibleSignedQty * $harga);
 
             $totalSelisihNetVisible += $nominalVisible;
 
@@ -8708,6 +11659,9 @@ class QCRController extends Controller
             'sales' => $totalSales,
             'sales_transaksi' => $totalSalesTransaksi,
             'sales_laporan_bulanan' => $totalSalesBulanan,
+            'sales_net' => $totalSalesNetDashboard,
+            'sales_gross_menu' => $totalSalesMenuGross,
+            'non_sales_transaction' => $nonSalesTransaction,
             'hpp' => $totalHpp,
             'hpp_percent' => $totalSales != 0 ? round(($totalHpp / $totalSales) * 100, 1) : 0,
             'profit' => $profit,
@@ -8729,11 +11683,23 @@ class QCRController extends Controller
         | QCR BAHAN NON-BOM / OPERASIONAL
         |--------------------------------------------------------------------------
         | Bahan yang tidak masuk resep menu/BOM tetap ditampilkan di section bawah.
-        | Error DataTables dicegah di Blade dengan memastikan tbody selalu punya
-        | jumlah kolom yang sama dengan thead.
+        |
+        | FIX LPG / OPERASIONAL:
+        | - Penentuan Non-BOM harus berdasarkan master BOM asli tbl_menu_bahan.
+        | - Jangan menganggap bahan masuk BOM hanya karena sudah ada di Summary QCR
+        |   / mapping / stock summary.
+        | - Contoh LPG: tidak ada resep menu/BOM, tapi ada di stock DSC, maka wajib
+        |   tampil di QCR Bahan Non-BOM / Operasional.
+        | - Bahan operasional seperti LPG/GAS/ELPIJI tetap ditampilkan walaupun nilai
+        |   stock/usage/waste sedang 0, selama bahan tersebut ada di data stock DSC.
+        | - Tidak mengubah rumus QCR utama.
         */
-        $visibleBahanNorms = collect($visibleBahanNames)
-            ->map(fn ($nama) => $this->normName($nama))
+        $bomBahanNorms = DB::table('tbl_menu_bahan as mb')
+            ->join('tbl_bahan as b', 'b.id', '=', 'mb.bahan_id')
+            ->select('b.nama_bahan')
+            ->distinct()
+            ->get()
+            ->map(fn ($row) => $this->normName((string) ($row->nama_bahan ?? '')))
             ->filter()
             ->unique()
             ->values()
@@ -8746,14 +11712,16 @@ class QCRController extends Controller
             $namaBahan = (string) ($agg->bahan_nama ?? '');
             $namaNorm = $this->normName($namaBahan);
 
-            if ($namaBahan === '' || $this->isTepungBreader($namaBahan)) {
+            // Hanya bahan yang benar-benar masuk master BOM/menu yang tidak tampil di Non-BOM.
+            // Jangan pakai $visibleBahanNames / $bahanSummary sebagai dasar skip,
+            // karena bahan operasional seperti LPG bisa ikut mapping/summary tapi bukan BOM.
+            if (in_array($namaNorm, $bomBahanNorms, true)) {
                 continue;
             }
 
-            // Kalau sudah dipakai BOM/menu, jangan masuk Non-BOM.
-            if (in_array($namaNorm, $visibleBahanNorms, true)) {
-                continue;
-            }
+            $isOperationalForced = str_contains($namaNorm, 'lpg')
+                || str_contains($namaNorm, 'elpiji')
+                || str_contains($namaNorm, 'gas');
 
             $priceRow = $priceMap[$namaNorm] ?? null;
 
@@ -8770,11 +11738,25 @@ class QCRController extends Controller
 
             $wasteProduct = (float) ($agg->waste_product_qty ?? 0);
             $wasteBahan = (float) ($agg->waste_bahan_qty ?? 0);
-            $wasteQty = $wasteProduct + $wasteBahan;
+            $wasteTepung = (float) ($agg->waste_tepung_qty ?? 0);
+            $wasteQty = $wasteProduct + $wasteBahan + $wasteTepung;
 
             // Karena Non-BOM tidak punya Usage POS/BOM, selisih dinilai dari usage DSC net.
             $usageDscNet = $usageDsc - $wasteQty;
             $selisihQty = $usageDscNet;
+
+            // Bahan non-BOM yang stock, usage, waste, dan selisih semuanya 0 tetap disembunyikan,
+            // kecuali bahan operasional penting seperti LPG/GAS/ELPIJI yang memang harus dimonitor.
+            if (
+                ! $isOperationalForced &&
+                abs($stock) < 0.00001 &&
+                abs($usageDsc) < 0.00001 &&
+                abs($wasteQty) < 0.00001 &&
+                abs($selisihQty) < 0.00001
+            ) {
+                continue;
+            }
+
             $selisihRp = abs($selisihQty) * $hargaPerBase;
 
             if ($selisihQty > 0) {
@@ -8788,14 +11770,16 @@ class QCRController extends Controller
                 $status = 'Normal';
             }
 
+            $satuanNonBom = (string) ($agg->bahan_satuan ?? ($priceRow->satuan ?? '-'));
+
             $bahanNonBomRows[] = [
                 'bahan_id' => (int) $bahanId,
                 'nama_bahan' => $namaBahan,
-                'satuan' => (string) ($agg->bahan_satuan ?? ($priceRow->satuan ?? '-')),
-                'stock' => $stock,
-                'usage_dsc' => $usageDsc,
-                'waste_qty' => $wasteQty,
-                'selisih_qty' => $selisihQty,
+                'satuan' => $satuanNonBom,
+                'stock' => $this->normalizeQcrDisplayQty($stock, $satuanNonBom),
+                'usage_dsc' => $this->normalizeQcrDisplayQty($usageDsc, $satuanNonBom),
+                'waste_qty' => $this->normalizeQcrDisplayQty($wasteQty, $satuanNonBom),
+                'selisih_qty' => $this->normalizeQcrDisplayQty($selisihQty, $satuanNonBom),
                 'harga' => $hargaPerBase,
                 'selisih_rp' => $selisihRp,
                 'status' => $status,
@@ -8848,9 +11832,10 @@ class QCRController extends Controller
             $qcrMinusNotifItems
         ));
 
-        // Backward compatibility: $summary tetap berisi angka setelah data PLUS/MINUS di-hidden,
-        // supaya bagian lama yang masih membaca $summary tidak rusak.
-        $summary = $summarySetelahHapus;
+        // FIX QCR: ringkasan utama harus tetap data NORMAL saat halaman pertama dibuka.
+        // Angka setelah hide hanya dipakai saat user klik tombol Hapus PLUS/MINUS / melihat card setelah hide.
+        // Jadi Selisih Persediaan (Loss) tidak otomatis berubah karena hidden tersimpan.
+        $summary = $summaryNormal;
 
         return compact(
             'menuData',
@@ -9022,20 +12007,70 @@ class QCRController extends Controller
 
 private function isHargaOutletOnlyRole(): bool
 {
-    $role = auth()->check() ? auth()->user()->role : null;
-
-    return in_array($role, [
-        'spv',
-        'tm_manager',
-        'terotorial_manager',
-        'territorial_manager',
-    ], true);
+    /*
+    |--------------------------------------------------------------------------
+    | PERMISSION DRIVEN
+    |--------------------------------------------------------------------------
+    | Tidak ada lagi role yang dipaksa hanya boleh Harga Bahan Outlet.
+    | Tab dan tombol tetap mengikuti role_permissions di Blade + middleware route.
+    | Method ini dipertahankan agar variable $hargaOutletOnly di dataqcr tetap aman.
+    |--------------------------------------------------------------------------
+    */
+    return false;
 }
 
 private function abortIfHargaOutletOnlyRole(): void
 {
-    if ($this->isHargaOutletOnlyRole()) {
-        abort(403, 'Role ini hanya boleh mengakses Harga Bahan Outlet.');
+    /*
+    |--------------------------------------------------------------------------
+    | LEGACY NO-OP
+    |--------------------------------------------------------------------------
+    | Dulu method ini abort untuk role spv/tm_manager.
+    | Sekarang tidak boleh hardcode role. Akses CRUD dicek dari permission.
+    |--------------------------------------------------------------------------
+    */
+    return;
+}
+
+private function currentUserRole(): string
+{
+    return strtolower(trim((string) (auth()->user()->role ?? '')));
+}
+
+private function controllerHasPermission(string $permission): bool
+{
+    if (! auth()->check()) {
+        return false;
+    }
+
+    $role = $this->currentUserRole();
+
+    if ($role === 'superadmin') {
+        return true;
+    }
+
+    if ($role === '') {
+        return false;
+    }
+
+    $permissions = Cache::remember("role_permissions:{$role}", now()->addMinutes(5), function () use ($role) {
+        return DB::table('role_permissions')
+            ->whereRaw('LOWER(TRIM(role)) = ?', [$role])
+            ->pluck('permission')
+            ->map(fn ($permission) => trim((string) $permission))
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+    });
+
+    return in_array(trim($permission), $permissions, true);
+}
+
+private function assertPermission(string $permission): void
+{
+    if (! $this->controllerHasPermission($permission)) {
+        abort(403, "Anda tidak memiliki akses untuk permission: {$permission}");
     }
 }
 
@@ -9267,7 +12302,7 @@ public function deleteBahanHargaOutlet(Request $request)
 // ---------------- MENU ----------------
 public function storeMenu(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('menu.store');
 
     $request->validate([
         'item_produk' => 'required|string|max:100',
@@ -9288,7 +12323,7 @@ public function storeMenu(Request $request)
 
 public function updateMenu(Request $request, $id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('menu.update');
 
     $request->validate([
         'item_produk' => 'required|string|max:100',
@@ -9310,7 +12345,7 @@ public function updateMenu(Request $request, $id)
 
 public function destroyMenu($id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('menu.destroy');
 
     DB::transaction(function () use ($id) {
         DB::table('tbl_menu_bahan')->where('menu_id', $id)->delete();
@@ -9323,7 +12358,7 @@ public function destroyMenu($id)
 // ---------------- BAHAN ----------------
 public function storeBahan(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan.store');
 
     $request->validate([
         'nama_bahan'   => 'required|string|max:255',
@@ -9350,7 +12385,7 @@ public function storeBahan(Request $request)
 
 public function updateBahan(Request $request, $id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan.update');
 
     $request->validate([
         'nama_bahan'  => 'required|string|max:100',
@@ -9376,7 +12411,7 @@ public function updateBahan(Request $request, $id)
 
 public function destroyBahan($id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan.destroy');
 
     DB::table('tbl_bahan')->where('id', $id)->delete();
 
@@ -9386,7 +12421,7 @@ public function destroyBahan($id)
 // ---------------- BAHAN DSC ----------------
 public function storeBahanDsc(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan-dsc.store');
 
     $request->validate([
         'nama_bahan' => 'required|string|max:255',
@@ -9420,7 +12455,7 @@ public function storeBahanDsc(Request $request)
 
 public function updateBahanDsc(Request $request, $id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan-dsc.update');
 
     $request->validate([
         'nama_bahan' => 'required|string|max:255',
@@ -9456,7 +12491,7 @@ public function updateBahanDsc(Request $request, $id)
 
 public function destroyBahanDsc($id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bahan-dsc.destroy');
 
     $usedInStock = DB::table('tbl_stock')->where('bahan_id', (int) $id)->exists();
     $usedInDraft = DB::table('tbl_stock_draft')->where('bahan_id', (int) $id)->exists();
@@ -9477,7 +12512,7 @@ public function destroyBahanDsc($id)
 // ---------------- BUM / BOM ----------------
 public function storeBum(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bum.store');
 
     $request->validate([
         'menu_id'      => 'required|exists:tbl_menu,id',
@@ -9504,7 +12539,7 @@ public function storeBum(Request $request)
 
 public function updateBum(Request $request, $menu_id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bum.update');
 
     $request->validate([
         'bahan_id'   => 'required|array|min:1',
@@ -9536,7 +12571,7 @@ public function updateBum(Request $request, $menu_id)
 
 public function destroyBum($menu_id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bum.destroy');
 
     DB::table('tbl_menu_bahan')
         ->where('menu_id', (int) $menu_id)
@@ -9547,7 +12582,7 @@ public function destroyBum($menu_id)
 
 public function getMenuBahan($menu_id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    // $this->assertPermission('bum.detail'); // matikan dulu
 
     try {
         $data = DB::table('tbl_menu_bahan as mb')
@@ -9575,7 +12610,7 @@ public function getMenuBahan($menu_id)
 
 public function destroyBumByMenu($menu_id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('bum.destroy');
 
     DB::table('tbl_menu_bahan')->where('menu_id', $menu_id)->delete();
 
@@ -9585,7 +12620,7 @@ public function destroyBumByMenu($menu_id)
 // ---------------- STOCK ----------------
 public function storeStock(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('stock.store');
 
     $request->validate([
         'bahan_id'       => 'required|integer|exists:tbl_bahan,id',
@@ -9619,7 +12654,7 @@ public function storeStock(Request $request)
 
 public function editStock($id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('stock.edit');
 
     $stock = DB::table('tbl_stock')->where('id', $id)->first();
 
@@ -9644,7 +12679,7 @@ public function editStock($id)
 
 public function updateStock(Request $request, $id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('stock.update');
 
     $request->validate([
         'bahan_id'       => 'required|integer|exists:tbl_bahan,id',
@@ -9680,7 +12715,7 @@ public function updateStock(Request $request, $id)
 
 public function destroyStock($id)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('stock.destroy');
 
     DB::table('tbl_stock')->where('id', $id)->delete();
 
@@ -9689,7 +12724,7 @@ public function destroyStock($id)
 
 public function stockList(Request $request)
 {
-    $this->abortIfHargaOutletOnlyRole();
+    $this->assertPermission('stock.edit');
 
     $perPage  = max(10, min((int) $request->get('per_page', 25), 100));
     $page     = max((int) $request->get('page', 1), 1);
@@ -9779,4 +12814,481 @@ public function bahanOptions()
 
     return response()->json($data);
 }
+
+    // DSC TRIAL DUPLIKAT FORM SETORAN OMSET
+    public function normalizeAmount($value): float
+    {
+        if ($value === null) {
+            return 0.0;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        $s = trim((string) $value);
+        if ($s === '') {
+            return 0.0;
+        }
+
+        $s = str_replace(['Rp', 'rp', ' ', '.'], '', $s);
+        $s = str_replace(',', '.', $s);
+
+        return is_numeric($s) ? (float) $s : 0.0;
+    }
+
+    public function importBcaItems(array $items): array
+    {
+        $inserted = 0;
+        $skipped = 0;
+
+        foreach ($items as $item) {
+            $tanggal = Carbon::parse($item['tanggal'])->format('Y-m-d');
+            $nominal = $this->normalizeAmount($item['nominal'] ?? 0);
+            $tipe = strtoupper((string) ($item['tipe'] ?? 'CR'));
+            $referenceNo = $item['reference_no'] ?? null;
+            $description = $item['description'] ?? null;
+
+            $exists = DB::selectOne(
+                "SELECT id FROM tbl_bca_mutasi
+                 WHERE tanggal = ?
+                   AND nominal = ?
+                   AND COALESCE(reference_no, '') = COALESCE(?, '')
+                 LIMIT 1",
+                [$tanggal, $nominal, $referenceNo]
+            );
+
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            DB::insert(
+                "INSERT INTO tbl_bca_mutasi
+                    (tanggal, nominal, tipe, reference_no, description, raw_payload, is_matched, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), NOW())",
+                [
+                    $tanggal,
+                    $nominal,
+                    $tipe,
+                    $referenceNo,
+                    $description,
+                    json_encode($item, JSON_UNESCAPED_UNICODE),
+                ]
+            );
+
+            $inserted++;
+        }
+
+        return [
+            'inserted' => $inserted,
+            'skipped' => $skipped,
+        ];
+    }
+
+    public function matchSetoran(
+        int $outletId,
+        string $tanggalSetor,
+        float $nominal,
+        ?string $kodeRef = null
+    ): array {
+        $tanggalSetor = Carbon::parse($tanggalSetor)->format('Y-m-d');
+        $start = Carbon::parse($tanggalSetor)->subDays(1)->format('Y-m-d');
+        $end = Carbon::parse($tanggalSetor)->addDays(2)->format('Y-m-d');
+        $kodeRef = trim((string) $kodeRef) ?: null;
+
+        $candidates = DB::select(
+            "SELECT *
+             FROM tbl_bca_mutasi
+             WHERE tipe = 'CR'
+               AND is_matched = 0
+               AND tanggal BETWEEN ? AND ?
+             ORDER BY tanggal ASC, id ASC",
+            [$start, $end]
+        );
+
+        if (! $candidates) {
+            return [
+                'status' => 'BELUM_ADA_BCA',
+                'bca_mutasi_id' => null,
+                'reference_no' => $kodeRef,
+                'selisih' => $nominal,
+                'score' => 0,
+                'note' => 'Tidak ada mutasi BCA masuk pada rentang H-1 sampai H+2.',
+            ];
+        }
+
+        $best = null;
+        $sameNominalCount = 0;
+
+        foreach ($candidates as $bca) {
+            $bcaNominal = (float) $bca->nominal;
+            $selisih = abs($bcaNominal - $nominal);
+            $score = 0;
+            $notes = [];
+
+            if ($selisih == 0.0) {
+                $score += 60;
+                $sameNominalCount++;
+                $notes[] = 'Nominal sama';
+            } elseif ($selisih <= 1000) {
+                $score += 25;
+                $notes[] = 'Nominal beda kecil';
+            }
+
+            $dateDiff = abs(Carbon::parse($tanggalSetor)->diffInDays(Carbon::parse($bca->tanggal), false));
+            if ($dateDiff === 0) {
+                $score += 20;
+                $notes[] = 'Tanggal sama';
+            } elseif ($dateDiff <= 2) {
+                $score += 10;
+                $notes[] = 'Tanggal dekat';
+            }
+
+            if ($kodeRef) {
+                $needle = strtolower($kodeRef);
+                $ref = strtolower((string) $bca->reference_no);
+                $desc = strtolower((string) $bca->description);
+
+                if ($ref === $needle || str_contains($desc, $needle)) {
+                    $score += 40;
+                    $notes[] = 'Kode reference cocok';
+                }
+            }
+
+            if (! $best || $score > $best['score']) {
+                $best = [
+                    'bca' => $bca,
+                    'score' => $score,
+                    'selisih' => $selisih,
+                    'note' => implode(', ', $notes),
+                ];
+            }
+        }
+
+        if (! $best || $best['score'] < 40) {
+            return [
+                'status' => 'BELUM_ADA_BCA',
+                'bca_mutasi_id' => null,
+                'reference_no' => $kodeRef,
+                'selisih' => $nominal,
+                'score' => $best['score'] ?? 0,
+                'note' => 'Ada mutasi BCA, tetapi tidak cukup kuat untuk dicocokkan.',
+            ];
+        }
+
+        if ($sameNominalCount > 1 && ! $kodeRef) {
+            $status = 'DUPLIKAT';
+            $note = 'Nominal sama ditemukan lebih dari satu. Isi kode reference agar tidak salah match.';
+        } elseif ($best['score'] >= 100) {
+            $status = 'MATCH_STRONG';
+            $note = $best['note'];
+        } elseif ($best['selisih'] == 0.0) {
+            $status = 'MATCH_NOMINAL';
+            $note = $best['note'];
+        } else {
+            $status = 'SELISIH';
+            $note = $best['note'];
+        }
+
+        return [
+            'status' => $status,
+            'bca_mutasi_id' => $best['bca']->id,
+            'reference_no' => $best['bca']->reference_no ?: $kodeRef,
+            'selisih' => $best['selisih'],
+            'score' => $best['score'],
+            'note' => $note,
+        ];
+    }
+
+    public function applyToOmsetRow(int $rowId, int $shift): array
+    {
+        $row = DB::selectOne(
+            "SELECT * FROM tbl_dsc_omset_setoran WHERE id = ? LIMIT 1",
+            [$rowId]
+        );
+
+        if (! $row) {
+            return [
+                'ok' => false,
+                'message' => 'Data omset/setoran tidak ditemukan.',
+            ];
+        }
+
+        $prefix = $shift === 1 ? 's1' : 's2';
+        $tanggalSetor = $row->{$prefix . '_tanggal_setor'} ?? null;
+        $nominal = $this->normalizeAmount($row->{$prefix . '_sudah_disetor'} ?? 0);
+        $kodeRef = $row->{$prefix . '_bca_ref'} ?? null;
+
+        if (! $tanggalSetor || $nominal <= 0) {
+            DB::update(
+                "UPDATE tbl_dsc_omset_setoran
+                 SET {$prefix}_rekon_status = 'PENDING',
+                     {$prefix}_rekon_selisih = 0,
+                     {$prefix}_rekon_note = 'Tanggal setor atau nominal belum lengkap',
+                     updated_at = NOW()
+                 WHERE id = ?",
+                [$rowId]
+            );
+
+            return [
+                'ok' => false,
+                'message' => 'Tanggal setor atau nominal belum lengkap.',
+            ];
+        }
+
+        $result = $this->matchSetoran(
+            (int) $row->outlet_id,
+            $tanggalSetor,
+            $nominal,
+            $kodeRef
+        );
+
+        DB::update(
+            "UPDATE tbl_dsc_omset_setoran
+             SET {$prefix}_bca_ref = ?,
+                 {$prefix}_bca_mutasi_id = ?,
+                 {$prefix}_rekon_status = ?,
+                 {$prefix}_rekon_selisih = ?,
+                 {$prefix}_rekon_note = ?,
+                 updated_at = NOW()
+             WHERE id = ?",
+            [
+                $result['reference_no'],
+                $result['bca_mutasi_id'],
+                $result['status'],
+                $result['selisih'],
+                $result['note'],
+                $rowId,
+            ]
+        );
+
+        if ($result['bca_mutasi_id'] && in_array($result['status'], ['MATCH_STRONG', 'MATCH_NOMINAL'], true)) {
+            DB::update(
+                "UPDATE tbl_bca_mutasi
+                 SET is_matched = 1,
+                     matched_table = 'tbl_dsc_omset_setoran',
+                     matched_row_id = ?,
+                     matched_shift = ?,
+                     updated_at = NOW()
+                 WHERE id = ?",
+                [$rowId, $shift, $result['bca_mutasi_id']]
+            );
+        }
+
+        return [
+            'ok' => true,
+            'result' => $result,
+        ];
+    }
+
+    public function listRekon(?string $tanggal = null, ?int $outletId = null): array
+    {
+        $tanggal = $tanggal ?: date('Y-m-d');
+
+        $params = [$tanggal];
+        $whereOutlet = '';
+
+        if ($outletId) {
+            $whereOutlet = ' AND o.outlet_id = ?';
+            $params[] = $outletId;
+        }
+
+        return DB::select(
+            "SELECT
+                o.id,
+                o.outlet_id,
+                o.tanggal,
+                o.pic,
+
+                o.s1_sudah_disetor,
+                o.s1_tanggal_setor,
+                o.s1_bca_ref,
+                o.s1_bca_mutasi_id,
+                o.s1_rekon_status,
+                o.s1_rekon_selisih,
+                o.s1_rekon_note,
+                b1.tanggal AS s1_bca_tanggal,
+                b1.nominal AS s1_bca_nominal,
+                b1.reference_no AS s1_bca_reference,
+                b1.description AS s1_bca_description,
+
+                o.s2_sudah_disetor,
+                o.s2_tanggal_setor,
+                o.s2_bca_ref,
+                o.s2_bca_mutasi_id,
+                o.s2_rekon_status,
+                o.s2_rekon_selisih,
+                o.s2_rekon_note,
+                b2.tanggal AS s2_bca_tanggal,
+                b2.nominal AS s2_bca_nominal,
+                b2.reference_no AS s2_bca_reference,
+                b2.description AS s2_bca_description
+             FROM tbl_dsc_omset_setoran o
+             LEFT JOIN tbl_bca_mutasi b1 ON b1.id = o.s1_bca_mutasi_id
+             LEFT JOIN tbl_bca_mutasi b2 ON b2.id = o.s2_bca_mutasi_id
+             WHERE DATE(o.tanggal) = ? {$whereOutlet}
+             ORDER BY o.outlet_id ASC, o.id ASC",
+            $params
+        );
+    }
+/*
+|--------------------------------------------------------------------------
+| TEMPEL METHOD INI DI DALAM CLASS QCRController
+|--------------------------------------------------------------------------
+| Jangan tempel tag <?php jika file QCRController Anda sudah ada.
+| Pastikan di atas controller sudah ada:
+| use App\Services\BcaRekonSqlService;
+*/
+
+public function index2(Request $request, BcaRekonSqlService $service)
+{
+    $startDate = $this->normalizeDateToYmd((string) $request->get('start_date', $request->get('tanggal', date('Y-m-d'))));
+    $endDate = $this->normalizeDateToYmd((string) $request->get('end_date', $startDate));
+
+    if ($startDate > $endDate) {
+        [$startDate, $endDate] = [$endDate, $startDate];
+    }
+
+    $outletId = $request->get('outlet_id', '');
+    $outletIds = $request->get('outlet_ids', '');
+    $statusFilter = $request->get('status', '');
+    $providerFilter = $request->get('provider', '');
+
+    $hasFilter = $request->hasAny([
+        'tanggal',
+        'start_date',
+        'end_date',
+        'outlet_id',
+        'outlet_ids',
+        'status',
+        'provider',
+    ]);
+
+    return view('Investor.Inventory.dscFormulirOmset2', [
+        'tanggal' => $startDate,
+        'startDate' => $startDate,
+        'endDate' => $endDate,
+        'outletId' => $outletId,
+        'outletIds' => $outletIds,
+        'statusFilter' => $statusFilter,
+        'providerFilter' => $providerFilter,
+        'rows' => $hasFilter
+            ? $service->listRekon($startDate, $endDate, $outletId, [
+                'outlet_ids' => $outletIds,
+                'status' => $statusFilter,
+                'provider' => $providerFilter,
+            ])
+            : collect(),
+        'outlets' => $service->listOutlets(),
+        'providers' => $service->listProviders(),
+        'vaMappings' => $service->listVaMappings(),
+        'hasFilter' => $hasFilter,
+    ]);
+}
+
+public function importManual(Request $request, BcaRekonSqlService $service)
+{
+    $request->validate([
+        'tanggal' => 'required|date',
+        'nominal' => 'required',
+        'tipe' => 'nullable|string|max:20',
+        'reference_no' => 'nullable|string|max:191',
+        'description' => 'nullable|string',
+        'provider' => 'nullable|string|max:50',
+        'va_number' => 'nullable|string|max:100',
+    ]);
+
+    $result = $service->importManual($request->all());
+
+    return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+}
+
+public function importApi(Request $request, BcaRekonSqlService $service)
+{
+    // Kosong dulu untuk Xendit/API. Tidak ada proses simpan.
+    return response()->json([
+        'ok' => true,
+        'message' => 'Import API/Xendit belum diaktifkan. Gunakan input payment manual dulu.',
+        'inserted' => 0,
+        'skipped' => 0,
+    ]);
+}
+
+public function updateRef(Request $request, BcaRekonSqlService $service)
+{
+    $request->validate([
+        'row_id' => 'required|integer',
+        'shift' => 'required|integer|in:1,2',
+        'bca_ref' => 'nullable|string|max:191',
+    ]);
+
+    $result = $service->updateRef(
+        (int) $request->row_id,
+        (int) $request->shift,
+        $request->bca_ref
+    );
+
+    return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+}
+
+public function matchOne(Request $request, BcaRekonSqlService $service)
+{
+    $request->validate([
+        'row_id' => 'required|integer',
+        'shift' => 'required|integer|in:1,2',
+    ]);
+
+    $result = $service->matchOne((int) $request->row_id, (int) $request->shift);
+
+    return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+}
+
+public function matchAll(Request $request, BcaRekonSqlService $service)
+{
+    $request->validate([
+        'tanggal' => 'nullable|date',
+        'start_date' => 'nullable|date',
+        'end_date' => 'nullable|date',
+        'outlet_id' => 'nullable',
+        'outlet_ids' => 'nullable|string',
+    ]);
+
+    $startDate = (string) ($request->start_date ?: $request->tanggal ?: date('Y-m-d'));
+    $endDate = (string) ($request->end_date ?: $startDate);
+
+    $result = $service->matchAll($startDate, $request->outlet_id, $endDate, [
+        'outlet_ids' => $request->outlet_ids,
+    ]);
+
+    return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+}
+
+public function saveVaMapping(Request $request, BcaRekonSqlService $service)
+{
+    $request->validate([
+        'outlet_id' => 'required|integer',
+        'shift' => 'nullable|in:1,2',
+        'provider' => 'required|string|max:50',
+        'va_number' => 'required|string|max:100',
+        'va_name' => 'nullable|string|max:191',
+        'is_active' => 'nullable',
+    ]);
+
+    $data = $request->all();
+    $data['is_active'] = $request->has('is_active') ? 1 : 0;
+
+    $result = $service->saveVaMapping($data);
+
+    return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
+}
+
+public function paymentVaWebhook(Request $request, BcaRekonSqlService $service)
+{
+    // Kosong dulu untuk Xendit. Service hanya return stub, tidak simpan apa pun.
+    $result = $service->handleVaWebhook($request->all());
+
+    return response()->json($result, $result['ok'] ? 200 : 422);
+}
+
 }

@@ -296,6 +296,12 @@
                                 <select name="role" class="form-select" required>
                                     <option value="">-- Pilih Akses Role --</option>
                                     <option value="admindc">Admin DC</option>
+                                    <option value="purchasing">Purchasing</option>
+                                    <option value="finance_scm">Finance SCM</option>
+                                    <option value="accounting_scm">Accounting SCM</option>
+                                    <option value="distribusi">Distribusi</option>
+                                    <option value="qaqc">QA/QC</option>
+                                    <option value="superadmin_scm">Superadmin SCM</option>
                                 </select>
                             </div>
 
@@ -352,6 +358,12 @@
                                 <select name="role" id="edit-role" class="form-select" required>
                                     <option value="">-- Pilih Akses Role --</option>
                                     <option value="admindc">Admin DC</option>
+                                    <option value="purchasing">Purchasing</option>
+                                    <option value="finance_scm">Finance SCM</option>
+                                    <option value="accounting_scm">Accounting SCM</option>
+                                    <option value="distribusi">Distribusi</option>
+                                    <option value="qaqc">QA/QC</option>
+                                    <option value="superadmin_scm">Superadmin SCM</option>
                                 </select>
                             </div>
 

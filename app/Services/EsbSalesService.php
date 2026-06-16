@@ -308,11 +308,20 @@ class EsbSalesService
 
         DB::transaction(function () use ($salesDate, $nomorList, $outletIds, $allRows, &$inserted) {
             if (! empty($nomorList) && ! empty($outletIds)) {
+                // DB::table('tbl_transaksi_perhari')
+                //     ->where('sesi_tanggal', $salesDate)
+                //     ->whereIn('outlet_id', $outletIds)
+                //     ->whereIn('nomor', $nomorList)
+                //     ->delete();
                 DB::table('tbl_transaksi_perhari')
-                    ->where('sesi_tanggal', $salesDate)
-                    ->whereIn('outlet_id', $outletIds)
-                    ->whereIn('nomor', $nomorList)
-                    ->delete();
+                        ->where('sesi_tanggal', $salesDate)
+                        ->whereIn('outlet_id', $outletIds)
+                        ->whereIn('nomor', $nomorList)
+                        ->where(function ($q) {
+                            $q->whereNull('source')
+                            ->orWhere('source', '!=', 'UANG_PLUS');
+                        })
+                        ->delete();
             }
 
             if (! empty($allRows)) {
@@ -699,11 +708,20 @@ class EsbSalesService
 
         DB::transaction(function () use ($salesDate, $nomorList, $outletIds, $allRows, &$inserted) {
             if (! empty($nomorList) && ! empty($outletIds)) {
+                // DB::table('tbl_transaksi_perhari')
+                //     ->where('sesi_tanggal', $salesDate)
+                //     ->whereIn('outlet_id', $outletIds)
+                //     ->whereIn('nomor', $nomorList)
+                //     ->delete();
                 DB::table('tbl_transaksi_perhari')
-                    ->where('sesi_tanggal', $salesDate)
-                    ->whereIn('outlet_id', $outletIds)
-                    ->whereIn('nomor', $nomorList)
-                    ->delete();
+                        ->where('sesi_tanggal', $salesDate)
+                        ->whereIn('outlet_id', $outletIds)
+                        ->whereIn('nomor', $nomorList)
+                        ->where(function ($q) {
+                            $q->whereNull('source')
+                            ->orWhere('source', '!=', 'UANG_PLUS');
+                        })
+                        ->delete();
             }
 
             if (! empty($allRows)) {

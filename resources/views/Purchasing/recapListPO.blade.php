@@ -3,74 +3,80 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    body {
-        font-family: Arial;
+    :root {
+        --primary-color: #696cff;
+        --primary-light: #e7e7ff;
+        --border-color: #d9dee3;
+        --text-main: #566a7f;
     }
 
+    body { background-color: #f5f5f9; font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+    /* Card Styling */
     .card {
-        border-radius: 15px;
+        border-radius: 12px;
         border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 0.125rem 0.25rem rgba(161, 172, 184, 0.2);
+        margin-bottom: 1.5rem;
     }
 
-    .table thead {
-        background-color: #f8f9fa;
-    }
-
+    /* Table Improvements */
+    .table thead { background-color: #f8f9fa; }
     .table thead th {
-        padding: 15px !important;
-        color: #495057;
+        padding: 15px 20px !important;
+        color: #a1acb8 !important;
         text-transform: uppercase;
-        font-size: 0.8rem;
-        letter-spacing: 0.5px;
+        font-size: 0.75rem;
+        letter-spacing: 0.8px;
+        border-bottom: 2px solid #eceef1 !important;
     }
+    .table tbody td { padding: 15px 20px !important; color: #435971; font-weight: 500; }
 
-    .table tbody td {
-        padding: 15px !important;
-        color: #333;
-    }
-
-    .form-label {
-        font-weight: 600;
-        color: #555;
-        font-size: 0.9rem;
-    }
-
-    .form-control,
-    .form-select {
-        border-radius: 10px;
-        padding: 10px 14px;
-        border: 1px solid #dee2e6;
-        background: #fdfdfd;
-    }
-
-    .btn-success,
-    .btn-primary {
-        border-radius: 10px;
-        padding: 12px 25px;
-        font-weight: 600;
-    }
-
-    .btn-secondary {
-        border-radius: 10px;
-        padding: 12px 25px;
-    }
-
-    .section-header {
-        display: flex;
+    /* Badges & Pills */
+    .po-badge {
+        display: inline-flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 1rem;
-    }
-
-    .section-icon {
-        width: 36px;
-        height: 36px;
+        background: #f0f0ff;
+        color: var(--primary-color);
+        border: 1px solid #e1e1ff;
+        padding: 8px 16px;
         border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin: 4px;
+        transition: all 0.2s;
+    }
+    .btn-remove-po {
+        background: none; border: none;
+        color: var(--primary-color);
+        margin-left: 10px;
+        cursor: pointer;
+        opacity: 0.7;
+    }
+    .btn-remove-po:hover { opacity: 1; color: #ff3e1d; }
+
+    /* Buttons */
+    .btn-primary {
+        background: var(--primary-color) !important;
+        border-color: var(--primary-color) !important;
+        padding: 12px 25px;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    .btn-primary:hover { background: #5f61e6 !important; }
+    
+    /* Inputs */
+    .form-select { border-radius: 8px; border-color: var(--border-color); padding: 10px; }
+    
+    /* Progress Bar */
+    .progress { height: 10px !important; border-radius: 5px !important; }
+    
+    /* Section Headers */
+    .section-icon {
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        margin-right: 15px;
     }
 </style>
 
@@ -85,15 +91,46 @@
                 </a>
                 <div>
                     <h4 class="fw-bold mb-0">Rekap & Finalisasi Surat Jalan</h4>
-                    <small class="text-muted">{{ count($poIds) }} PO dipilih</small>
+                    <small class="text-muted">{{ count($poIds) }} PO dipilih untuk dimuat</small>
+                </div>
+            </div>
+
+            {{-- ── DAFTAR PO (FITUR EJECT) ────────────────────────── --}}
+            <div class="card p-3 mb-4 shadow-sm border-0 bg-white">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold text-dark small text-uppercase"><i class="fas fa-box-open me-2"></i>Daftar PO Muatan</span>
+                    <span class="text-muted" style="font-size: 11px;">*Klik tanda (x) untuk mengeluarkan PO jika truk overkapasitas</span>
+                </div>
+                
+                <div class="d-flex flex-wrap" id="poListContainer">
+                    {{-- Form tersembunyi untuk proses Eject / Hitung Ulang --}}
+                    <form id="formReloadRekap" action="{{ url()->current() }}" method="POST" class="d-none">
+                        @csrf
+                        {{-- Mengirimkan route_id kembali jika ada --}}
+                        <input type="hidden" name="route_id" value="{{ request('route_id') }}">
+                    </form>
+
+                    {{-- Looping daftar PO dari Controller baru --}}
+                    @foreach($selectedPOs as $po)
+                        <div class="po-badge" id="badge-po-{{ $po->id }}" title="{{ $po->outlet_name }} - {{ number_format($po->total_berat, 2) }} kg">
+                            <span class="me-2">{{ $po->no_po }}</span>
+                            <button type="button" class="btn-remove-po d-flex align-items-center justify-content-center" data-id="{{ $po->id }}" title="Keluarkan PO" style="line-height: 1;">
+                                <span style="font-size: 1.3rem; font-weight: bold;">&times;</span>
+                            </button>
+                        </div>
+                    @endforeach
                 </div>
             </div>
 
             <form action="{{ route('scm.finalisasi-sj') }}" method="POST" id="formFinalisasi">
                 @csrf
-                @foreach($poIds as $id)
-                    <input type="hidden" name="po_ids[]" value="{{ $id }}">
-                @endforeach
+                
+                {{-- Kumpulan ID PO yang akan dikirim ke Backend --}}
+                <div id="hiddenInputsContainer">
+                    @foreach($poIds as $id)
+                        <input type="hidden" name="po_ids[]" value="{{ $id }}" id="input-po-{{ $id }}">
+                    @endforeach
+                </div>
 
                 {{-- ══════════════════════════════════════════════════
                 SECTION GUDANG — hanya tampil jika ada item gudang
@@ -151,12 +188,12 @@
                                 style="background: linear-gradient(45deg, #4e73df, #224abe);">
                                 <h6 class="text-white-50 mb-1">Total Muatan Gudang</h6>
                                 <h2 class="fw-bold mb-0">
-                                    {{ number_format($totalTonaseGudang, 2) }}
+                                    <span id="labelTotalBerat" data-berat="{{ $totalTonaseGudang }}">{{ number_format($totalTonaseGudang, 2) }}</span>
                                     <small style="font-size:0.45em;">Kg</small>
                                 </h2>
                                 <div class="mt-2 pt-2 border-top border-white-25 d-flex justify-content-between">
                                     <span class="small">Dalam Ton:</span>
-                                    <strong>{{ number_format($totalTonaseGudang / 1000, 3) }} Ton</strong>
+                                    <strong>{{ number_format($totalTonaseGudang / 1000, 1) }} Ton</strong>
                                 </div>
                                 <div class="mt-3 p-3 bg-warning text-dark rounded shadow-sm">
                                     <small class="fw-bold d-block mb-1">
@@ -172,7 +209,7 @@
                     </div>
 
                     {{-- Form Driver & Armada (hanya untuk GUDANG) --}}
-                    <div class="card p-4 mb-4 shadow-sm">
+                    <div class="card p-4 mb-4 shadow-sm border-0">
                         <h6 class="fw-bold text-primary mb-3">
                             <i class="fas fa-truck me-2"></i>Armada Pengiriman DC
                         </h6>
@@ -188,13 +225,30 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Pilih Armada (Nopol) <span class="text-danger">*</span></label>
-                                <select name="armada_id" class="form-select" required>
-                                    <option value="">-- Pilih Kendaraan --</option>
+                                <select name="armada_id" id="selectArmada" class="form-select" required>
+                                    <option value="" data-kapasitas="0">-- Pilih Kendaraan --</option>
                                     @foreach($armadaDaftar as $ar)
-                                        <option value="{{ $ar->id }}">{{ $ar->no_pol }}</option>
+                                        {{-- Pastikan data armada punya field kapasitas_kg --}}
+                                        <option value="{{ $ar->id }}" data-kapasitas="{{ $ar->kapasitas_kg ?? 3000 }}">
+                                            {{ $ar->no_pol }} (Max: {{ number_format($ar->kapasitas_kg ?? 3000) }} Kg)
+                                        </option>
                                     @endforeach
                                 </select>
                             </div>
+                        </div>
+
+                        {{-- Tampilan Sensor Overload --}}
+                        <div id="kapasitasContainer" class="mt-4" style="display: none;">
+                            <div class="d-flex justify-content-between small fw-bold mb-2">
+                                <span class="text-muted">Kapasitas Muatan Terpakai:</span>
+                                <span id="textKapasitasPersen" class="text-primary fs-6">0%</span>
+                            </div>
+                            <div class="progress" style="height: 12px; border-radius: 10px;">
+                                <div id="barKapasitas" class="progress-bar bg-primary" role="progressbar" style="width: 0%;"></div>
+                            </div>
+                            <small id="textKapasitasPeringatan" class="text-danger fw-bold d-none mt-2 d-block">
+                                <i class="fas fa-exclamation-triangle me-1"></i> OVERLOAD! Beban truk melebihi kapasitas maksimal. Silakan keluarkan beberapa PO dari daftar di atas.
+                            </small>
                         </div>
                     </div>
                 @endif
@@ -335,45 +389,130 @@
 
 @push('scripts')
     <script>
-        // Konfirmasi sebelum submit
-        $('#btnFinalisasi').on('click', function (e) {
-            e.preventDefault();
+        $(document).ready(function() {
 
-            const hasGudang = {{ $rekapGudang->count() > 0 ? 'true' : 'false' }};
-            const hasSupplier = {{ $rekapSupplier->count() > 0 ? 'true' : 'false' }};
-
-            // Validasi driver & armada jika ada item gudang
-            if (hasGudang) {
-                if (!$('select[name="driver_id"]').val()) {
-                    Swal.fire('Perhatian', 'Pilih driver untuk pengiriman dari DC/Gudang.', 'warning');
+            // ==========================================
+            // 1. FUNGSI MENGHAPUS (EJECT) PO DARI MUATAN
+            // ==========================================
+            $('.btn-remove-po').click(function() {
+                let id = $(this).data('id');
+                
+                // Cegah penghapusan jika hanya tersisa 1 PO
+                if($('.po-badge').length <= 1) {
+                    Swal.fire('Tidak Bisa', 'Ini adalah PO terakhir. Jika ingin membatalkan semua, silakan klik tombol Batal di bawah.', 'warning');
                     return;
                 }
-                if (!$('select[name="armada_id"]').val()) {
-                    Swal.fire('Perhatian', 'Pilih armada untuk pengiriman dari DC/Gudang.', 'warning');
-                    return;
-                }
-            }
 
-            let pesan = 'Sistem akan membuat:<br><ul class="text-start mt-2">';
-            if (hasGudang) pesan += '<li>✅ Surat Jalan Gudang + SO + GD otomatis</li>';
-            if (hasSupplier) pesan += '<li>✅ Surat Jalan Supplier + PO SCM otomatis</li>';
-            pesan += '</ul>Lanjutkan?';
+                Swal.fire({
+                    title: 'Keluarkan PO ini?',
+                    text: 'Sistem akan memuat ulang halaman untuk menghitung tonase terbaru tanpa PO ini.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e74a3b',
+                    confirmButtonText: 'Ya, Keluarkan'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        Swal.fire({title: 'Menghitung Ulang...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() }});
+                        
+                        // Hapus input hidden dari formReload
+                        $('#input-po-' + id).remove();
+                        $('#badge-po-' + id).remove();
 
-            Swal.fire({
-                title: 'Konfirmasi Finalisasi',
-                html: pesan,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#4e73df',
-                confirmButtonText: 'Ya, Buat Sekarang!',
-                cancelButtonText: 'Batal',
-            }).then(result => {
-                if (result.isConfirmed) {
-                    $('#btnFinalisasi')
-                        .prop('disabled', true)
-                        .html('<span class="spinner-border spinner-border-sm me-2"></span>Memproses...');
-                    $('#formFinalisasi').submit();
+                        // Ambil semua ID PO yang tersisa dari form utama
+                        let remainingIds = [];
+                        $('#hiddenInputsContainer input').each(function() {
+                            remainingIds.push($(this).val());
+                        });
+
+                        // Masukkan kembali ke form Reload
+                        $('#formReloadRekap input[name="po_ids[]"]').remove();
+                        remainingIds.forEach(function(val) {
+                            $('#formReloadRekap').append('<input type="hidden" name="po_ids[]" value="'+val+'">');
+                        });
+
+                        // Lakukan submit ke route yang sama
+                        $('#formReloadRekap').submit();
+                    }
+                });
+            });
+
+            // ==========================================
+            // 2. FUNGSI SENSOR OVERLOAD ARMADA
+            // ==========================================
+            $('#selectArmada').change(function() {
+                let kapasitasTruk = parseFloat($(this).find(':selected').data('kapasitas')) || 0;
+                let totalBeratBarang = parseFloat($('#labelTotalBerat').data('berat')) || 0;
+                
+                if(kapasitasTruk > 0) {
+                    $('#kapasitasContainer').slideDown();
+                    let persen = (totalBeratBarang / kapasitasTruk) * 100;
+                    
+                    $('#barKapasitas').css('width', Math.min(persen, 100) + '%');
+                    $('#textKapasitasPersen').text(persen.toFixed(1) + '%');
+
+                    // Jika OVERLOAD
+                    if(persen > 100) {
+                        $('#barKapasitas').removeClass('bg-primary bg-success').addClass('bg-danger');
+                        $('#textKapasitasPersen').removeClass('text-primary').addClass('text-danger');
+                        $('#textKapasitasPeringatan').removeClass('d-none');
+                        // Kunci tombol finalisasi
+                        $('#btnFinalisasi').prop('disabled', true).html('<i class="fas fa-ban me-2"></i> Truk Overload');
+                    } else {
+                        $('#barKapasitas').removeClass('bg-primary bg-danger').addClass('bg-success');
+                        $('#textKapasitasPersen').removeClass('text-danger').addClass('text-success');
+                        $('#textKapasitasPeringatan').addClass('d-none');
+                        // Buka kunci
+                        $('#btnFinalisasi').prop('disabled', false).html('<i class="fas fa-paper-plane me-2"></i> Finalisasi Surat Jalan');
+                    }
+                } else {
+                    $('#kapasitasContainer').slideUp();
+                    $('#btnFinalisasi').prop('disabled', false).html('<i class="fas fa-paper-plane me-2"></i> Finalisasi Surat Jalan');
                 }
+            });
+
+
+            // ==========================================
+            // 3. KONFIRMASI SEBELUM SUBMIT FINALISASI
+            // ==========================================
+            $('#btnFinalisasi').on('click', function (e) {
+                e.preventDefault();
+
+                const hasGudang = {{ $rekapGudang->count() > 0 ? 'true' : 'false' }};
+                const hasSupplier = {{ $rekapSupplier->count() > 0 ? 'true' : 'false' }};
+
+                // Validasi driver & armada jika ada item gudang
+                if (hasGudang) {
+                    if (!$('select[name="driver_id"]').val()) {
+                        Swal.fire('Perhatian', 'Pilih driver untuk pengiriman dari DC/Gudang.', 'warning');
+                        return;
+                    }
+                    if (!$('select[name="armada_id"]').val()) {
+                        Swal.fire('Perhatian', 'Pilih armada untuk pengiriman dari DC/Gudang.', 'warning');
+                        return;
+                    }
+                }
+
+                let pesan = 'Sistem akan membuat:<br><ul class="text-start mt-2">';
+                if (hasGudang) pesan += '<li>✅ Surat Jalan Gudang + SO + GD otomatis</li>';
+                if (hasSupplier) pesan += '<li>✅ Surat Jalan Supplier + PO SCM otomatis</li>';
+                pesan += '</ul>Lanjutkan?';
+
+                Swal.fire({
+                    title: 'Konfirmasi Finalisasi',
+                    html: pesan,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#4e73df',
+                    confirmButtonText: 'Ya, Buat Sekarang!',
+                    cancelButtonText: 'Batal',
+                }).then(result => {
+                    if (result.isConfirmed) {
+                        $('#btnFinalisasi')
+                            .prop('disabled', true)
+                            .html('<span class="spinner-border spinner-border-sm me-2"></span>Memproses...');
+                        $('#formFinalisasi').submit();
+                    }
+                });
             });
         });
     </script>

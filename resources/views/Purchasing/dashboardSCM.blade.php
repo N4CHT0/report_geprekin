@@ -1,9 +1,6 @@
 {{-- resources/views/purchasing/dashboardOutlet.blade.php --}}
-@if(auth()->user()->role === 'superadmin')
-    @include('Temp.Investor.header')
-@else
-    @include('Temp.DC.header')
-@endif
+@include('Temp.Investor.header')
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
@@ -205,7 +202,7 @@
                                             {{ $po->no_po }}
                                         </td>
                                         <td class="text-center small">{{ $po->tgl_permintaan }}</td>
-                                        <td class="text-center text-dark text-start px-3">{{ $po->nama_outlet }}</td>
+                                        <td class="text-center text-dark text-start px-3">SCM-{{ $po->nama_outlet }}-LINK(NEW)</td>
                                         <td class="text-center">
                                             @php
                                                 $statusColors = [
@@ -361,7 +358,7 @@
                 $('#detailModal').data('current-id', poId);
                 detailModal.querySelector('.modal-title').textContent = 'Detail PO: ' + noPo;
 
-                // --- FIX PERBAIKAN: RESET STATE & TEXT TOMBOL AGAR BERFUNGSI ---
+                // Reset state & text tombol
                 if (status !== 'Waiting') {
                     $('#btn-approve').prop('disabled', true).text('Sudah diproses').attr('data-status', '');
                     $('#btn-reject').prop('disabled', true).text('Sudah diproses').attr('data-status', '');
@@ -370,6 +367,8 @@
                     $('#btn-reject').prop('disabled', false).text('Tolak Transaksi').attr('data-status', 'Rejected');
                 }
 
+                const isEditable = (status === 'Waiting') ? '' : 'disabled';
+
                 let itemRows = '';
                 if (items.length > 0) {
                     items.forEach((item, index) => {
@@ -377,13 +376,26 @@
                         const badge = sumber === 'SUPPLIER'
                             ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-semibold px-2 py-1 rounded-pill" style="font-size:10px; --bs-border-opacity: .2;">Supplier</span>'
                             : '<span class="badge bg-primary-subtle text-primary-emphasis border border-primary fw-semibold px-2 py-1 rounded-pill" style="font-size:10px; --bs-border-opacity: .2;">DC</span>';
+                        
+                        const detailId = item.id || item.detail_id || '';
+
+                        // Render baris tabel, beri class 'satuan-dropdown' untuk diload via AJAX
                         itemRows += `
-                                <tr class="small text-secondary" style="border-bottom: 1px solid #f1f5f9;">
-                                    <td class="text-center text-muted">${index + 1}</td>
-                                    <td class="text-dark fw-bold" style="font-size:13px;">${item.nama_bahan}</td>
-                                    <td class="text-center text-dark">${item.jumlah}</td>
-                                    <td>${item.satuan || '-'}</td>
-                                    <td>${badge}</td>
+                                <tr class="small text-secondary item-row" data-detail-id="${detailId}" style="border-bottom: 1px solid #f1f5f9;">
+                                    <td class="text-center text-muted align-middle">${index + 1}</td>
+                                    <td class="text-dark fw-bold align-middle" style="font-size:13px;">${item.nama_bahan}</td>
+                                    <td class="align-middle">
+                                        <input type="number" class="form-control form-control-sm text-center edit-qty mx-auto" 
+                                            value="${item.jumlah}" ${isEditable} min="0" step="0.01" style="max-width: 80px; border-radius: 6px;">
+                                    </td>
+                                    <td class="align-middle">
+                                        <select class="form-select form-select-sm edit-satuan satuan-dropdown" 
+                                            data-bahan-id="${item.bahan_id}" data-current-unit="${item.unit_id}" 
+                                            ${isEditable} style="border-radius: 6px; min-width: 120px;">
+                                            <option value="${item.unit_id}">${item.satuan || 'Loading...'}</option>
+                                        </select>
+                                    </td>
+                                    <td class="align-middle text-center">${badge}</td>
                                 </tr>`;
                     });
                 } else {
@@ -418,15 +430,30 @@
                         </div>
 
                         <div class="card p-3 border-0 shadow-sm rounded-4" style="background-color: #ffffff;">
-                            <h6 class="fw-bold text-dark small text-uppercase mb-2.5" style="letter-spacing: 0.3px;">Daftar Item Pesanan</h6>
+                            <div class="d-flex justify-content-between align-items-center mb-2.5">
+                                <h6 class="fw-bold text-dark small text-uppercase mb-0" style="letter-spacing: 0.3px;">Daftar Item Pesanan</h6>
+                                ${status === 'Waiting' ? `
+                                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle shadow-sm" 
+                                          style="cursor: pointer; padding: 6px 12px; font-size: 11px; letter-spacing: 0.3px;"
+                                          onclick="Swal.fire({
+                                              icon: 'info',
+                                              title: 'Petunjuk Validasi PO',
+                                              text: 'Sebelum menyetujui PO, harap pastikan Qty dan Satuan yang diajukan sudah sesuai dengan ketersediaan stok riil di gudang. Anda dapat mengubahnya langsung pada tabel di bawah ini.',
+                                              confirmButtonColor: '#4f46e5',
+                                              confirmButtonText: 'Mengerti'
+                                          })">
+                                        <i class="bi bi-info-circle-fill me-1"></i> Info Penyesuaian
+                                    </span>
+                                ` : ''}
+                            </div>
                             <table class="table table-sm align-middle mb-0">
                                 <thead class="text-muted small text-uppercase" style="border-bottom: 2px solid #f1f5f9;">
                                     <tr>
                                         <th class="text-center pb-2" width="5%" style="font-weight:600;">No.</th>
                                         <th class="pb-2" style="font-weight:600;">Nama Bahan</th>
-                                        <th class="text-center pb-2" width="15%" style="font-weight:600;">Qty</th>
-                                        <th class="pb-2" width="15%" style="font-weight:600;">Satuan</th>
-                                        <th class="pb-2" width="20%" style="font-weight:600;">Asal</th>
+                                        <th class="text-center pb-2" width="20%" style="font-weight:600;">Qty</th>
+                                        <th class="text-start pb-2" width="25%" style="font-weight:600;">Satuan (Bisa diubah)</th>
+                                        <th class="text-center pb-2" width="15%" style="font-weight:600;">Asal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -435,6 +462,22 @@
                             </table>
                         </div>
                     `);
+
+                // --- LOAD DROPDOWN SATUAN VIA AJAX ---
+                $('.satuan-dropdown').each(function() {
+                    let selectElement = $(this);
+                    let bahanId = selectElement.data('bahan-id');
+                    let currentUnitId = selectElement.data('current-unit');
+
+                    $.get('/get-satuan-bahan/' + bahanId, function(res) {
+                        let options = '';
+                        res.forEach(function(satuan) {
+                            let isSelected = (satuan.id == currentUnitId) ? 'selected' : '';
+                            options += `<option value="${satuan.id}" ${isSelected}>${satuan.nama_unit}</option>`;
+                        });
+                        selectElement.html(options);
+                    });
+                });
 
                 $('#supplier-section').hide();
                 $('#supplier-inputs').html('');
@@ -462,6 +505,85 @@
                         }
                     });
                 }
+            });
+
+            // SELEKTOR KLIK UNTUK APPROVE / REJECT
+            $('#btn-approve, #btn-reject').click(function () {
+                let status = $(this).attr('data-status');
+                let id = $('#detailModal').data('current-id');
+
+                if (!status) return;
+
+                if (status === 'Approved') {
+                    let valid = true;
+                    $('#supplier-inputs select.supplier-select').each(function () {
+                        if (!$(this).val()) {
+                            valid = false;
+                            $(this).addClass('is-invalid');
+                        } else {
+                            $(this).removeClass('is-invalid');
+                        }
+                    });
+                    if (!valid) {
+                        Swal.fire('Perhatian', 'Pilih supplier untuk semua bahan dari Supplier terlebih dahulu!', 'warning');
+                        return;
+                    }
+                }
+
+                Swal.fire({
+                    title: 'Memproses Data',
+                    text: 'Sedang memperbarui status PO...',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+
+                let supplierData = [];
+                $('#supplier-inputs select.supplier-select').each(function () {
+                    if ($(this).val()) {
+                        supplierData.push({
+                            detail_id: $(this).data('detail-id'),
+                            supplier_id: $(this).val()
+                        });
+                    }
+                });
+
+                // PERUBAHAN: Tangkap data Qty dan Satuan yang sudah diedit
+                let modifiedItems = [];
+                $('#modalContent .item-row').each(function() {
+                    modifiedItems.push({
+                        detail_id: $(this).data('detail-id'),
+                        qty: $(this).find('.edit-qty').val(),
+                        satuan: $(this).find('.edit-satuan').val()
+                    });
+                });
+
+                $.ajax({
+                    url: "{{ route('update.status.po') }}",
+                    type: 'POST',
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        id: id,
+                        status: status,
+                        supplier_data: supplierData,
+                        modified_items: modifiedItems // Data ini akan dikirim ke Backend
+                    },
+                    success: function (response) {
+                        Swal.close();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil',
+                            text: 'Status diubah ke ' + status
+                        }).then(() => { location.reload(); });
+                    },
+                    error: function (xhr) {
+                        Swal.close();
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: xhr.responseJSON?.message ?? 'Terjadi kesalahan sistem'
+                        });
+                    }
+                });
             });
 
             // --- FIX PERBAIKAN: SELEKTOR KLIK BERDASARKAN ID LANGSUNG ---
@@ -553,8 +675,4 @@
     </script>
 @endpush
 
-@if(auth()->user()->role === 'superadmin')
-    @include('Temp.Investor.footer')
-@else
-    @include('Temp.DC.footer')
-@endif
+@include('Temp.Investor.footer')

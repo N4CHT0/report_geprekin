@@ -63,7 +63,7 @@ class PushSimpleSalesJob implements ShouldQueue
 
         // 3. Format Payload menggunakan Service yang baru dibuat
         $payload = $service->formatSimpleSales($this->salesNum);
-        $endpoint = 'https://services.esb.co.id/pilot-core/sales/simple-product-sales';
+        $endpoint = 'https://services.esb.co.id/core/sales/simple-product-sales';
 
         try {
             Log::debug("ESB-SALES-JOB [PAYLOAD]: ", $payload);

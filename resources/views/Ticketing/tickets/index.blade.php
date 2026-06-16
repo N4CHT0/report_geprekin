@@ -258,7 +258,7 @@
 
                         <td class="px-6 py-5 align-top">
                             @if($canQuickUpdate)
-                                <form method="POST" action="{{ route('ticketing.status.quick', $t->id) }}">
+                                <form method="POST" action="{{ route('ticketing.quick-status', $t->id) }}">
                                     @csrf
                                     @method('PATCH')
                                     <select

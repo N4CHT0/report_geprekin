@@ -19,6 +19,16 @@ class SurveyorSiteScoreController extends Controller
         return view('Surveyor.index', compact('scores', 'summary'));
     }
 
+    public function getMasterOutlets()
+    {
+        $outlets = DB::table('master_outlets')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->select('id', 'nama_outlet', 'kota_kab', 'latitude', 'longitude')
+            ->get();
+        return response()->json($outlets);
+    }
+
     public function myDrafts()
     {
         $userName = auth()->user()->name ?? '';
@@ -39,7 +49,10 @@ class SurveyorSiteScoreController extends Controller
                 ->where('id', $request->candidate_id)
                 ->first();
         }
-        return view('Surveyor.create.create', compact('candidate'));
+
+        $masterBoqs = \App\Models\MasterBoq::where('is_active', true)->get();
+
+        return view('Surveyor.create.create', compact('candidate', 'masterBoqs'));
     }
 
     public function store(Request $request)
@@ -62,18 +75,36 @@ class SurveyorSiteScoreController extends Controller
         $moe        = $isMadura ? 0.30 : 0.20;
         $tipeOutlet = $request->tipe_outlet ?? 'LDP';
         $avgCheck   = (float) ($request->average_check ?? 21000);
+        
+        $customConfig = [];
+        if ($request->formula_type === 'CUSTOM' && !empty($request->custom_weights_json)) {
+            $customConfig = json_decode($request->custom_weights_json, true) ?? [];
+        }
 
         $calc = $this->calculator->calculate(
             array_merge($validated, [
                 'average_check'    => $avgCheck,
                 'harga_kompetitor' => (float) ($request->harga_kompetitor ?? 0),
+                'formula_type'     => $request->formula_type ?? 'DEFAULT',
             ]),
             $moe,
-            $tipeOutlet
+            $tipeOutlet,
+            $customConfig
         );
 
         // Hapus kolom virtual yang hanya untuk view agar tidak error saat disimpan ke DB
-        unset($calc['subtotal_perhari'], $calc['moe_percent'], $calc['grand_total_perhari'], $calc['label_outlet']);
+        unset(
+            $calc['subtotal_perhari'], 
+            $calc['moe_percent'], 
+            $calc['grand_total_perhari'], 
+            $calc['label_outlet'],
+            $calc['curve_motor_wd'],
+            $calc['curve_motor_we'],
+            $calc['curve_pejalan_wd'],
+            $calc['curve_pejalan_we'],
+            $calc['details_penambah'],
+            $calc['details_pengurang']
+        );
 
         $id = DB::table('surveyor_site_scores')->insertGetId(array_merge([
             'kode_score'     => 'SS-' . date('YmdHis'),
@@ -85,6 +116,10 @@ class SurveyorSiteScoreController extends Controller
             'latitude'       => $lat,
             'longitude'      => $lng,
             'maps_url'       => $mapsUrl,
+            'formula_type'           => $request->formula_type ?? 'DEFAULT',
+            'scan_radius_fasum'      => (int)($request->scan_radius_fasum ?? 750),
+            'scan_radius_kompetitor' => (int)($request->scan_radius_kompetitor ?? 500),
+            'custom_weights_json'    => $request->custom_weights_json,
 
             'motor_weekday_pagi'    => (int)$request->motor_weekday_pagi,
             'motor_weekday_siang'   => (int)$request->motor_weekday_siang,
@@ -98,16 +133,20 @@ class SurveyorSiteScoreController extends Controller
             'pejalan_weekend_pagi'  => (int)$request->pejalan_weekend_pagi,
             'pejalan_weekend_siang' => (int)$request->pejalan_weekend_siang,
             'pejalan_weekend_sore'  => (int)$request->pejalan_weekend_sore,
+            'traffic_calibration_json' => $request->traffic_calibration_json,
             'rumah_q1'           => (int)$request->rumah_q1,
             'rumah_q2'           => (int)$request->rumah_q2,
             'rumah_q3'           => (int)$request->rumah_q3,
             'rumah_q4'           => (int)$request->rumah_q4,
             'sekolah'            => (int)$request->sekolah,
+            'kampus'             => (int)$request->kampus,
             'market'             => (int)$request->market,
             'perkantoran'        => (int)$request->perkantoran,
             'kesehatan'          => (int)$request->kesehatan,
+            'pabrik'             => (int)$request->pabrik,
             'kompetitor_geprek'  => (int)$request->kompetitor_geprek,
             'kompetitor_lokal'   => (int)$request->kompetitor_lokal,
+            'jarak_kompetitor'   => (int)$request->jarak_kompetitor,
             'harga_kompetitor'   => (float)($request->harga_kompetitor ?? 0),
 
             'tipe_bangunan'      => $request->tipe_bangunan,
@@ -132,6 +171,13 @@ class SurveyorSiteScoreController extends Controller
             'akses_mobil'           => (int)$request->akses_mobil,
             
 
+
+            'cu_per_hari'           => (float)$request->cu_per_hari,
+            'cu_per_minggu'         => (float)$request->cu_per_minggu,
+            'cu_per_bulan'          => (float)$request->cu_per_bulan,
+            'omset_per_hari'        => (float)$request->omset_per_hari,
+            'omset_per_minggu'      => (float)$request->omset_per_minggu,
+            'omset_per_bulan'       => (float)$request->omset_per_bulan,
 
             'rab_renovasi'       => (float)$request->rab_renovasi,
             'rab_kitchen'        => (float)$request->rab_kitchen,
@@ -193,7 +239,8 @@ class SurveyorSiteScoreController extends Controller
         $score = DB::table('surveyor_site_scores')->where('id', $id)->first();
         if (!$score) return redirect()->back()->with('error', 'Data tidak ditemukan.');
         $photos = DB::table('surveyor_site_score_photos')->where('site_score_id', $id)->get();
-        return view('Surveyor.create.edit', compact('score', 'photos'));
+        $masterBoqs = \App\Models\MasterBoq::where('is_active', true)->get();
+        return view('Surveyor.create.edit', compact('score', 'photos', 'masterBoqs'));
     }
 
     public function update(Request $request, $id)
@@ -216,18 +263,36 @@ class SurveyorSiteScoreController extends Controller
         $moe        = $isMadura ? 0.30 : 0.20;
         $tipeOutlet = $request->tipe_outlet ?? 'LDP';
         $avgCheck   = (float) ($request->average_check ?? 21000);
+        
+        $customConfig = [];
+        if ($request->formula_type === 'CUSTOM' && !empty($request->custom_weights_json)) {
+            $customConfig = json_decode($request->custom_weights_json, true) ?? [];
+        }
 
         $calc = $this->calculator->calculate(
             array_merge($validated, [
                 'average_check'    => $avgCheck,
                 'harga_kompetitor' => (float) ($request->harga_kompetitor ?? 0),
+                'formula_type'     => $request->formula_type ?? 'DEFAULT',
             ]),
             $moe,
-            $tipeOutlet
+            $tipeOutlet,
+            $customConfig
         );
 
         // Hapus kolom virtual yang hanya untuk view agar tidak error saat disimpan ke DB
-        unset($calc['subtotal_perhari'], $calc['moe_percent'], $calc['grand_total_perhari'], $calc['label_outlet']);
+        unset(
+            $calc['subtotal_perhari'], 
+            $calc['moe_percent'], 
+            $calc['grand_total_perhari'], 
+            $calc['label_outlet'],
+            $calc['curve_motor_wd'],
+            $calc['curve_motor_we'],
+            $calc['curve_pejalan_wd'],
+            $calc['curve_pejalan_we'],
+            $calc['details_penambah'],
+            $calc['details_pengurang']
+        );
 
         DB::table('surveyor_site_scores')->where('id', $id)->update(array_merge([
             'lokasi'         => $request->lokasi,
@@ -238,6 +303,10 @@ class SurveyorSiteScoreController extends Controller
             'latitude'       => $lat,
             'longitude'      => $lng,
             'maps_url'       => $mapsUrl,
+            'formula_type'           => $request->formula_type ?? 'DEFAULT',
+            'scan_radius_fasum'      => (int)($request->scan_radius_fasum ?? 750),
+            'scan_radius_kompetitor' => (int)($request->scan_radius_kompetitor ?? 500),
+            'custom_weights_json'    => $request->custom_weights_json,
 
             'motor_weekday_pagi'    => (int)$request->motor_weekday_pagi,
             'motor_weekday_siang'   => (int)$request->motor_weekday_siang,
@@ -251,16 +320,20 @@ class SurveyorSiteScoreController extends Controller
             'pejalan_weekend_pagi'  => (int)$request->pejalan_weekend_pagi,
             'pejalan_weekend_siang' => (int)$request->pejalan_weekend_siang,
             'pejalan_weekend_sore'  => (int)$request->pejalan_weekend_sore,
+            'traffic_calibration_json' => $request->traffic_calibration_json,
             'rumah_q1'           => (int)$request->rumah_q1,
             'rumah_q2'           => (int)$request->rumah_q2,
             'rumah_q3'           => (int)$request->rumah_q3,
             'rumah_q4'           => (int)$request->rumah_q4,
             'sekolah'            => (int)$request->sekolah,
+            'kampus'             => (int)$request->kampus,
             'market'             => (int)$request->market,
             'perkantoran'        => (int)$request->perkantoran,
             'kesehatan'          => (int)$request->kesehatan,
+            'pabrik'             => (int)$request->pabrik,
             'kompetitor_geprek'  => (int)$request->kompetitor_geprek,
             'kompetitor_lokal'   => (int)$request->kompetitor_lokal,
+            'jarak_kompetitor'   => (int)$request->jarak_kompetitor,
             'harga_kompetitor'   => (float)($request->harga_kompetitor ?? 0),
 
             'tipe_bangunan'      => $request->tipe_bangunan,
@@ -285,6 +358,13 @@ class SurveyorSiteScoreController extends Controller
             'akses_mobil'           => (int)$request->akses_mobil,
             
 
+
+            'cu_per_hari'           => (float)$request->cu_per_hari,
+            'cu_per_minggu'         => (float)$request->cu_per_minggu,
+            'cu_per_bulan'          => (float)$request->cu_per_bulan,
+            'omset_per_hari'        => (float)$request->omset_per_hari,
+            'omset_per_minggu'      => (float)$request->omset_per_minggu,
+            'omset_per_bulan'       => (float)$request->omset_per_bulan,
 
             'rab_renovasi'       => (float)$request->rab_renovasi,
             'rab_kitchen'        => (float)$request->rab_kitchen,
@@ -341,12 +421,22 @@ class SurveyorSiteScoreController extends Controller
         $photos = DB::table('surveyor_site_score_photos')->where('site_score_id', $id)->get();
         
         $provinsi   = strtolower($score->provinsi ?? '');
-        $moe        = str_contains($provinsi, 'madura') ? 0.30 : 0.20;
-        $tipeOutlet = 'LDP'; // Default or from db if available
+        $kota       = strtolower($score->kota ?? '');
+        $isMadura   = str_contains($provinsi, 'madura') || str_contains($kota, 'madura') || 
+                      str_contains($kota, 'bangkalan') || str_contains($kota, 'sampang') || 
+                      str_contains($kota, 'pamekasan') || str_contains($kota, 'sumenep');
+        
+        $moe        = $isMadura ? 0.30 : 0.20;
+        $tipeOutlet = $score->tipe_outlet ?? 'LDP';
+        
+        $customConfig = [];
+        if (($score->formula_type ?? 'DEFAULT') === 'CUSTOM' && !empty($score->custom_weights_json)) {
+            $customConfig = json_decode($score->custom_weights_json, true) ?? [];
+        }
         
         // Re-calculate to get the full curves
         $scoreArray = json_decode(json_encode($score), true);
-        $calcData = $this->calculator->calculate($scoreArray, $moe, $tipeOutlet);
+        $calcData = $this->calculator->calculate($scoreArray, $moe, $tipeOutlet, $customConfig);
         
         return view('Surveyor.detail', compact('score', 'photos', 'calcData'));
     }
@@ -514,6 +604,8 @@ class SurveyorSiteScoreController extends Controller
         try {
             // Gunakan Guzzle dengan track_redirects agar kita bisa melacak semua URL pengalihan
             $client = new \GuzzleHttp\Client([
+                'timeout' => 15,
+                'connect_timeout' => 10,
                 'allow_redirects' => [
                     'max'             => 10,
                     'strict'          => false,
@@ -601,7 +693,8 @@ class SurveyorSiteScoreController extends Controller
     {
         $lat = (float) $request->input('lat');
         $lng = (float) $request->input('lng');
-        $radius = 1500.0;
+        $radiusFasum = (float) $request->input('radius_fasum', 750);
+        $radiusKompetitor = (float) $request->input('radius_kompetitor', 500);
 
         if (!$lat || !$lng) {
             return response()->json(['error' => 'Latitude and longitude are required'], 400);
@@ -636,7 +729,7 @@ class SurveyorSiteScoreController extends Controller
                 'locationRestriction' => [
                     'circle' => [
                         'center' => ['latitude' => $lat, 'longitude' => $lng],
-                        'radius' => $radius
+                        'radius' => $radiusFasum
                     ]
                 ]
             ];
@@ -658,7 +751,7 @@ class SurveyorSiteScoreController extends Controller
                 'locationRestriction' => [
                     'circle' => [
                         'center' => ['latitude' => $lat, 'longitude' => $lng],
-                        'radius' => $radius
+                        'radius' => $radiusFasum
                     ]
                 ]
             ];
@@ -678,7 +771,7 @@ class SurveyorSiteScoreController extends Controller
                 'locationRestriction' => [
                     'circle' => [
                         'center' => ['latitude' => $lat, 'longitude' => $lng],
-                        'radius' => $radius
+                        'radius' => $radiusFasum
                     ]
                 ]
             ];
@@ -697,7 +790,7 @@ class SurveyorSiteScoreController extends Controller
                 'locationBias' => [
                     'circle' => [
                         'center' => ['latitude' => $lat, 'longitude' => $lng],
-                        'radius' => $radius
+                        'radius' => $radiusKompetitor
                     ]
                 ]
             ];
@@ -821,12 +914,12 @@ class SurveyorSiteScoreController extends Controller
             
             // Data Bangunan
             'tipe_bangunan'     => 'nullable|string|max:150',
-            'luas_bangunan'     => 'nullable|integer|min:0',
+            'luas_bangunan'     => 'nullable|numeric|min:0',
             'status_sewa_beli'  => 'nullable|string|max:150',
             'harga_sewa'        => 'nullable|numeric|min:0',
-            'lebar_depan'       => 'nullable|integer|min:0',
-            'panjang_bangunan'  => 'nullable|integer|min:0',
-            'jumlah_lantai'     => 'nullable|integer|min:0',
+            'lebar_depan'       => 'nullable|numeric|min:0',
+            'panjang_bangunan'  => 'nullable|numeric|min:0',
+            'jumlah_lantai'     => 'nullable|numeric|min:0',
             'kondisi_bangunan'  => 'nullable|string|max:150',
             
             // Visibilitas & Akses

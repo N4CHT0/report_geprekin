@@ -202,7 +202,7 @@
                     <div class="col-md-6">
                         <div class="choice-card">
                             <div class="choice-icon">📝</div>
-                            <div class="choice-title">Formulir</div>
+                            <div class="choice-title">Daily Stock Report</div>
                             <div class="choice-desc">
                                 Masuk ke halaman formulir stock dan omset yang sudah berjalan saat ini.
                             </div>

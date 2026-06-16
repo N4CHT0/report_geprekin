@@ -28,10 +28,13 @@ class ProcessVideoDetectionJob implements ShouldQueue
 
     public function handle(): void
     {
+        // BUG FIX: Progress tracking - Stage 1: Extracting frames
         $this->putStatus([
             'status' => 'processing',
-            'message' => 'Video sedang dianalisis.',
-            'progress' => 30,
+            'stage' => 'extracting_frames',
+            'stage_name' => 'Extracting frames',
+            'message' => 'Mengekstrak frame dari video...',
+            'progress' => 20,
         ]);
 
         try {
@@ -57,8 +60,11 @@ class ProcessVideoDetectionJob implements ShouldQueue
                 'NUMEXPR_NUM_THREADS' => '1',
             ];
 
+            // Gunakan 'python' untuk Windows, 'python3' untuk Linux/Mac
+            $pythonExe = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'python' : 'python3';
+
             $process = new Process([
-                'python3',
+                $pythonExe,
                 $python,
                 '--video', $this->videoPath,
                 '--job', $this->jobId,
@@ -70,6 +76,15 @@ class ProcessVideoDetectionJob implements ShouldQueue
 
             $process->setTimeout(1800);
             $process->run();
+
+            // BUG FIX: Progress tracking - Stage 2: Detecting objects
+            $this->putStatus([
+                'status' => 'processing',
+                'stage' => 'detecting_objects',
+                'stage_name' => 'Detecting objects',
+                'message' => 'Mendeteksi dan menghitung objek...',
+                'progress' => 60,
+            ]);
 
             $output = trim($process->getOutput());
             $errorOutput = trim($process->getErrorOutput());
@@ -127,6 +142,22 @@ class ProcessVideoDetectionJob implements ShouldQueue
             $result['source_type'] = $this->sourceType;
             $result['progress'] = 100;
             $result['finished_at'] = now()->toDateTimeString();
+
+            // BUG FIX: Progress tracking - Stage 3: Processing results
+            $this->putStatus([
+                'status' => 'processing',
+                'stage' => 'processing_results',
+                'stage_name' => 'Processing results',
+                'message' => 'Memproses hasil analisis...',
+                'progress' => 90,
+            ]);
+
+            // Wait 1 second for user to see processing stage
+            sleep(1);
+
+            // BUG FIX: Progress tracking - Stage 4: Completed
+            $result['stage'] = 'completed';
+            $result['stage_name'] = 'Complete';
 
             Redis::setex('video_detection:' . $this->jobId, 3600, json_encode($result));
 

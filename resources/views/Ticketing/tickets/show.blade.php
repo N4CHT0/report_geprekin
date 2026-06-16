@@ -180,7 +180,7 @@
 
                             @if(in_array($role, ['superadmin', 'admin', 'admin_ticketing', 'ticket_admin', 'superadmin_audit']))
                                 <form method="POST"
-                                      action="{{ route('ticketing.division.update', $row->id) }}"
+                                      action="{{ route('ticketing.update-division', $row->id) }}"
                                       class="mt-2">
                                     @csrf
                                     @method('PUT')
@@ -247,7 +247,7 @@
                     </div>
 
                     <form method="POST"
-                          action="{{ route('ticketing.content.update', $row->id) }}"
+                          action="{{ route('ticketing.update-content', $row->id) }}"
                           class="mt-6 space-y-4 rounded-2xl border border-slate-100 bg-white p-5">
                         @csrf
                         @method('PUT')
@@ -500,7 +500,7 @@
                     </p>
 
                     <form method="POST"
-                          action="{{ route('ticketing.priority.update', $row->id) }}"
+                          action="{{ route('ticketing.update-priority', $row->id) }}"
                           class="mt-5 space-y-4">
                         @csrf
                         @method('PUT')

@@ -173,7 +173,7 @@
                                             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                                                 <li><a class="dropdown-item" href="{{ route('simple-sales.show', $row->sales_num) }}"><i class="bi bi-eye me-2 text-primary"></i> Detail</a></li>
                                                 <li>
-                                                    <a class="dropdown-item rounded-2 py-2" href="#">
+                                                    <a class="dropdown-item rounded-2 py-2" href="{{ route('simple-sales.edit', $row->sales_num) }}">
                                                         <i class="bi bi-pencil-square me-2 text-warning"></i> Edit
                                                     </a>
                                                 </li>

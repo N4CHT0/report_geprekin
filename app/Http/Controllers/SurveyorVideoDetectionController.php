@@ -138,7 +138,15 @@ class SurveyorVideoDetectionController extends Controller
             ], 404);
         }
 
-        return response()->json(json_decode($payload, true));
+        $data = json_decode($payload, true);
+
+        if (isset($data['status']) && $data['status'] === 'queued') {
+            $queueLength = Redis::llen('queues:default');
+            $data['queue_position'] = $queueLength;
+        }
+
+        // Return all data to the frontend polling (including ai_insight and peak_frame_b64)
+        return response()->json($data);
     }
 
     public function saveResult(Request $request, string $jobId)
@@ -188,6 +196,7 @@ class SurveyorVideoDetectionController extends Controller
             ->with('success', 'Hasil analisis disimpan.');
     }
 
+
     public function discardResult(string $jobId)
     {
         Redis::del('video_detection:' . $jobId);
@@ -195,5 +204,63 @@ class SurveyorVideoDetectionController extends Controller
         return redirect()
             ->route('investor.surveyor.video-detection.index')
             ->with('success', 'Hasil temporary dibuang.');
+    }
+
+    /**
+     * Get progress of a video detection job
+     * BUG FIX: Return detailed progress stages for frontend banner
+     */
+    public function getProgress(string $jobId)
+    {
+        $data = Redis::get('video_detection:' . $jobId);
+        if (!$data) {
+            return response()->json(['success' => false, 'message' => 'Job not found'], 404);
+        }
+
+        try {
+            $job = json_decode($data, true);
+            return response()->json([
+                'success' => true,
+                'job_id' => $jobId,
+                'status' => $job['status'] ?? 'unknown',
+                'stage' => $job['stage'] ?? 'queued',
+                'stage_name' => $job['stage_name'] ?? 'Queued',
+                'message' => $job['message'] ?? '',
+                'progress' => $job['progress'] ?? 0,
+                'counts' => $job['counts'] ?? null,
+                'peak_frame_b64' => $job['peak_frame_b64'] ?? null,
+                'ai_insight' => $job['ai_insight'] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+
+     * List all active video detection jobs for current user
+     * BUG FIX: Allow page refresh/navigation while job is processing
+     */
+    public function listActiveJobs()
+    {
+        // Get all keys matching pattern from Redis
+        $keys = Redis::keys('video_detection:*');
+        $jobs = [];
+
+        foreach ($keys as $key) {
+            $data = Redis::get($key);
+            if ($data) {
+                $job = json_decode($data, true);
+                if ($job && $job['status'] !== 'completed') {
+                    $jobs[] = $job;
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'jobs' => $jobs,
+            'count' => count($jobs)
+        ]);
     }
 }

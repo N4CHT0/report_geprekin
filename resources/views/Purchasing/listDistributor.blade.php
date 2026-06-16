@@ -107,6 +107,7 @@
                                 <tr>
                                     <th style="width: 60px;" class="text-center">No</th>
                                     <th>Nama Warehouse / DC</th>
+                                    <th>Alamat</th>
                                     <th class="text-center" style="width: 80px;">Action</th>
                                 </tr>
                             </thead>
@@ -121,7 +122,15 @@
                                             </div>
                                             <div>
                                                 <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ $dist->nama_warehouse }}</div>
-                                                <small class="text-muted" style="font-size: 10px;">ID System: #{{ $dist->id }}</small>
+                                                <!-- <small class="text-muted" style="font-size: 10px;">ID System: #{{ $dist->id }}</small> -->
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div>
+                                                <div class="fw-semibold text-dark" style="font-size: 0.9rem;">{{ $dist->alamat }}</div>
+                                                <!-- <small class="text-muted" style="font-size: 10px;">ID System: #{{ $dist->id }}</small> -->
                                             </div>
                                         </div>
                                     </td>

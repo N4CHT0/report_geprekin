@@ -206,7 +206,10 @@
             <div class="detail-kicker">
                 <i class="bi bi-file-earmark-bar-graph"></i> Detail Site Score
             </div>
-            <h1>{{ $score->lokasi ?? '-' }}</h1>
+            <h1 class="d-flex align-items-center gap-2">
+                {{ $score->lokasi ?? '-' }}
+                <span class="badge bg-dark fs-6">{{ $score->tipe_outlet ?? 'LDP' }}</span>
+            </h1>
             <p>
                 <i class="bi bi-upc-scan"></i> {{ $score->kode_score ?? '-' }} &nbsp;&bull;&nbsp;
                 <i class="bi bi-geo-alt"></i> {{ $score->kota ?? '-' }}, {{ $score->provinsi ?? '-' }} &nbsp;&bull;&nbsp;
@@ -241,6 +244,14 @@
             $icon = 'bi-x-circle';
             if($rekomendasi === 'APPROVED') { $statusClass = 'pill-approved'; $icon = 'bi-check-circle'; }
             elseif($rekomendasi === 'CONSIDERATION') { $statusClass = 'pill-consideration'; $icon = 'bi-exclamation-circle'; }
+            
+            // Perhitungan RAB Total
+            $totalRab = ($score->rab_renovasi ?? 0) + ($score->rab_kitchen ?? 0) + ($score->rab_signage ?? 0) + ($score->rab_furniture ?? 0) + ($score->rab_listrik ?? 0) + ($score->rab_air ?? 0) + ($score->rab_exhaust ?? 0) + ($score->rab_ac_kipas ?? 0) + ($score->rab_perizinan ?? 0) + ($score->rab_deposit_sewa ?? 0) + ($score->rab_biaya_opening ?? 0);
+            
+            // Perhitungan Proyeksi Balik Modal (BEP)
+            $omsetPerHari = $calcData['grand_total_perhari'] ?? ($score->potensi_omset_perhari ?? 0);
+            $labaPerBulan = $omsetPerHari * 30 * 0.20; // Asumsi 20% Net Margin
+            $bepBulan = $labaPerBulan > 0 ? ($totalRab / $labaPerBulan) : 0;
         @endphp
         <div class="worksheet-kpi">
             <span>Rekomendasi</span>
@@ -252,10 +263,53 @@
             <small class="mt-2">Status Penilaian</small>
         </div>
         
+        <div class="worksheet-kpi" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+            <span style="color: #166534;">Est. Omset Harian</span>
+            <strong style="color: #166534;">Rp {{ number_format($omsetPerHari, 0, ',', '.') }}</strong>
+            <small style="color: #166534;">Setelah Margin Error (MoE)</small>
+        </div>
+
+        <div class="worksheet-kpi" style="background-color: #eff6ff; border-color: #bfdbfe;">
+            <span style="color: #1e40af;">Grand Total Investasi</span>
+            <strong style="color: #1e40af;">Rp {{ number_format($totalRab, 0, ',', '.') }}</strong>
+            <small style="color: #1e40af;">Estimasi Biaya Buka Outlet</small>
+        </div>
+
+        <div class="worksheet-kpi" style="background-color: #fffbeb; border-color: #fde68a;">
+            <span style="color: #92400e;">Est. BEP / Balik Modal</span>
+            <strong style="color: #92400e;">{{ number_format($bepBulan, 1) }} Bulan</strong>
+            <small style="color: #92400e;">Asumsi Laba Bersih 20%</small>
+        </div>
+        
+
+
+        @php
+            $tipe = $score->tipe_outlet ?? 'LDP';
+            $omset = $score->potensi_omset_perhari ?? 0;
+            
+            $labelOmset = 'Di Bawah Standar';
+            $labelClass = 'bg-secondary text-white';
+            
+            if ($tipe === 'LDP') {
+                if ($omset >= 3500000) { $labelOmset = 'Plus'; $labelClass = 'bg-success text-white'; }
+                elseif ($omset >= 2000000) { $labelOmset = 'Flagship'; $labelClass = 'bg-primary text-white'; }
+                elseif ($omset >= 1400000) { $labelOmset = 'Express'; $labelClass = 'bg-warning text-dark'; }
+                elseif ($omset >= 750000)  { $labelOmset = 'Mini'; $labelClass = 'bg-info text-dark'; }
+            } else {
+                // BDP
+                if ($omset >= 3500000) { $labelOmset = 'Flagship'; $labelClass = 'bg-primary text-white'; }
+                elseif ($omset >= 2000000) { $labelOmset = 'Express'; $labelClass = 'bg-warning text-dark'; }
+                elseif ($omset >= 1400000) { $labelOmset = 'Mini'; $labelClass = 'bg-info text-dark'; }
+            }
+        @endphp
         <div class="worksheet-kpi">
-            <span>Est. Omset Harian</span>
-            <strong>Rp {{ number_format($score->potensi_omset_perhari ?? 0, 0, ',', '.') }}</strong>
-            <small>Berdasarkan Score & Traffic</small>
+            <span>Label Target</span>
+            <div style="margin-top: 10px;">
+                <span class="badge {{ $labelClass }} fs-6 px-3 py-2 w-100" style="letter-spacing: 1px;">
+                    {{ strtoupper($labelOmset) }}
+                </span>
+            </div>
+            <small class="mt-2">Kategori Outlet</small>
         </div>
 
         <div class="worksheet-kpi">
@@ -272,6 +326,27 @@
         
         <!-- KOLOM KIRI (TABEL DATA) -->
         <div class="d-flex flex-column gap-3">
+            <ul class="nav nav-tabs shadow-sm rounded-top" id="detailTabs" role="tablist" style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0; padding-top: 8px; padding-left: 8px;">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active fw-bold px-4 py-2" id="feasibility-tab" data-bs-toggle="tab" data-bs-target="#feasibility-content" type="button" role="tab" style="color: #475569; border: none; border-bottom: 3px solid transparent;">
+                        <i class="bi bi-graph-up-arrow me-2"></i>Feasibility Study
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link fw-bold px-4 py-2" id="rab-tab" data-bs-toggle="tab" data-bs-target="#rab-content" type="button" role="tab" style="color: #475569; border: none; border-bottom: 3px solid transparent;">
+                        <i class="bi bi-calculator me-2"></i>RAB & Kesimpulan
+                    </button>
+                </li>
+            </ul>
+            <style>
+                .nav-tabs .nav-link.active { color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: transparent !important; }
+                .nav-tabs .nav-link:hover:not(.active) { color: #3b82f6 !important; border-bottom: 3px solid #cbd5e1 !important; }
+                @media print { .nav-tabs { display: none !important; } .tab-content > .tab-pane { display: flex !important; opacity: 1 !important; } }
+            </style>
+            <div class="tab-content" id="detailTabsContent" style="margin-top: 15px;">
+                <!-- TAB 2: RAB & Kesimpulan -->
+                <div class="tab-pane fade" id="rab-content" role="tabpanel" tabindex="0">
+                    <div class="d-flex flex-column gap-3">
             <div class="worksheet-card">
                 <div class="worksheet-card-header">
                     <div>
@@ -324,82 +399,24 @@
                                 <th style="background:#f8fafc; font-weight:900;">U-Turn / Lampu Merah</th>
                                 <td>{{ ($score->u_turn_lampu_merah ?? 0) ? 'Dekat' : 'Jauh' }}</td>
                             </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="worksheet-card">
-                <div class="worksheet-card-header">
-                    <div>
-                        <h5>Breakdown Data Lapangan</h5>
-                        <p>Detail fasilitas, kompetitor, dan perumahan (radius 1-1.5km)</p>
-                    </div>
-                </div>
-                <div class="worksheet-table-wrap m-3">
-                    <table class="worksheet-table">
-                        <tbody>
                             <tr>
-                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Rumah Q1</th>
-                                <td style="width: 25%;">{{ number_format($score->rumah_q1 ?? 0) }}</td>
-                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Rumah Q2</th>
-                                <td style="width: 25%;">{{ number_format($score->rumah_q2 ?? 0) }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Jumlah Lantai</th>
+                                <td>{{ $score->jumlah_lantai ?? 0 }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Kondisi Bangunan</th>
+                                <td>{{ $score->kondisi_bangunan ?? '-' }}</td>
                             </tr>
                             <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Rumah Q3</th>
-                                <td>{{ number_format($score->rumah_q3 ?? 0) }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Rumah Q4</th>
-                                <td>{{ number_format($score->rumah_q4 ?? 0) }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Sekolah</th>
-                                <td>{{ number_format($score->sekolah ?? 0) }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Kampus</th>
-                                <td>{{ number_format($score->kampus ?? 0) }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Market/Supermarket</th>
-                                <td>{{ number_format($score->market ?? 0) }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Perkantoran</th>
-                                <td>{{ number_format($score->perkantoran ?? 0) }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Fasilitas Kesehatan</th>
-                                <td>{{ number_format($score->kesehatan ?? 0) }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Pabrik</th>
-                                <td>{{ number_format($score->pabrik ?? 0) }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Kompetitor Geprek</th>
-                                <td>{{ number_format($score->kompetitor_geprek ?? 0) }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Kompetitor Lokal</th>
-                                <td>{{ number_format($score->kompetitor_lokal ?? 0) }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Jarak Kompetitor Terdekat</th>
-                                <td>{{ number_format($score->jarak_kompetitor ?? 0) }} m</td>
-                                <th style="background:#f8fafc; font-weight:900;">Harga Kompetitor</th>
-                                <td class="fw-bold text-danger">Rp {{ number_format($score->harga_kompetitor ?? 0, 0, ',', '.') }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Kelebihan Lokasi</th>
-                                <td style="white-space: pre-line;">{{ $score->kelebihan_lokasi ?: '-' }}</td>
-                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Kekurangan Lokasi</th>
-                                <td style="white-space: pre-line;">{{ $score->kekurangan_lokasi ?: '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Risiko</th>
-                                <td colspan="3" style="white-space: pre-line;">{{ $score->risiko ?: '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Catatan Surveyor</th>
-                                <td colspan="3" style="white-space: pre-line;">{{ $score->catatan ?: '-' }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Terlihat dr Jalan Utama</th>
+                                <td>{{ ($score->terlihat_jalan_utama ?? 0) ? 'Ya' : 'Tidak' }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Akses Mobil</th>
+                                <td>{{ ($score->akses_mobil ?? 0) ? 'Bisa' : 'Sulit/Tidak' }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
+            <?php /* START RAB BLOCK COPIED FROM BELOW */ ?>
             <div class="worksheet-card">
                 <div class="worksheet-card-header">
                     <div>
@@ -407,25 +424,57 @@
                         <p>Estimasi biaya awal pembukaan outlet</p>
                     </div>
                 </div>
+                
+                @php
+                    $rabSipil = $score->rab_renovasi ?? 0;
+                    $rabDapur = $score->rab_kitchen ?? 0;
+                    $rabPromosi = ($score->rab_signage ?? 0) + ($score->rab_furniture ?? 0);
+                    $rabME = ($score->rab_listrik ?? 0) + ($score->rab_air ?? 0) + ($score->rab_exhaust ?? 0) + ($score->rab_ac_kipas ?? 0);
+                    $rabLainnya = ($score->rab_perizinan ?? 0) + ($score->rab_deposit_sewa ?? 0) + ($score->rab_biaya_opening ?? 0);
+                    
+                    $pctSipil = $totalRab > 0 ? ($rabSipil / $totalRab) * 100 : 0;
+                    $pctDapur = $totalRab > 0 ? ($rabDapur / $totalRab) * 100 : 0;
+                    $pctPromosi = $totalRab > 0 ? ($rabPromosi / $totalRab) * 100 : 0;
+                    $pctME = $totalRab > 0 ? ($rabME / $totalRab) * 100 : 0;
+                    $pctLainnya = $totalRab > 0 ? ($rabLainnya / $totalRab) * 100 : 0;
+                @endphp
+                
+                <div class="m-3 mb-0">
+                    <div class="progress" style="height: 12px; border-radius: 6px;">
+                        @if($pctSipil > 0)<div class="progress-bar bg-primary" role="progressbar" style="width: {{ $pctSipil }}%" title="Sipil/Partisi: {{ number_format($pctSipil, 1) }}%"></div>@endif
+                        @if($pctDapur > 0)<div class="progress-bar bg-success" role="progressbar" style="width: {{ $pctDapur }}%" title="Dapur: {{ number_format($pctDapur, 1) }}%"></div>@endif
+                        @if($pctPromosi > 0)<div class="progress-bar bg-warning" role="progressbar" style="width: {{ $pctPromosi }}%" title="Promosi: {{ number_format($pctPromosi, 1) }}%"></div>@endif
+                        @if($pctME > 0)<div class="progress-bar bg-info" role="progressbar" style="width: {{ $pctME }}%" title="Mekanikal/Elektrikal: {{ number_format($pctME, 1) }}%"></div>@endif
+                        @if($pctLainnya > 0)<div class="progress-bar bg-secondary" role="progressbar" style="width: {{ $pctLainnya }}%" title="Lainnya: {{ number_format($pctLainnya, 1) }}%"></div>@endif
+                    </div>
+                    <div class="d-flex justify-content-between mt-2" style="font-size: 11px; font-weight: 700; color: #64748b;">
+                        <div><span style="display:inline-block;width:10px;height:10px;background:var(--bs-primary);border-radius:50%;margin-right:4px;"></span> Sipil/Transport</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:var(--bs-success);border-radius:50%;margin-right:4px;"></span> Dapur</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:var(--bs-warning);border-radius:50%;margin-right:4px;"></span> Promosi</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:var(--bs-info);border-radius:50%;margin-right:4px;"></span> ME (Listrik/Air)</div>
+                        <div><span style="display:inline-block;width:10px;height:10px;background:var(--bs-secondary);border-radius:50%;margin-right:4px;"></span> Lainnya</div>
+                    </div>
+                </div>
+
                 <div class="worksheet-table-wrap m-3">
                     <table class="worksheet-table">
                         <tbody>
                             <tr>
-                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Renovasi</th>
+                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Sipil, Partisi & Transport</th>
                                 <td style="width: 25%;">Rp {{ number_format($score->rab_renovasi ?? 0, 0, ',', '.') }}</td>
-                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Peralatan Dapur</th>
+                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Peralatan Dapur / Zink</th>
                                 <td style="width: 25%;">Rp {{ number_format($score->rab_kitchen ?? 0, 0, ',', '.') }}</td>
                             </tr>
                             <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Signage</th>
+                                <th style="background:#f8fafc; font-weight:900;">Promosi (Signage)</th>
                                 <td>Rp {{ number_format($score->rab_signage ?? 0, 0, ',', '.') }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Furniture</th>
+                                <th style="background:#f8fafc; font-weight:900;">Promosi (Furniture)</th>
                                 <td>Rp {{ number_format($score->rab_furniture ?? 0, 0, ',', '.') }}</td>
                             </tr>
                             <tr>
-                                <th style="background:#f8fafc; font-weight:900;">Listrik</th>
+                                <th style="background:#f8fafc; font-weight:900;">Instalasi Listrik</th>
                                 <td>Rp {{ number_format($score->rab_listrik ?? 0, 0, ',', '.') }}</td>
-                                <th style="background:#f8fafc; font-weight:900;">Air</th>
+                                <th style="background:#f8fafc; font-weight:900;">Air & Sanitasi</th>
                                 <td>Rp {{ number_format($score->rab_air ?? 0, 0, ',', '.') }}</td>
                             </tr>
                             <tr>
@@ -446,73 +495,215 @@
                                 <th style="background:#f8fafc; font-weight:900;"></th>
                                 <td></td>
                             </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Kelebihan Lokasi</th>
+                                <td style="white-space: pre-line;">{{ $score->kelebihan_lokasi ?: '-' }}</td>
+                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Kekurangan Lokasi</th>
+                                <td style="white-space: pre-line;">{{ $score->kekurangan_lokasi ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Risiko</th>
+                                <td colspan="3" style="white-space: pre-line;">{{ $score->risiko ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900; vertical-align: top;">Catatan Surveyor</th>
+                                <td colspan="3" style="white-space: pre-line;">{{ $score->catatan ?: '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th colspan="3" style="background:#1e3a8a; color:#fff; text-align:right; font-weight:900; font-size:16px;">GRAND TOTAL INVESTASI</th>
+                                <td style="background:#1e3a8a; color:#fff; font-weight:900; font-size:16px;">Rp {{ number_format($totalRab, 0, ',', '.') }}</td>
+                            </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+            </div> <!-- End d-flex wrapper -->
+            </div> <!-- End Tab 2 -->
+
+            <!-- TAB 1: Feasibility Study -->
+            <div class="tab-pane fade show active" id="feasibility-content" role="tabpanel" tabindex="0">
+                <div class="d-flex flex-column gap-3">
+            <?php /* END RAB BLOCK */ ?>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="worksheet-card h-100">
+                        <div class="worksheet-card-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                            <div>
+                                <h5 class="mb-1" style="font-weight: 800; color: #1e293b;">Parameter Kelayakan</h5>
+                                <p class="mb-0 text-muted" style="font-size: 13px;">Bobot analisis penambah & pengurang nilai</p>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="mb-3 pb-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <div class="fw-bold text-success mb-1" style="font-size: 15px;"><i class="bi bi-plus-circle-fill me-1"></i> Total Penambah</div>
+                                    </div>
+                                    <div class="fw-bold text-success" style="font-size: 22px;">+{{ number_format(($score->total_penambah ?? 0) * 100, 2) }}%</div>
+                                </div>
+                                @if(!empty($calcData['details_penambah']))
+                                <div class="row g-2 mt-2 px-1">
+                                    @foreach($calcData['details_penambah'] as $key => $val)
+                                        <div class="col-6">
+                                            <div class="d-flex justify-content-between align-items-center border-bottom pb-1" style="border-color: #e2e8f0; border-style: dashed !important;">
+                                                <span class="text-muted" style="font-size: 11px;">{{ ucwords(str_replace('_', ' ', $key)) }}</span>
+                                                <span class="text-success fw-bold" style="font-size: 11px;">+{{ number_format($val * 100, 1) }}%</span>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                @else
+                                <div class="text-muted mt-2" style="font-size: 12px;">Dari traffic, perumahan, fasilitas umum, dll.</div>
+                                @endif
+                            </div>
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <div class="fw-bold text-danger mb-1" style="font-size: 15px;"><i class="bi bi-dash-circle-fill me-1"></i> Total Pengurang</div>
+                                    </div>
+                                    <div class="fw-bold text-danger" style="font-size: 22px;">-{{ number_format(($score->total_pengurang ?? 0) * 100, 2) }}%</div>
+                                </div>
+                                @if(!empty($calcData['details_pengurang']))
+                                <div class="row g-2 mt-2 px-1">
+                                    @foreach($calcData['details_pengurang'] as $key => $val)
+                                        <div class="col-6">
+                                            <div class="d-flex justify-content-between align-items-center border-bottom pb-1" style="border-color: #e2e8f0; border-style: dashed !important;">
+                                                <span class="text-muted" style="font-size: 11px;">{{ ucwords(str_replace('_', ' ', $key)) }}</span>
+                                                <span class="text-danger fw-bold" style="font-size: 11px;">-{{ number_format($val * 100, 1) }}%</span>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                                @else
+                                <div class="text-muted mt-2" style="font-size: 12px;">Pinalti dari jumlah kompetitor di area.</div>
+                                @endif
+                            </div>
+
+                            <div class="p-3 rounded" style="background-color: #f1f5f9; border: 1px solid #cbd5e1;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-secondary fw-bold" style="font-size: 13px;">Threshold Approved</span>
+                                    <b class="text-dark" style="font-size: 14px;">≥ {{ ($score->tipe_outlet ?? 'LDP') === 'LDP' ? '60' : '60' }}%</b>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-secondary fw-bold" style="font-size: 13px;">Margin of Error (MoE)</span>
+                                    <span class="badge bg-danger">{{ $calcData['moe_percent'] ?? 20 }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="worksheet-card h-100">
+                        <div class="worksheet-card-header" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                            <div>
+                                <h5 class="mb-1" style="font-weight: 800; color: #1e293b;">Proyeksi Chicken Unit & Omset</h5>
+                                <p class="mb-0 text-muted" style="font-size: 13px;">Breakdown perhitungan potensi penjualan</p>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            @php
+                                $totalCuHari = $calcData['total_potensi_cu'] ?? 0;
+                                $omsetHari = $calcData['grand_total_perhari'] ?? 0;
+                                $averageCheck = $calcData['average_check'] ?? ($score->average_check ?? 21000);
+                            @endphp
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style="border-style: dashed !important; border-color: #e2e8f0 !important;">
+                                <span class="text-secondary fw-bold" style="font-size: 13px;"><i class="bi bi-cash-stack me-1"></i> Average Check</span>
+                                <b class="text-dark" style="font-size: 14px;">Rp {{ number_format($averageCheck, 0, ',', '.') }} / CU</b>
+                            </div>
+                            
+                            <div class="row g-3 mb-4">
+                                <div class="col-6">
+                                    <div class="p-3 rounded text-center h-100" style="background: #eff6ff; border: 1px solid #bfdbfe;">
+                                        <div class="text-primary fw-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px;">ESTIMASI CU (HARIAN)</div>
+                                        <div class="fw-bold text-dark" style="font-size: 18px;">{{ number_format($totalCuHari, 1, ',', '.') }} CU</div>
+                                        <div class="text-muted mt-1" style="font-size: 11px;">{{ number_format($totalCuHari * 30, 0, ',', '.') }} / bln</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 rounded text-center h-100" style="background: #fdf4ff; border: 1px solid #f5d0fe;">
+                                        <div class="text-purple fw-bold mb-1" style="font-size: 11px; letter-spacing: 0.5px; color: #a21caf;">OMSET MINGGUAN</div>
+                                        <div class="fw-bold text-dark" style="font-size: 18px;">Rp {{ number_format($omsetHari * 7, 0, ',', '.') }}</div>
+                                        <div class="text-muted mt-1" style="font-size: 11px;">(7 Hari Operasional)</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="p-3 rounded text-center" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 1px solid #a7f3d0; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1);">
+                                <div class="text-success fw-bold mb-1" style="font-size: 0.85rem; letter-spacing: 1px;">ESTIMASI OMSET BULANAN</div>
+                                <div class="text-success fw-bold" style="font-size: 1.8rem;">Rp {{ number_format($omsetHari * 30, 0, ',', '.') }}</div>
+                                <div class="text-muted mt-2" style="font-size: 11px;">Subtotal (Sblm MoE): Rp {{ number_format(($calcData['subtotal_perhari'] ?? 0) * 30, 0, ',', '.') }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="worksheet-card">
                 <div class="worksheet-card-header">
                     <div>
-                        <h5>Analisis Score</h5>
-                        <p>Bobot perbandingan elemen penambah dan pengurang nilai.</p>
+                        <h5>Breakdown Data Lapangan</h5>
+                        <p>Detail fasilitas, kompetitor, dan perumahan (radius 1-1.5km)</p>
                     </div>
                 </div>
                 <div class="worksheet-table-wrap m-3">
+                    @php
+                        $multiplierRumah = 1.0;
+                        if (($score->formula_type ?? 'DEFAULT') === 'CUSTOM' && !empty($score->custom_weights_json)) {
+                            $customConfig = json_decode($score->custom_weights_json, true) ?? [];
+                            if (isset($customConfig['multipliers']['rumah']) && $customConfig['multipliers']['rumah'] > 0) {
+                                $multiplierRumah = (float) $customConfig['multipliers']['rumah'];
+                            }
+                        }
+                    @endphp
                     <table class="worksheet-table">
-                        <thead>
-                            <tr>
-                                <th>Elemen</th>
-                                <th>Kontribusi</th>
-                                <th>Keterangan</th>
-                            </tr>
-                        </thead>
                         <tbody>
                             <tr>
-                                <td class="fw-bold text-success"><i class="bi bi-plus-circle me-1"></i> Total Penambah</td>
-                                <td class="fw-bold text-success">+{{ number_format(($score->total_penambah ?? 0) * 100, 2) }}%</td>
-                                <td>Dari traffic, perumahan, fasilitas umum, dll.</td>
+                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Rumah Q1</th>
+                                <td style="width: 25%;">{{ number_format(($score->rumah_q1 ?? 0) * $multiplierRumah) }}</td>
+                                <th style="width: 25%; background:#f8fafc; font-weight:900;">Rumah Q2</th>
+                                <td style="width: 25%;">{{ number_format(($score->rumah_q2 ?? 0) * $multiplierRumah) }}</td>
                             </tr>
                             <tr>
-                                <td class="fw-bold text-danger"><i class="bi bi-dash-circle me-1"></i> Total Pengurang</td>
-                                <td class="fw-bold text-danger">-{{ number_format(($score->total_pengurang ?? 0) * 100, 2) }}%</td>
-                                <td>Pinalti dari jumlah kompetitor di area tersebut.</td>
+                                <th style="background:#f8fafc; font-weight:900;">Rumah Q3</th>
+                                <td>{{ number_format(($score->rumah_q3 ?? 0) * $multiplierRumah) }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Rumah Q4</th>
+                                <td>{{ number_format(($score->rumah_q4 ?? 0) * $multiplierRumah) }}</td>
                             </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900;">Sekolah</th>
+                                <td>{{ number_format($score->sekolah ?? 0) }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Market/Supermarket</th>
+                                <td>{{ number_format($score->market ?? 0) }}</td>
+                            </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900;">Perkantoran</th>
+                                <td>{{ number_format($score->perkantoran ?? 0) }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Fasilitas Kesehatan</th>
+                                <td>{{ number_format($score->kesehatan ?? 0) }}</td>
+                            </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900;">Kompetitor Geprek</th>
+                                <td>{{ number_format($score->kompetitor_geprek ?? 0) }}</td>
+                                <th style="background:#f8fafc; font-weight:900;">Kompetitor Lokal</th>
+                                <td>{{ number_format($score->kompetitor_lokal ?? 0) }}</td>
+                            </tr>
+                            <tr>
+                                <th style="background:#f8fafc; font-weight:900;">Harga Kompetitor</th>
+                                <td class="fw-bold text-danger">Rp {{ number_format($score->harga_kompetitor ?? 0, 0, ',', '.') }}</td>
+                                <th style="background:#f8fafc; font-weight:900;"></th>
+                                <td></td>
+                            </tr>
+                            <!-- Kelebihan & Risiko dipindah ke tab RAB -->
                         </tbody>
                     </table>
                 </div>
             </div>
-
-            <div class="worksheet-card">
-                <div class="worksheet-card-header">
-                    <div>
-                        <h5>Estimasi Potensi Omset (Harian)</h5>
-                        <p>Breakdown perhitungan omset dan klasifikasi label outlet</p>
-                    </div>
-                </div>
-                <div class="worksheet-table-wrap m-3">
-                    <table class="worksheet-table text-end">
-                        <tbody>
-                            <tr>
-                                <th style="background:#1e3a8a; color:#fff; text-align:left; font-weight:800; width:50%; font-size:15px;">Sub Total</th>
-                                <td class="fw-bold" style="background:#1e3a8a; color:#fff; width:50%; font-size:15px;">Rp {{ number_format($calcData['subtotal_perhari'] ?? 0, 0, ',', '.') }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#dc2626; color:#fff; text-align:left; font-weight:800; font-size:15px;">% MoE (Margin of Error)</th>
-                                <td class="fw-bold" style="background:#dc2626; color:#fff; font-size:15px;">{{ $calcData['moe_percent'] ?? 20 }}%</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#166534; color:#fff; text-align:left; font-weight:800; font-size:15px;">Grand Total After MoE</th>
-                                <td class="fw-bold" style="background:#166534; color:#fff; font-size:15px;">Rp {{ number_format($calcData['grand_total_perhari'] ?? 0, 0, ',', '.') }}</td>
-                            </tr>
-                            <tr>
-                                <th style="background:#831843; color:#fff; text-align:left; font-weight:800; font-size:15px;">Label Outlet</th>
-                                <td class="fw-bold" style="background:#831843; color:#fff; font-size:18px; text-transform:uppercase;">{{ $calcData['label_outlet'] ?? '-' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            </div> <!-- End d-flex wrapper -->
+            </div> <!-- End Tab 1 -->
+            </div> <!-- End detailTabsContent -->
         </div>
         
         <!-- KOLOM KANAN (MAP & FOTO) -->
@@ -605,57 +796,188 @@
 
 @push('scripts')
 @if($score && !empty($score->latitude) && !empty($score->longitude))
+<script src="https://maps.googleapis.com/maps/api/js?key={{ env('GOOGLE_MAPS_API_KEY') }}&libraries=places,geometry"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const lat = {{ (float)$score->latitude }};
         const lng = {{ (float)$score->longitude }};
-        const embedUrl = 'https://maps.google.com/maps?q=' + lat + ',' + lng + '&hl=id&z=16&output=embed';
+        const center = { lat: lat, lng: lng };
         
         const mapBox = document.getElementById('detailMap');
-        mapBox.innerHTML = '<iframe src="' + embedUrl + '" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>';
+        
+        const map = new google.maps.Map(mapBox, {
+            center: center,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+        });
+
+        // Target Marker
+        new google.maps.Marker({
+            position: center,
+            map: map,
+            icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            title: 'Lokasi Target'
+        });
+
+        // Radius Circles
+        new google.maps.Circle({
+            strokeColor: "#3b82f6", strokeOpacity: 0.8, strokeWeight: 2,
+            fillColor: "#3b82f6", fillOpacity: 0.1,
+            map: map, center: center, radius: {{ $score->scan_radius_fasum ?? 750 }}
+        });
+        new google.maps.Circle({
+            strokeColor: "#ef4444", strokeOpacity: 0.8, strokeWeight: 2,
+            fillColor: "#ef4444", fillOpacity: 0.05,
+            map: map, center: center, radius: {{ $score->scan_radius_kompetitor ?? 500 }}
+        });
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.style.background = 'white';
+        legend.style.padding = '10px';
+        legend.style.margin = '10px';
+        legend.style.borderRadius = '8px';
+        legend.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+        legend.style.fontSize = '12px';
+        legend.style.lineHeight = '1.5';
+        legend.innerHTML = `
+            <div style="font-weight:bold;margin-bottom:8px;font-size:14px;">Legenda Maps</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/red-dot.png" width="16" style="vertical-align:middle"> Lokasi Target</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/blue-dot.png" width="16" style="vertical-align:middle"> Sekolah</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/purple-dot.png" width="16" style="vertical-align:middle"> Kampus</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/pink-dot.png" width="16" style="vertical-align:middle"> Kesehatan</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/green-dot.png" width="16" style="vertical-align:middle"> Market / Mall</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/ltblue-dot.png" width="16" style="vertical-align:middle"> Perkantoran</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/orange-dot.png" width="16" style="vertical-align:middle"> Kompetitor (Geprek)</div>
+            <div><img src="http://maps.google.com/mapfiles/ms/icons/yellow-dot.png" width="16" style="vertical-align:middle"> F&B Lokal</div>
+        `;
+        map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(legend);
+
+        // Traffic Generator (Places API)
+        const service = new google.maps.places.PlacesService(map);
+        function searchFasum(radius, type, iconPath) {
+            service.nearbySearch({ location: center, radius: radius, type: type }, function(results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                    results.forEach(place => {
+                        new google.maps.Marker({
+                            map: map, position: place.geometry.location, icon: iconPath, title: place.name
+                        });
+                    });
+                }
+            });
+        }
+        function searchKeyword(radius, keyword, iconPath) {
+            service.nearbySearch({ location: center, radius: radius, keyword: keyword }, function(results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                    results.forEach(place => {
+                        new google.maps.Marker({
+                            map: map, position: place.geometry.location, icon: iconPath, title: place.name
+                        });
+                    });
+                }
+            });
+        }
+
+        const radFasum = {{ $score->scan_radius_fasum ?? 750 }};
+        searchFasum(radFasum, 'school', 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png');
+        searchFasum(radFasum, 'university', 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png');
+        searchFasum(radFasum, 'hospital', 'http://maps.google.com/mapfiles/ms/icons/pink-dot.png');
+        searchFasum(radFasum, 'supermarket', 'http://maps.google.com/mapfiles/ms/icons/green-dot.png');
+        searchKeyword(radFasum, 'perkantoran', 'http://maps.google.com/mapfiles/ms/icons/ltblue-dot.png');
+        searchKeyword(radFasum, 'pabrik', 'http://maps.google.com/mapfiles/ms/icons/ltblue-dot.png');
+
+        const radKomp = {{ $score->scan_radius_kompetitor ?? 500 }};
+        searchKeyword(radKomp, 'ayam geprek', 'http://maps.google.com/mapfiles/ms/icons/orange-dot.png');
+        searchFasum(radKomp, 'restaurant', 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png');
     });
 </script>
 @endif
 
 @if($score)
 <script>
+    @php
+        $multiplierTraffic = 1.0;
+        if (($score->formula_type ?? 'DEFAULT') === 'CUSTOM' && !empty($score->custom_weights_json)) {
+            $customConfig = json_decode($score->custom_weights_json, true) ?? [];
+            if (isset($customConfig['multipliers']['traffic']) && $customConfig['multipliers']['traffic'] > 0) {
+                $multiplierTraffic = (float) $customConfig['multipliers']['traffic'];
+            }
+        }
+    @endphp
     const trafficData = {
         wd: {
-            mPagi: {{ $score->motor_weekday_pagi ?? 0 }},
-            mSiang: {{ $score->motor_weekday_siang ?? 0 }},
-            mSore: {{ $score->motor_weekday_sore ?? 0 }},
-            pPagi: {{ $score->pejalan_weekday_pagi ?? 0 }},
-            pSiang: {{ $score->pejalan_weekday_siang ?? 0 }},
-            pSore: {{ $score->pejalan_weekday_sore ?? 0 }},
+            mPagi: {{ ($score->motor_weekday_pagi ?? 0) * $multiplierTraffic }},
+            mSiang: {{ ($score->motor_weekday_siang ?? 0) * $multiplierTraffic }},
+            mSore: {{ ($score->motor_weekday_sore ?? 0) * $multiplierTraffic }},
+            pPagi: {{ ($score->pejalan_weekday_pagi ?? 0) * $multiplierTraffic }},
+            pSiang: {{ ($score->pejalan_weekday_siang ?? 0) * $multiplierTraffic }},
+            pSore: {{ ($score->pejalan_weekday_sore ?? 0) * $multiplierTraffic }},
         },
         we: {
-            mPagi: {{ $score->motor_weekend_pagi ?? 0 }},
-            mSiang: {{ $score->motor_weekend_siang ?? 0 }},
-            mSore: {{ $score->motor_weekend_sore ?? 0 }},
-            pPagi: {{ $score->pejalan_weekend_pagi ?? 0 }},
-            pSiang: {{ $score->pejalan_weekend_siang ?? 0 }},
-            pSore: {{ $score->pejalan_weekend_sore ?? 0 }},
+            mPagi: {{ ($score->motor_weekend_pagi ?? 0) * $multiplierTraffic }},
+            mSiang: {{ ($score->motor_weekend_siang ?? 0) * $multiplierTraffic }},
+            mSore: {{ ($score->motor_weekend_sore ?? 0) * $multiplierTraffic }},
+            pPagi: {{ ($score->pejalan_weekend_pagi ?? 0) * $multiplierTraffic }},
+            pSiang: {{ ($score->pejalan_weekend_siang ?? 0) * $multiplierTraffic }},
+            pSore: {{ ($score->pejalan_weekend_sore ?? 0) * $multiplierTraffic }},
         }
     };
 
-    function synthesizeTrafficCurveJS(pagi, siang, sore) {
-        const baseCurve = {
-            6: 0.2, 7: 0.4, 8: 0.5, 9: 0.4, 10: 0.5,
-            11: 0.7, 12: 1.0, 13: 0.8, 14: 0.6, 15: 0.5,
-            16: 0.6, 17: 0.8, 18: 1.0, 19: 0.9, 20: 0.8, 21: 0.6, 22: 0.4, 23: 0.2
-        };
+    function synthesizeTrafficCurveJS(pagi, siang, sore, day) {
+        let baseCurve = {};
 
-        const sumMorning = 2.0;
-        const sumNoon    = 3.6;
-        const sumEvening = 5.3;
-        
+        // Google Maps-like organic curves per day
+        if (day === 'Jum') {
+            // Friday - evening peak is higher and stretches later
+            baseCurve = {
+                6: 0.2, 7: 0.5, 8: 0.7, 9: 0.5, 10: 0.4,
+                11: 0.6, 12: 1.0, 13: 1.0, 14: 0.7, 15: 0.6,
+                16: 0.8, 17: 0.9, 18: 1.0, 19: 1.2, 20: 1.1, 21: 0.9, 22: 0.6, 23: 0.4
+            };
+        } else if (day === 'Sab') {
+            // Saturday - slow morning, steady afternoon, very high night
+            baseCurve = {
+                6: 0.1, 7: 0.2, 8: 0.4, 9: 0.6, 10: 0.7,
+                11: 0.8, 12: 1.0, 13: 1.0, 14: 0.9, 15: 0.9,
+                16: 1.0, 17: 1.0, 18: 1.1, 19: 1.3, 20: 1.4, 21: 1.2, 22: 0.9, 23: 0.6
+            };
+        } else if (day === 'Min') {
+            // Sunday - morning activity (sports/CFD), high lunch, tapers early night
+            baseCurve = {
+                6: 0.4, 7: 0.7, 8: 0.9, 9: 0.8, 10: 0.7,
+                11: 0.8, 12: 1.0, 13: 0.9, 14: 0.8, 15: 0.7,
+                16: 0.8, 17: 0.9, 18: 0.9, 19: 0.8, 20: 0.6, 21: 0.4, 22: 0.2, 23: 0.1
+            };
+        } else {
+            // Standard Weekday (Sen, Sel, Rab, Kam) - typical commute patterns
+            baseCurve = {
+                6: 0.2, 7: 0.6, 8: 0.8, 9: 0.5, 10: 0.4,
+                11: 0.6, 12: 1.0, 13: 0.8, 14: 0.6, 15: 0.5,
+                16: 0.7, 17: 0.9, 18: 1.0, 19: 0.8, 20: 0.6, 21: 0.4, 22: 0.3, 23: 0.1
+            };
+        }
+
+        // Dynamically calculate sums so the distribution is perfectly accurate to the inputs
+        let sumMorning = 0, sumNoon = 0, sumEvening = 0;
+        for (let h = 6; h <= 10; h++) sumMorning += baseCurve[h];
+        for (let h = 11; h <= 15; h++) sumNoon += baseCurve[h];
+        for (let h = 16; h <= 23; h++) sumEvening += baseCurve[h];
+
+        sumMorning = sumMorning || 1;
+        sumNoon = sumNoon || 1;
+        sumEvening = sumEvening || 1;
+
         const hourlyData = {};
         for (let h = 6; h <= 23; h++) {
             let count = 0;
             if (h <= 10) count = pagi * (baseCurve[h] / sumMorning);
             else if (h <= 15) count = siang * (baseCurve[h] / sumNoon);
             else count = sore * (baseCurve[h] / sumEvening);
-            hourlyData[h] = Math.round(count);
+
+            // Add tiny 2-4% organic variance to make it look realistic
+            let variance = 1.0 + ((Math.random() * 0.08) - 0.04);
+            hourlyData[h] = Math.max(0, Math.round(count * variance));
         }
         return hourlyData;
     }
@@ -666,8 +988,8 @@
         const isWeekend = ['Sab', 'Min'].includes(day);
         const data = isWeekend ? trafficData.we : trafficData.wd;
 
-        const motorCurve = synthesizeTrafficCurveJS(data.mPagi, data.mSiang, data.mSore);
-        const pejalanCurve = synthesizeTrafficCurveJS(data.pPagi, data.pSiang, data.pSore);
+        const motorCurve = synthesizeTrafficCurveJS(data.mPagi, data.mSiang, data.mSore, day);
+        const pejalanCurve = synthesizeTrafficCurveJS(data.pPagi, data.pSiang, data.pSore, day);
 
         const hoursData = [];
         let maxVal = 0;

@@ -286,9 +286,17 @@
                             </span>
                         @endif
                     </h4>
-                    <p class="text-muted mb-0" style="font-size: 0.85rem;">
+
+                    {{-- TAMBAHAN ALAMAT DI SINI --}}
+                    @if($myOutlet && $myOutlet->alamat)
+                        <p class="text-muted mb-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-geo-alt me-1"></i> {{ $myOutlet->alamat }}
+                        </p>
+                    @endif
+
+                    <!-- <p class="text-muted mb-0" style="font-size: 0.85rem;">
                         Ringkasan aktivitas Purchase Order dan operasional distribusi logistik utama.
-                    </p>
+                    </p> -->
                 </div>
 
                 <div class="d-flex gap-2">
@@ -388,11 +396,12 @@
             </div>
         </div>
 
-        <form action="{{ route('po.store') }}" method="POST">
+        <form action="{{ route('po.store') }}" method="POST" id="formPO">
             @csrf
             <div class="modal fade" id="modalRequestPO" tabindex="-1">
                 <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content shadow-lg">
+
                         <div class="modal-header bg-light border-bottom">
                             <h6 class="modal-title fw-bold text-dark mb-0 d-flex align-items-center">
                                 <i class="bi bi-cart-plus me-2 text-primary fs-5"></i>Form Request Purchase Order
@@ -401,51 +410,257 @@
                         </div>
 
                         <div class="modal-body p-4" style="background-color: #fafafa;">
-                            <div class="row g-4">
-                                <div class="col-12">
-                                    <div class="card p-3 border-0 shadow-sm rounded-4 bg-white">
-                                        <h6 class="fw-bold border-bottom pb-2 mb-3 text-dark fs-6">Informasi
-                                            Administrasi Outlet</h6>
-                                        <div class="row g-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label">Nama Target Outlet</label>
-                                                @if($myOutlet)
-                                                    <input type="hidden" name="outlet_id" value="{{ $myOutlet->id }}">
-                                                    <input type="text" class="form-control bg-light fw-semibold text-dark"
-                                                        value="{{ $myOutlet->nama_outlet }}" disabled
-                                                        style="cursor: not-allowed;">
-                                                    <div class="mt-1 d-flex align-items-center gap-1 small text-muted"
-                                                        style="font-size: 0.75rem;">
-                                                        <i class="bi bi-info-circle-fill text-indigo"
-                                                            style="color: var(--primary);"></i> Terkunci otomatis sesuai
-                                                        otoritas akun
+
+                            <ul class="nav nav-tabs mb-4" id="poTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active fw-bold px-4" id="dc-tab" data-bs-toggle="tab"
+                                        data-bs-target="#dc-pane" type="button" role="tab" aria-controls="dc-pane"
+                                        aria-selected="true">
+                                        <i class="bi bi-box-seam me-2"></i>PO Bahan Baku DC
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link fw-bold px-4" id="supplier-tab" data-bs-toggle="tab"
+                                        data-bs-target="#supplier-pane" type="button" role="tab"
+                                        aria-controls="supplier-pane" aria-selected="false">
+                                        <i class="bi bi-truck me-2"></i>PO Bahan Baku Supplier
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content" id="poTabsContent">
+
+                                <div class="tab-pane fade show active" id="dc-pane" role="tabpanel"
+                                    aria-labelledby="dc-tab" tabindex="0">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <div
+                                                class="card p-3 border-0 shadow-sm rounded-4 bg-white border-top border-primary border-3">
+                                                <h6 class="fw-bold border-bottom pb-2 mb-3 text-dark fs-6">Bahan Baku
+                                                    (PO ke DC)</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Nama Outlet</label>
+                                                        @if($myOutlet)
+                                                            <input type="hidden" name="outlet_id_dc"
+                                                                value="{{ $myOutlet->id }}">
+                                                            <input type="text"
+                                                                class="form-control bg-light fw-semibold text-dark"
+                                                                value="SCM-{{ $myOutlet->nama_outlet }}-LINK(NEW)" disabled
+                                                                style="cursor: not-allowed;">
+                                                        @else
+                                                            <select name="outlet_id_dc" class="form-control select2-outlet"
+                                                                style="width: 100%;">
+                                                                <option value="">— Pilih Outlet —</option>
+                                                                @foreach($outlets as $outlet)
+                                                                    <option value="{{ $outlet->id }}">{{ $outlet->nama_outlet }}
+                                                                    </option>
+                                                                @endforeach
+                                                            </select>
+                                                        @endif
                                                     </div>
-                                                @else
-                                                    <select name="outlet_id" id="outlet_id"
-                                                        class="form-control select2-outlet" required style="width: 100%;">
-                                                        <option value="">— Pilih Outlet —</option>
-                                                        @foreach($outlets as $outlet)
-                                                            <option value="{{ $outlet->id }}">{{ $outlet->nama_outlet }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                @endif
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Nama Penanggungjawab</label>
+                                                        <input type="text" name="nama_pemesan_dc"
+                                                            class="form-control shadow-none"
+                                                            placeholder="Ketik penanggungjawab...">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Tanggal Permintaan</label>
+                                                        <input type="date" name="tgl_permintaan_dc"
+                                                            value="{{ date('Y-m-d') }}"
+                                                            class="form-control shadow-none">
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Nama Penanggungjawab</label>
-                                                <input type="text" name="nama_pemesan" class="form-control shadow-none"
-                                                    required placeholder="Ketik penanggungjawab...">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Tanggal Pengajuan Permintaan</label>
-                                                <input type="date" name="tgl_permintaan" id="permintaanDate"
-                                                    value="{{ date('Y-m-d') }}" class="form-control shadow-none"
-                                                    required>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <div class="card p-3 border-0 shadow-sm rounded-4 bg-white">
+                                                <div
+                                                    class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                                    <h6 class="fw-bold text-dark mb-0 fs-6">Item Bahan Baku DC</h6>
+                                                    <button type="button" id="addRowDC"
+                                                        class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
+                                                        <i class="bi bi-plus-lg me-1"></i> Tambah Item
+                                                    </button>
+                                                </div>
+                                                <div class="table-responsive border rounded-3">
+                                                    <table class="table table-hover align-middle mb-0">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 60%;"
+                                                                    class="text-secondary small fw-semibold">Produk /
+                                                                    Bahan Baku</th>
+                                                                <th style="width: 25%;"
+                                                                    class="text-secondary small fw-semibold">Qty Order
+                                                                </th>
+                                                                <th style="width: 15%;"
+                                                                    class="text-center text-secondary small fw-semibold">
+                                                                    Aksi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="produkBodyDC">
+                                                            <tr>
+                                                                <td class="p-2">
+                                                                    <select name="bahan_id_dc[]"
+                                                                        class="form-control select-bahan-searchable"
+                                                                        style="width:100%;">
+                                                                        <option value="">🔍 Cari Bahan</option>
+                                                                        @foreach($bahansDC as $bahan)
+                                                                            <option value="{{ $bahan->id }}"
+                                                                                data-unit-id="{{ $bahan->purchase_unit_id ?? '' }}"
+                                                                                data-satuan="{{ $bahan->nama_purchase_unit ?? '' }}">
+                                                                                {{ $bahan->nama_bahan }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                </td>
+                                                                <td class="p-2">
+                                                                    <div class="input-group">
+                                                                        <input type="number" name="jumlah_dc[]"
+                                                                            class="form-control shadow-none text-center fw-bold"
+                                                                            min="1" placeholder="0" step="0.01">
+                                                                        <span
+                                                                            class="input-group-text bg-light text-muted satuan-display"
+                                                                            style="font-size:0.75rem; min-width:50px; justify-content: center;">—</span>
+                                                                    </div>
+                                                                    <input type="hidden" name="unit_id_dc[]"
+                                                                        class="unit-id-input" value="">
+                                                                </td>
+                                                                <td class="text-center p-2">
+                                                                    <button type="button"
+                                                                        class="btn btn-sm btn-outline-danger removeRow rounded-pill p-1 d-inline-flex align-items-center justify-content-center"
+                                                                        style="width:28px; height:28px;">
+                                                                        <i class="bi bi-trash"></i>
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
+                                <div class="tab-pane fade" id="supplier-pane" role="tabpanel"
+                                    aria-labelledby="supplier-tab" tabindex="0">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <div
+                                                class="card p-3 border-0 shadow-sm rounded-4 bg-white border-top border-success border-3">
+                                                <h6 class="fw-bold border-bottom pb-2 mb-3 text-dark fs-6">Bahan Baku
+                                                    (Direct Supplier)</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Nama Outlet</label>
+                                                        @if($myOutlet)
+                                                            <input type="hidden" name="outlet_id_supplier"
+                                                                value="{{ $myOutlet->id }}">
+                                                            <input type="text"
+                                                                class="form-control bg-light fw-semibold text-dark"
+                                                                value="SCM-{{ $myOutlet->nama_outlet }}-LINK(NEW)" disabled
+                                                                style="cursor: not-allowed;">
+                                                        @else
+                                                            <select name="outlet_id_supplier"
+                                                                class="form-control select2-outlet" style="width: 100%;">
+                                                                <option value="">— Pilih Outlet —</option>
+                                                                @foreach($outlets as $outlet)
+                                                                    <option value="{{ $outlet->id }}">{{ $outlet->nama_outlet }}
+                                                                    </option>
+                                                                @endforeach
+                                                            </select>
+                                                        @endif
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Nama Penanggungjawab</label>
+                                                        <input type="text" name="nama_pemesan_supplier"
+                                                            class="form-control shadow-none"
+                                                            placeholder="Ketik penanggungjawab...">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label class="form-label">Tanggal Permintaan</label>
+                                                        <input type="date" name="tgl_permintaan_supplier"
+                                                            value="{{ date('Y-m-d') }}"
+                                                            class="form-control shadow-none">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <div class="card p-3 border-0 shadow-sm rounded-4 bg-white">
+                                                <div
+                                                    class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                                    <h6 class="fw-bold text-dark mb-0 fs-6">Item Bahan Baku Supplier
+                                                    </h6>
+                                                    <button type="button" id="addRowSupplier"
+                                                        class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
+                                                        <i class="bi bi-plus-lg me-1"></i> Tambah Item
+                                                    </button>
+                                                </div>
+                                                <div class="table-responsive border rounded-3">
+                                                    <table class="table table-hover align-middle mb-0">
+                                                        <thead class="table-light">
+                                                            <tr>
+                                                                <th style="width: 60%;"
+                                                                    class="text-secondary small fw-semibold">Produk /
+                                                                    Bahan Baku</th>
+                                                                <th style="width: 25%;"
+                                                                    class="text-secondary small fw-semibold">Qty Order
+                                                                </th>
+                                                                <th style="width: 15%;"
+                                                                    class="text-center text-secondary small fw-semibold">
+                                                                    Aksi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="produkBodySupplier">
+                                                            <tr>
+                                                                <td class="p-2">
+                                                                    <select name="bahan_id_supplier[]"
+                                                                        class="form-control select-bahan-searchable"
+                                                                        style="width:100%;">
+                                                                        <option value="">🔍 Cari Bahan</option>
+                                                                        @foreach($bahansSupplier as $bahan)
+                                                                            <option value="{{ $bahan->id }}"
+                                                                                data-unit-id="{{ $bahan->purchase_unit_id ?? '' }}"
+                                                                                data-satuan="{{ $bahan->nama_purchase_unit ?? '' }}">
+                                                                                {{ $bahan->nama_bahan }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                </td>
+                                                                <td class="p-2">
+                                                                    <div class="input-group">
+                                                                        <input type="number" name="jumlah_supplier[]"
+                                                                            class="form-control shadow-none text-center fw-bold"
+                                                                            min="1" placeholder="0" step="0.01">
+                                                                        <span
+                                                                            class="input-group-text bg-light text-muted satuan-display"
+                                                                            style="font-size:0.75rem; min-width:50px; justify-content: center;">—</span>
+                                                                    </div>
+                                                                    <input type="hidden" name="unit_id_supplier[]"
+                                                                        class="unit-id-input" value="">
+                                                                </td>
+                                                                <td class="text-center p-2">
+                                                                    <button type="button"
+                                                                        class="btn btn-sm btn-outline-danger removeRow rounded-pill p-1 d-inline-flex align-items-center justify-content-center"
+                                                                        style="width:28px; height:28px;">
+                                                                        <i class="bi bi-trash"></i>
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="row g-4 mt-1">
                                 <div class="col-12">
                                     <div class="card p-3 border-0 shadow-sm rounded-4 bg-white">
                                         <label class="form-label text-dark mb-2">Catatan Khusus Permintaan
@@ -454,114 +669,22 @@
                                             placeholder="Tambahkan catatan instruksi khusus pengiriman (opsional)..."></textarea>
                                     </div>
                                 </div>
-
-                                <div class="col-12">
-                                    <div class="card p-3 border-0 shadow-sm rounded-4 bg-white">
-                                        <div
-                                            class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                                            <h6 class="fw-bold text-dark mb-0 fs-6">Item Daftar Barang</h6>
-                                            <button type="button" id="addRow"
-                                                class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center">
-                                                <i class="bi bi-plus-lg me-1"></i> Sisipkan Baris Baru
-                                            </button>
-                                        </div>
-                                        <div class="table-responsive border rounded-3">
-                                            <table class="table table-hover align-middle mb-0">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th style="width: 60%; font-weight:600;"
-                                                            class="text-secondary small">Produk / Bahan Baku</th>
-                                                        <th style="width: 25%; font-weight:600;"
-                                                            class="text-secondary small">Quantity Order</th>
-                                                        <th style="width: 15%; font-weight:600;"
-                                                            class="text-center text-secondary small">Eliminasi</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="produkBody">
-                                                    <tr class="bahan-row">
-                                                        <td class="p-2">
-                                                            <select name="bahan_id[]"
-                                                                class="form-control select-bahan-searchable" required
-                                                                style="width:100%;">
-                                                                <option value="">🔍 Cari / Pilih Bahan...</option>
-                                                                @foreach($bahans as $bahan)
-                                                                    <option value="{{ $bahan->id }}"
-                                                                        data-unit-id="{{ $bahan->purchase_unit_id ?? '' }}"
-                                                                        data-satuan="{{ $bahan->nama_purchase_unit ?? '' }}">
-                                                                        {{ $bahan->nama_bahan }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        </td>
-                                                        <td class="p-2">
-                                                            <div class="input-group">
-                                                                <input type="number" name="jumlah[]"
-                                                                    class="form-control shadow-none text-center fw-bold"
-                                                                    required min="1" placeholder="0" step="0.01">
-                                                                <span
-                                                                    class="input-group-text bg-light text-muted satuan-display"
-                                                                    style="font-size:0.75rem; min-width:50px; justify-content: center;">—</span>
-                                                            </div>
-                                                            <input type="hidden" name="unit_id[]" class="unit-id-input"
-                                                                value="">
-                                                        </td>
-                                                        <td class="text-center p-2">
-                                                            <button type="button"
-                                                                class="btn btn-sm btn-outline-danger removeRow rounded-pill p-1 d-inline-flex align-items-center justify-content-center"
-                                                                style="width:28px; height:28px;">
-                                                                <i class="bi bi-trash"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
+
                         </div>
 
                         <div class="modal-footer bg-light p-3">
                             <button type="button" class="btn btn-light border px-4"
                                 data-bs-dismiss="modal">Batalkan</button>
-                            <button type="submit" class="btn btn-primary px-4 shadow-sm"><i
-                                    class="bi bi-send-fill me-2"></i>Kirim Berkas PO</button>
+                            <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                                <i class="bi bi-send-fill me-2"></i>Kirim Berkas PO
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </form>
 
-        <script id="bahan-row-template" type="text/html">
-            <tr class="bahan-row">
-                <td class="p-2">
-                    <select name="bahan_id[]" class="form-control select-bahan-searchable" required style="width:100%;">
-                        <option value="">🔍 Cari bahan...</option>
-                        @foreach($bahans as $bahan)
-                            <option value="{{ $bahan->id }}"
-                                    data-unit-id="{{ $bahan->purchase_unit_id ?? '' }}"
-                                    data-satuan="{{ $bahan->nama_purchase_unit ?? '' }}">
-                                {{ $bahan->nama_bahan }}
-                            </option>
-                        @endforeach
-                    </select>
-                </td>
-                <td class="p-2">
-                    <div class="input-group">
-                        <input type="number" name="jumlah[]" class="form-control shadow-none text-center fw-bold"
-                               required min="1" placeholder="0" step="0.01">
-                        <span class="input-group-text bg-light text-muted satuan-display"
-                              style="font-size:0.75rem; min-width:50px; justify-content: center;">—</span>
-                    </div>
-                    <input type="hidden" name="unit_id[]" class="unit-id-input" value="">
-                </td>
-                <td class="text-center p-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger removeRow rounded-pill p-1 d-inline-flex align-items-center justify-content-center" style="width:28px; height:28px;">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        </script>
 
         <section class="maincard">
             <div class="card-body p-0">
@@ -636,14 +759,6 @@
                                                 style="background-color: #0284c7; border-color:#0284c7; width:32px; height:32px;">
                                                 <i class="bi bi-eye"></i>
                                             </button>
-                                            @if($po->status == 'Partial Received')
-                                                <button type="button"
-                                                    class="btn btn-warning btn-sm btn-retur text-dark shadow-sm d-inline-flex align-items-center justify-content-center"
-                                                    data-id="{{ $po->id }}" data-nopo="{{ $po->no_po }}" title="Retur Barang"
-                                                    style="width:32px; height:32px;">
-                                                    <i class="bi bi-arrow-clockwise"></i>
-                                                </button>
-                                            @endif
                                             <button type="button"
                                                 class="btn btn-sm btn-danger shadow-sm d-inline-flex align-items-center justify-content-center"
                                                 onclick="confirmDelete('{{ $po->id }}')" title="Hapus Berkas"
@@ -1279,56 +1394,79 @@
                 });
             });
         });
-    </script>
 
-    <!-- <script>
-        $(document).ready(function () {
-            // 1. Saat tombol View diklik, simpan ID ke modal
-            $('.btn-view-po').click(function () {
-                let id = $(this).data('id');
-                let noPo = $(this).data('no-po');
-
-                // Simpan ID ke attribute modal agar bisa dipakai tombol di dalam modal
-                $('#detailModal').data('current-id', id);
-
-                // Isi konten modal
-                $('#modalContent').html('Detail untuk PO: ' + noPo);
+        function checkGlobalAlasanHeader() {
+            let hasKurang = false;
+            $('.qty-kurang').each(function () {
+                if (parseFloat($(this).val()) > 0) {
+                    hasKurang = true;
+                }
             });
 
-            // 2. Saat tombol Approved/Rejected diklik
-            $('.btn-update-status').click(function () {
-                let status = $(this).data('status');
-                let id = $('#detailModal').data('current-id'); // Ambil ID yang disimpan tadi
+            if (hasKurang) {
+                $('#th-alasan').show();
+            } else {
+                $('#th-alasan').hide();
+            }
+        }
 
-                $.ajax({
-                    url: "{{ route('update.status.po') }}",
-                    type: 'POST',
-                    data: {
-                        _token: "{{ csrf_token() }}",
-                        id: id,
-                        status: status
-                    },
-                    success: function (response) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Berhasil',
-                            text: 'Status diubah ke ' + status
-                        })
-                            .then(() => {
-                                location.reload();
-                            });
-                    },
-                    error: function (xhr) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Gagal',
-                            text: 'Terjadi kesalahan'
-                        });
-                    }
-                });
-            });
+        // 2. Kalkulasi Otomatis untuk Bahan Baku Umum (Qty Kurang & Total Dasar)
+        $(document).on('input', '.qty-umum', function () {
+            let $row = $(this).closest('tr');
+
+            // Ambil nilai PO, Terima, dan Konversi
+            let qtyPo = parseFloat($row.find('input[name*="[qty_po]"]').val()) || 0;
+            let qtyTerima = parseFloat($(this).val()) || 0;
+            let konv = parseFloat($row.find('.konv').val()) || 1;
+
+            // Hitung Qty Kurang (Selisih)
+            let qtyKurang = qtyPo - qtyTerima;
+            if (qtyKurang < 0) qtyKurang = 0; // Jika dikirim lebih dari PO, selisih kurang dianggap 0
+
+            $row.find('.qty-kurang').val(qtyKurang);
+
+            // Munculkan dropdown Alasan jika barang kurang
+            if (qtyKurang > 0) {
+                $row.find('.alasan-wrapper').show();
+                $row.find('.alasan-wrapper select').prop('required', true);
+            } else {
+                $row.find('.alasan-wrapper').hide();
+                $row.find('.alasan-wrapper select').val('').prop('required', false);
+            }
+
+            // Hitung Total Dasar (Qty Terima * Konversi)
+            let totalDasar = qtyTerima * konv;
+            $row.find('.total-display').val(totalDasar.toLocaleString('id-ID'));
+
+            // Cek apakah header tabel alasan perlu dimunculkan
+            checkGlobalAlasanHeader();
         });
-    </script> -->
+
+        // 3. Kalkulasi Otomatis Khusus Ayam (Besar + Kecil = Total Pcs & Gramase)
+        $(document).on('input', '.qty-besar, .qty-kecil', function () {
+            let $row = $(this).closest('tr');
+
+            let besar = parseFloat($row.find('.qty-besar').val()) || 0;
+            let kecil = parseFloat($row.find('.qty-kecil').val()) || 0;
+            let konv = parseFloat($row.find('.konv').val()) || 1;
+
+            // Hitung Total Pcs
+            let totalAyam = besar + kecil;
+            $row.find('.qty-ayam-total').val(totalAyam);
+
+            // Hitung Gramase
+            let gramase = totalAyam * konv;
+            $row.find('.total-display').val(gramase.toLocaleString('id-ID'));
+        });
+
+        // 4. Fungsi yang dipanggil oleh AJAX setelah tabel berhasil dimuat
+        // Menggunakan window. agar bisa dipanggil dari blok script manapun
+        window.calculateAll = function () {
+            // Pancing event 'input' agar semua baris otomatis menghitung nilai default-nya
+            $('.qty-umum').trigger('input');
+            $('.qty-besar').trigger('input');
+        }
+    </script>
 
     <script>
         function confirmDelete(id) {
@@ -1391,12 +1529,7 @@
     <script>
         $(document).ready(function () {
 
-            // ================================================================
-            // FUNGSI UTAMA: init Select2 dengan fitur search pada .select-bahan-searchable
-            // Harus dipanggil ulang tiap kali ada baris baru ditambahkan
-            // ================================================================
             function initBahanSelect2() {
-                // Destroy dulu yang sudah ada agar tidak double-bind
                 $('.select-bahan-searchable').each(function () {
                     if ($(this).data('select2')) {
                         $(this).select2('destroy');
@@ -1406,7 +1539,7 @@
                 $('.select-bahan-searchable').select2({
                     width: '100%',
                     dropdownParent: $('#modalRequestPO'),
-                    placeholder: '🔍 Cari bahan...',
+                    placeholder: '🔍 Cari / Pilih Bahan...',
                     allowClear: true,
                     language: {
                         noResults: function () { return 'Bahan tidak ditemukan'; },
@@ -1416,80 +1549,73 @@
                 });
             }
 
-            // Init saat halaman pertama kali dimuat
-            initBahanSelect2();
+            function addRow(tipe) {
+                let tbodyId = tipe === 'dc' ? '#produkBodyDC' : '#produkBodySupplier';
+                let $tbody = $(tbodyId);
 
-            // ================================================================
-            // TAMBAH BARIS BARU
-            // Strategi: JANGAN clone baris yang sudah ada pilihannya.
-            // Ambil HTML mentah dari template <script> agar selalu bersih.
-            // ================================================================
-            $('#addRow').on('click', function () {
-                // Ambil HTML template baris kosong dari <script id="bahan-row-template">
-                // sehingga tidak ada state Select2 atau nilai apapun yang ikut
-                var templateHtml = $('#bahan-row-template').html();
-                var $newRow = $(templateHtml);
+                let $firstRow = $tbody.find('tr').first();
 
-                $('#produkBody').append($newRow);
+                if ($firstRow.find('.select-bahan-searchable').data('select2')) {
+                    $firstRow.find('.select-bahan-searchable').select2('destroy');
+                }
 
-                // Init Select2 HANYA untuk baris yang baru ditambahkan
-                $newRow.find('.select-bahan-searchable').select2({
-                    width: '100%',
-                    dropdownParent: $('#modalRequestPO'),
-                    placeholder: '🔍 Cari bahan...',
-                    allowClear: true,
-                    language: {
-                        noResults: function () { return 'Bahan tidak ditemukan'; },
-                        searching: function () { return 'Mencari...'; }
-                    }
-                });
+                let $newRow = $firstRow.clone();
+
+                $newRow.find('select').val('');
+                $newRow.find('input[type="number"]').val('');
+                $newRow.find('.unit-id-input').val('');
+                $newRow.find('.satuan-display').text('—');
+
+                $tbody.append($newRow);
+                initBahanSelect2();
+            }
+
+            $('#modalRequestPO').on('shown.bs.modal', function () {
+                initBahanSelect2();
             });
 
-            // ================================================================
-            // UPDATE SATUAN & UNIT_ID saat bahan dipilih
-            // Pakai event delegation karena baris bisa bertambah dinamis
-            // ================================================================
+            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                initBahanSelect2();
+            });
+
+            $('#addRowDC').on('click', function () {
+                addRow('dc');
+            });
+
+            $('#addRowSupplier').on('click', function () {
+                addRow('supplier');
+            });
+
             $(document).on('select2:select', '.select-bahan-searchable', function (e) {
-                var $option = $(e.params.data.element);
-                var satuan = $option.data('satuan') || '—';
-                var unitId = $option.data('unit-id') || '';
-                var $row = $(this).closest('tr');
+                let $option = $(e.params.data.element);
+                let satuan = $option.data('satuan') || '—';
+                let unitId = $option.data('unit-id') || '';
+                let $row = $(this).closest('tr');
 
                 $row.find('.satuan-display').text(satuan);
                 $row.find('.unit-id-input').val(unitId);
             });
 
-            // Reset saat pilihan dikosongkan
             $(document).on('select2:unselect select2:clear', '.select-bahan-searchable', function () {
-                var $row = $(this).closest('tr');
+                let $row = $(this).closest('tr');
                 $row.find('.satuan-display').text('—');
                 $row.find('.unit-id-input').val('');
             });
 
-            // ================================================================
-            // HAPUS BARIS — minimal harus ada 1 baris
-            // ================================================================
             $(document).on('click', '.removeRow', function () {
-                if ($('#produkBody tr.bahan-row').length > 1) {
-                    // Destroy Select2 di baris ini dulu sebelum remove
-                    var $sel = $(this).closest('tr').find('.select-bahan-searchable');
+                let $row = $(this).closest('tr');
+                let $tbody = $row.closest('tbody');
+
+                if ($tbody.find('tr').length > 1) {
+                    let $sel = $row.find('.select-bahan-searchable');
                     if ($sel.data('select2')) { $sel.select2('destroy'); }
-                    $(this).closest('tr').remove();
+                    $row.remove();
                 } else {
-                    // Reset baris terakhir instead of remove
-                    var $row = $(this).closest('tr');
                     $row.find('.select-bahan-searchable').val(null).trigger('change');
                     $row.find('input[type="number"]').val('');
                     $row.find('.unit-id-input').val('');
                     $row.find('.satuan-display').text('—');
                 }
-            });
-
-            // ================================================================
-            // Re-init Select2 bahan setiap modal dibuka (agar dropdown posisinya benar)
-            // ================================================================
-            $('#modalRequestPO').on('shown.bs.modal', function () {
-                initBahanSelect2();
             });
 
         });
@@ -1519,13 +1645,11 @@
                         res.details.forEach((item, i) => {
                             html += `
                         <tr>
-                            <!-- KOLOM 1: BAHAN -->
                             <td>
                                 <span class="fw-bold text-uppercase">${item.nama_bahan}</span>
                                 <input type="hidden" name="returns[${i}][bahan_id]" value="${item.bahan_id}">
                             </td>
 
-                            <!-- KOLOM 2: JUMLAH RETUR -->
                             <td>
                                 <div class="input-group">
                                     <input type="number" 
@@ -1537,7 +1661,6 @@
                                 </div>
                             </td>
 
-                            <!-- KOLOM 3: ALASAN -->
                             <td>
                                 <input type="text" 
                                        name="returns[${i}][alasan]" 

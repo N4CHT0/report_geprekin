@@ -744,6 +744,725 @@
             }
         }
 
+
+
+        /* =========================================================
+           MOBILE APP-LIKE POLISH - SAVE BUTTONS + SHIFT CARDS
+           UI only. Tidak mengubah ID/name/route/endpoint/JavaScript.
+           Fokus HP: tombol simpan rapat, panel omset/setoran tidak mencar.
+        ========================================================= */
+        @media (max-width: 575.98px) {
+            .appbar {
+                position: sticky;
+                top: 8px;
+                z-index: 30;
+            }
+
+            .top-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 7px !important;
+                align-items: stretch;
+            }
+
+            /* Tombol simpan selalu tampil paling atas dan rapi 2 kolom */
+            #btnSaveS1,
+            #btnSaveS2 {
+                order: -20;
+                min-height: 46px !important;
+                font-size: .82rem !important;
+                font-weight: 900 !important;
+                border-radius: 14px !important;
+                box-shadow: 0 8px 18px rgba(15, 118, 110, .16);
+            }
+
+            #btnLoad,
+            #btnShowOmsetRules {
+                order: -10;
+            }
+
+            .top-actions a.btn,
+            .top-actions button.btn,
+            .top-actions form .btn {
+                min-width: 0 !important;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .top-actions form {
+                grid-column: auto !important;
+            }
+
+            .top-actions form .btn {
+                max-width: none !important;
+            }
+
+            /* Panel Shift 1/2 dibuat seperti kartu mobile yang rapat dan full-width */
+            .row.g-3 > [class*="col-"] {
+                width: 100%;
+                flex: 0 0 100%;
+            }
+
+            #shiftPanelS1Omset,
+            #shiftPanelS2Omset,
+            #shiftPanelS1Setoran,
+            #shiftPanelS2Setoran {
+                margin: 0;
+                border-radius: 16px;
+                border-color: #dbe3ef;
+                background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            }
+
+            #shiftPanelS1Omset .panel-soft-head,
+            #shiftPanelS2Omset .panel-soft-head,
+            #shiftPanelS1Setoran .panel-soft-head,
+            #shiftPanelS2Setoran .panel-soft-head {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                align-items: center;
+            }
+
+            #shiftPanelS1Omset .locked-note,
+            #shiftPanelS2Omset .locked-note,
+            #shiftPanelS1Setoran .locked-note,
+            #shiftPanelS2Setoran .locked-note {
+                grid-column: 1 / -1;
+                justify-self: start;
+                margin-top: 4px;
+            }
+
+            .cardx + .cardx {
+                margin-top: 12px !important;
+            }
+
+            .section-head {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                align-items: center;
+            }
+
+            .section-head .badge-wh {
+                justify-self: end;
+            }
+
+            .calc {
+                min-height: 42px;
+            }
+        }
+
+        @media (max-width: 390px) {
+            /* Di layar sangat kecil, save tetap 2 kolom; tombol lain boleh 1 kolom agar tidak pecah. */
+            .top-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .top-actions .btn:not(#btnSaveS1):not(#btnSaveS2),
+            .top-actions form {
+                grid-column: 1 / -1;
+            }
+
+            #btnSaveS1,
+            #btnSaveS2 {
+                grid-column: auto !important;
+                padding-left: 4px !important;
+                padding-right: 4px !important;
+                font-size: .78rem !important;
+            }
+        }
+
+
+        /* =========================================================
+           MOBILE SHIFT FLOW + STICKY ACTION BAR
+           UI only. Tidak mengubah ID/name/route/endpoint/autosave logic.
+           HP: Omset S1 -> Setoran S1 -> Omset S2 -> Setoran S2.
+        ========================================================= */
+        @media (max-width: 575.98px) {
+            body {
+                padding-bottom: 92px;
+            }
+
+            .appbar {
+                position: relative !important;
+                top: auto !important;
+                z-index: 1 !important;
+            }
+
+            .top-actions {
+                position: fixed !important;
+                left: 10px;
+                right: 10px;
+                bottom: calc(10px + env(safe-area-inset-bottom));
+                z-index: 1040;
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 7px !important;
+                padding: 8px;
+                border: 1px solid rgba(15, 23, 42, .10);
+                border-radius: 18px;
+                background: rgba(255, 255, 255, .96);
+                box-shadow: 0 16px 42px rgba(15, 23, 42, .18);
+                backdrop-filter: blur(12px);
+            }
+
+            .top-actions > a,
+            .top-actions > form,
+            .top-actions > #btnShowOmsetRules {
+                display: none !important;
+            }
+
+            #btnLoad,
+            #btnSaveS1,
+            #btnSaveS2 {
+                display: inline-flex !important;
+                width: 100% !important;
+                min-height: 44px !important;
+                align-items: center;
+                justify-content: center;
+                border-radius: 14px !important;
+                padding: 7px 5px !important;
+                line-height: 1.1 !important;
+                white-space: normal !important;
+                font-size: .75rem !important;
+            }
+
+            #btnLoad { order: 1 !important; }
+            #btnSaveS1 { order: 2 !important; }
+            #btnSaveS2 { order: 3 !important; }
+
+            .mobile-shift-title {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                margin: 4px 0 8px;
+                padding: 9px 11px;
+                border-radius: 14px;
+                border: 1px solid #dbe3ef;
+                background: #f8fafc;
+                color: #0f172a;
+                font-weight: 900;
+                font-size: .9rem;
+            }
+
+            .mobile-shift-title .badge-wh {
+                font-size: .72rem;
+                padding: 4px 8px;
+            }
+
+            .mobile-order-s1-omset { order: 10; }
+            .mobile-order-s1-setoran { order: 20; }
+            .mobile-order-s2-omset { order: 30; }
+            .mobile-order-s2-setoran { order: 40; }
+            .mobile-order-summary { order: 50; }
+            .mobile-order-extra { order: 60; }
+
+            #mobileShiftFlowRow > [class*="mobile-order-"] {
+                margin-bottom: 10px;
+            }
+
+            #mobileShiftFlowRow .panel-soft {
+                box-shadow: 0 8px 22px rgba(15, 23, 42, .055);
+            }
+
+            .mobile-empty-setoran-shell {
+                display: none !important;
+            }
+        }
+
+        @media (min-width: 576px) {
+            .mobile-shift-title {
+                display: none !important;
+            }
+        }
+
+
+
+
+        /* =========================================================
+           MOBILE NATIVE ACTION BAR FINAL FIX
+           UI only. Tidak mengubah ID/name/route/endpoint/autosave logic.
+           - Semua tombol tetap muncul di HP, tidak ada yang disembunyikan.
+           - Load + Simpan tetap sticky di bawah.
+           - Tombol sekunder tampil sebagai shortcut kecil agar tidak hilang.
+        ========================================================= */
+        @media (max-width: 575.98px) {
+            body {
+                padding-bottom: calc(178px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .top-actions {
+                position: fixed !important;
+                left: 8px !important;
+                right: 8px !important;
+                bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+                z-index: 1050 !important;
+                display: grid !important;
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                gap: 7px !important;
+                padding: 9px !important;
+                border-radius: 20px !important;
+                border: 1px solid rgba(148, 163, 184, .30) !important;
+                background: rgba(15, 23, 42, .92) !important;
+                box-shadow: 0 18px 48px rgba(0, 0, 0, .28) !important;
+                backdrop-filter: blur(14px) !important;
+            }
+
+            .top-actions > a,
+            .top-actions > button,
+            .top-actions > form {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                min-width: 0 !important;
+            }
+
+            .top-actions > form {
+                grid-column: auto !important;
+            }
+
+            .top-actions .btn,
+            .top-actions form .btn {
+                width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                margin: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 5px !important;
+                overflow: hidden !important;
+                text-align: center !important;
+                white-space: normal !important;
+                line-height: 1.08 !important;
+                border-radius: 15px !important;
+                box-shadow: none !important;
+            }
+
+            #btnLoad {
+                grid-column: 1 / -1 !important;
+                order: 1 !important;
+                min-height: 48px !important;
+                font-size: .88rem !important;
+                font-weight: 900 !important;
+            }
+
+            #btnSaveS1 {
+                grid-column: 1 / 3 !important;
+                order: 2 !important;
+                min-height: 50px !important;
+                font-size: .84rem !important;
+                font-weight: 900 !important;
+            }
+
+            #btnSaveS2 {
+                grid-column: 3 / 5 !important;
+                order: 3 !important;
+                min-height: 50px !important;
+                font-size: .84rem !important;
+                font-weight: 900 !important;
+            }
+
+            .top-actions a[href*="dashboard"] { order: 4 !important; }
+            .top-actions a[href*="dscFormulir"] { order: 5 !important; }
+            #btnShowOmsetRules { order: 6 !important; }
+            .top-actions a[href*="guidebook"] { order: 7 !important; }
+            .top-actions form { order: 8 !important; }
+
+            .top-actions a.btn,
+            #btnShowOmsetRules,
+            .top-actions form .btn {
+                min-height: 36px !important;
+                padding: 6px 4px !important;
+                font-size: .64rem !important;
+                font-weight: 850 !important;
+            }
+
+            .top-actions a.btn i,
+            #btnShowOmsetRules i,
+            .top-actions form .btn i {
+                margin-right: 0 !important;
+                font-size: .9rem !important;
+            }
+
+            .top-actions a.btn,
+            #btnShowOmsetRules,
+            .top-actions form .btn {
+                flex-direction: column !important;
+            }
+
+            .top-actions .btn-danger {
+                background: #dc2626 !important;
+                border-color: #dc2626 !important;
+                color: #fff !important;
+            }
+
+            .cardx,
+            .appbar {
+                overflow: visible !important;
+            }
+
+            .section-head {
+                position: sticky;
+                top: 0;
+                z-index: 3;
+            }
+
+            #mobileShiftFlowRow {
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            .mobile-order-s1-omset { order: 10 !important; }
+            .mobile-order-s1-setoran { order: 20 !important; }
+            .mobile-order-s2-omset { order: 30 !important; }
+            .mobile-order-s2-setoran { order: 40 !important; }
+            .mobile-order-summary { order: 50 !important; }
+            .mobile-order-extra { order: 60 !important; }
+        }
+
+        @media (max-width: 390px) {
+            .top-actions {
+                left: 6px !important;
+                right: 6px !important;
+                gap: 6px !important;
+                padding: 8px !important;
+            }
+
+            #btnLoad {
+                min-height: 46px !important;
+            }
+
+            #btnSaveS1,
+            #btnSaveS2 {
+                min-height: 48px !important;
+                font-size: .78rem !important;
+            }
+
+            .top-actions a.btn,
+            #btnShowOmsetRules,
+            .top-actions form .btn {
+                font-size: .58rem !important;
+                min-height: 34px !important;
+            }
+        }
+
+
+
+        /* =========================================================
+           MOBILE REFINED ACTION BAR + COMPACT FORM
+           UI only. Logika JS, ID, name, route, endpoint tidak diubah.
+           - Hanya Load + Simpan S1/S2 yang sticky di bawah.
+           - Tombol lain kembali di top bar seperti semula, rapi di HP.
+           - Form dipadatkan agar terasa seperti mobile, tidak jumbo.
+        ========================================================= */
+        @media (max-width: 575.98px) {
+            body {
+                padding-bottom: calc(126px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .shell {
+                padding: 8px 8px calc(126px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .wrap {
+                padding-left: 6px !important;
+                padding-right: 6px !important;
+            }
+
+            .appbar {
+                padding: 11px !important;
+                border-radius: 15px !important;
+                position: relative !important;
+                top: auto !important;
+                z-index: 1 !important;
+                overflow: hidden !important;
+            }
+
+            .appbar-top {
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+            }
+
+            .title-wrap {
+                align-items: center !important;
+                gap: 9px !important;
+            }
+
+            .appbar h1 {
+                font-size: .98rem !important;
+                line-height: 1.18 !important;
+            }
+
+            .sub {
+                font-size: .74rem !important;
+                line-height: 1.35 !important;
+            }
+
+            /* Top bar tombol sekunder tetap di atas, bukan sticky bawah */
+            .top-actions {
+                position: static !important;
+                left: auto !important;
+                right: auto !important;
+                bottom: auto !important;
+                z-index: auto !important;
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 7px !important;
+                padding: 0 !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+            }
+
+            .top-actions > a,
+            .top-actions > button,
+            .top-actions > form {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                min-width: 0 !important;
+                grid-column: auto !important;
+            }
+
+            .top-actions .btn,
+            .top-actions form .btn {
+                width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                min-height: 38px !important;
+                padding: 7px 8px !important;
+                border-radius: 12px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 5px !important;
+                font-size: .74rem !important;
+                font-weight: 800 !important;
+                line-height: 1.12 !important;
+                white-space: normal !important;
+                text-align: center !important;
+                box-shadow: none !important;
+                flex-direction: row !important;
+            }
+
+            .top-actions a[href*="dashboard"] { order: 1 !important; }
+            .top-actions a[href*="dscFormulir"] { order: 2 !important; }
+            #btnShowOmsetRules { order: 3 !important; }
+            .top-actions a[href*="guidebook"] { order: 4 !important; }
+            .top-actions form { order: 5 !important; grid-column: 1 / -1 !important; }
+            .top-actions form .btn { max-width: 190px !important; margin-inline: auto !important; }
+
+            /* Hanya 3 tombol utama ini yang sticky di bawah */
+            #btnLoad,
+            #btnSaveS1,
+            #btnSaveS2 {
+                position: fixed !important;
+                z-index: 1060 !important;
+                margin: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 7px !important;
+                border-radius: 15px !important;
+                font-weight: 900 !important;
+                box-shadow: 0 12px 28px rgba(0, 0, 0, .18) !important;
+                white-space: normal !important;
+                line-height: 1.08 !important;
+            }
+
+            #btnLoad {
+                left: 12px !important;
+                right: 12px !important;
+                bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+                width: auto !important;
+                min-height: 48px !important;
+                font-size: .86rem !important;
+                order: 98 !important;
+            }
+
+            #btnSaveS1 {
+                left: 12px !important;
+                right: calc(50% + 5px) !important;
+                bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                width: auto !important;
+                min-height: 48px !important;
+                font-size: .82rem !important;
+                order: 99 !important;
+            }
+
+            #btnSaveS2 {
+                left: calc(50% + 5px) !important;
+                right: 12px !important;
+                bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                width: auto !important;
+                min-height: 48px !important;
+                font-size: .82rem !important;
+                order: 100 !important;
+            }
+
+            .cardx {
+                border-radius: 15px !important;
+                margin-top: 10px !important;
+                overflow: hidden !important;
+            }
+
+            .section-head {
+                position: static !important;
+                top: auto !important;
+                z-index: auto !important;
+                padding: 11px 12px !important;
+                display: grid !important;
+                grid-template-columns: 1fr auto !important;
+                gap: 8px !important;
+                align-items: center !important;
+            }
+
+            .section-head .title {
+                font-size: .94rem !important;
+                line-height: 1.2 !important;
+            }
+
+            .badge-wh,
+            .locked-note {
+                padding: 4px 8px !important;
+                font-size: .70rem !important;
+                gap: 5px !important;
+            }
+
+            .card-body-pad {
+                padding: 11px !important;
+            }
+
+            .panel-soft {
+                padding: 11px !important;
+                border-radius: 14px !important;
+                box-shadow: 0 6px 16px rgba(17, 24, 39, .04) !important;
+            }
+
+            .panel-soft-head {
+                margin-bottom: 9px !important;
+                padding-bottom: 7px !important;
+                gap: 7px !important;
+            }
+
+            .panel-soft-title {
+                font-size: .92rem !important;
+            }
+
+            .form-label {
+                font-size: .73rem !important;
+                margin-bottom: .24rem !important;
+                line-height: 1.25 !important;
+            }
+
+            .form-control,
+            .form-select,
+            .select2-container .select2-selection--single {
+                height: 40px !important;
+                min-height: 40px !important;
+                border-radius: 12px !important;
+                font-size: .88rem !important;
+                padding: 7px 10px !important;
+            }
+
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                line-height: 38px !important;
+                font-size: .88rem !important;
+            }
+
+            input[type="date"].form-control {
+                min-height: 40px !important;
+                height: 40px !important;
+            }
+
+            .mt-2 {
+                margin-top: .45rem !important;
+            }
+
+            .calc {
+                min-height: 38px !important;
+                padding: 8px 10px !important;
+                border-radius: 12px !important;
+            }
+
+            .calc span {
+                font-size: .73rem !important;
+            }
+
+            .calc b {
+                font-size: .88rem !important;
+            }
+
+            .summary-grid {
+                gap: 9px !important;
+            }
+
+            .summary-box {
+                padding: 10px !important;
+                border-radius: 13px !important;
+            }
+
+            .summary-box .label {
+                font-size: .72rem !important;
+            }
+
+            .summary-box .value {
+                font-size: .9rem !important;
+            }
+
+            .minihelp {
+                font-size: .73rem !important;
+                line-height: 1.45 !important;
+            }
+
+            .mobile-shift-title {
+                margin: 3px 0 7px !important;
+                padding: 8px 10px !important;
+                border-radius: 13px !important;
+                font-size: .86rem !important;
+            }
+
+            #mobileShiftFlowRow > [class*="mobile-order-"] {
+                margin-bottom: 9px !important;
+            }
+        }
+
+        @media (max-width: 390px) {
+            .top-actions .btn,
+            .top-actions form .btn {
+                min-height: 36px !important;
+                font-size: .69rem !important;
+                padding-left: 6px !important;
+                padding-right: 6px !important;
+            }
+
+            #btnLoad {
+                left: 10px !important;
+                right: 10px !important;
+                min-height: 46px !important;
+                font-size: .82rem !important;
+            }
+
+            #btnSaveS1,
+            #btnSaveS2 {
+                min-height: 46px !important;
+                font-size: .78rem !important;
+            }
+
+            #btnSaveS1 {
+                left: 10px !important;
+                right: calc(50% + 4px) !important;
+            }
+
+            #btnSaveS2 {
+                left: calc(50% + 4px) !important;
+                right: 10px !important;
+            }
+        }
+
+
         /* Hilangkan tombol up/down di Chrome, Safari, Edge */
         input[type=number]::-webkit-outer-spin-button,
         input[type=number]::-webkit-inner-spin-button {
@@ -865,6 +1584,169 @@
                 padding-right: 14px;
             }
         }
+
+        /* =========================================================
+           MOBILE SIMPLE READABLE FLOW - Anak SMP bisa baca
+           UI only: tidak mengubah ID, name, route, endpoint, atau logic JS save/autosave.
+        ========================================================= */
+        .step-pill {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-soft);
+            color: var(--primary);
+            border: 1px solid rgba(32, 107, 196, .18);
+            font-size: .78rem;
+            font-weight: 900;
+            margin-right: 6px;
+        }
+
+        @media (max-width: 575.98px) {
+            .appbar h1 {
+                font-size: 1.02rem !important;
+                letter-spacing: 0 !important;
+            }
+
+            .sub {
+                font-size: .78rem !important;
+                max-width: 30ch;
+            }
+
+            .top-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .top-actions .btn:not(#btnLoad):not(#btnSaveS1):not(#btnSaveS2) {
+                min-height: 38px !important;
+                border-radius: 13px !important;
+                font-size: .76rem !important;
+                padding: 7px 8px !important;
+            }
+
+            #btnSaveS1,
+            #btnSaveS2 {
+                font-size: .86rem !important;
+                min-height: 50px !important;
+            }
+
+            #btnSaveS1 .bi,
+            #btnSaveS2 .bi,
+            #btnLoad .bi {
+                font-size: 1.02rem !important;
+            }
+
+            .section-head .title {
+                font-size: 1rem !important;
+                font-weight: 900 !important;
+            }
+
+            .panel-soft {
+                padding: 12px !important;
+                border-radius: 16px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .panel-soft-head {
+                display: grid !important;
+                grid-template-columns: 1fr auto !important;
+                align-items: center !important;
+                border-bottom: 1px solid var(--border) !important;
+                padding-bottom: 9px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .panel-soft-title {
+                display: flex !important;
+                align-items: center !important;
+                font-size: 1rem !important;
+                line-height: 1.2 !important;
+                font-weight: 900 !important;
+                color: #f8fafc !important;
+            }
+
+            .step-pill {
+                width: 26px !important;
+                height: 26px !important;
+                font-size: .82rem !important;
+                margin-right: 7px !important;
+            }
+
+            .form-label {
+                font-size: .82rem !important;
+                font-weight: 900 !important;
+                color: #cbd5e1 !important;
+                margin-top: 2px !important;
+                margin-bottom: 5px !important;
+            }
+
+            .form-control,
+            .form-select,
+            .select2-container .select2-selection--single {
+                height: 44px !important;
+                min-height: 44px !important;
+                font-size: .98rem !important;
+                border-radius: 14px !important;
+                padding: 9px 12px !important;
+            }
+
+            input[type="date"].form-control {
+                height: 44px !important;
+                min-height: 44px !important;
+            }
+
+            .calc {
+                min-height: 44px !important;
+                padding: 9px 12px !important;
+                border-radius: 14px !important;
+            }
+
+            .calc span {
+                font-size: .82rem !important;
+                font-weight: 900 !important;
+            }
+
+            .calc b {
+                font-size: .98rem !important;
+                font-weight: 900 !important;
+            }
+
+            .mobile-shift-title {
+                margin: 10px 0 4px !important;
+                padding: 10px 12px !important;
+                border-radius: 16px !important;
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                background: rgba(32, 107, 196, .12) !important;
+                border: 1px solid rgba(32, 107, 196, .22) !important;
+                font-weight: 900 !important;
+                color: #e5edff !important;
+            }
+
+            .mobile-title-s2 {
+                background: rgba(15, 118, 110, .13) !important;
+                border-color: rgba(15, 118, 110, .26) !important;
+            }
+
+            .photo-wrap {
+                border-radius: 15px !important;
+                padding: 10px !important;
+            }
+
+            .cam-actions {
+                grid-template-columns: 1fr 1fr !important;
+            }
+
+            .cam-actions .btn {
+                min-height: 40px !important;
+                font-size: .8rem !important;
+                border-radius: 13px !important;
+            }
+        }
+
     </style>
 </head>
 
@@ -902,11 +1784,11 @@
                     </button>
 
                     <button class="btn btn-accent" id="btnSaveS1" type="button" onclick="saveOmsetShift(1)">
-                        <i class="bi bi-save me-1"></i>Simpan Shift 1
+                        <i class="bi bi-save me-1"></i>Simpan S1
                     </button>
 
                     <button class="btn btn-accent" id="btnSaveS2" type="button" onclick="saveOmsetShift(2)">
-                        <i class="bi bi-save me-1"></i>Simpan Shift 2
+                        <i class="bi bi-save me-1"></i>Simpan S2
                     </button>
 
                     <a href="{{ route('master.dscFormulirOmset.guidebook') }}"
@@ -968,23 +1850,23 @@
         {{-- OMSET --}}
         <div class="cardx mt-3">
             <div class="section-head">
-                <div class="title">Form Omset</div>
-                <span class="badge-wh"><i class="bi bi-receipt"></i> Shift 1 & 2</span>
+                <div class="title">Isi Omset</div>
+                <span class="badge-wh"><i class="bi bi-receipt"></i> Omset harian</span>
             </div>
 
             <div class="card-body-pad">
                 <div class="row g-3">
 
                     {{-- SHIFT 1 --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-6 mobile-order-s1-omset">
                         <div class="panel-soft" id="shiftPanelS1Omset">
                             <div class="panel-soft-head">
-                                <div class="panel-soft-title">Shift 1</div>
+                                <div class="panel-soft-title"><span class="step-pill">1</span> Shift 1 - Omset</div>
                                 <span class="locked-note d-none" id="lockedNoteS1Omset">Terkunci</span>
-                                <span class="badge-wh">S1</span>
+                                <span class="badge-wh">Langkah 1/4</span>
                             </div>
 
-                            <label class="form-label">Total Transaction</label>
+                            <label class="form-label">Total Transaksi</label>
                             <input type="number" class="form-control mono om" id="tt_s1" step="1" value="0" min="0" oninput="scheduleAutoSaveShift(1)" onchange="scheduleAutoSaveShift(1)">
 
                             <div class="mt-2">
@@ -1003,7 +1885,7 @@
                             </div>
 
                             <div class="mt-2 calc">
-                                <span>TOTAL</span>
+                                <span>Total Omset</span>
                                 <b id="total_s1">0</b>
                             </div>
 
@@ -1013,22 +1895,22 @@
                             </div>
 
                             <div class="mt-2 calc">
-                                <span>Cash Difference</span>
+                                <span>Selisih Kas</span>
                                 <b id="cashdiff_s1">0</b>
                             </div>
                         </div>
                     </div>
 
                     {{-- SHIFT 2 --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-6 mobile-order-s2-omset">
                         <div class="panel-soft" id="shiftPanelS2Omset">
                             <div class="panel-soft-head">
-                                <div class="panel-soft-title">Shift 2</div>
+                                <div class="panel-soft-title"><span class="step-pill">3</span> Shift 2 - Omset</div>
                                 <span class="locked-note d-none" id="lockedNoteS2Omset">Terkunci</span>
-                                <span class="badge-wh">S2</span>
+                                <span class="badge-wh">Langkah 3/4</span>
                             </div>
 
-                            <label class="form-label">Total Transaction</label>
+                            <label class="form-label">Total Transaksi</label>
                             <input type="number" class="form-control mono om" id="tt_s2" step="1" value="0" min="0" oninput="scheduleAutoSaveShift(2)" onchange="scheduleAutoSaveShift(2)">
 
                             <div class="mt-2">
@@ -1047,7 +1929,7 @@
                             </div>
 
                             <div class="mt-2 calc">
-                                <span>TOTAL</span>
+                                <span>Total Omset</span>
                                 <b id="total_s2">0</b>
                             </div>
 
@@ -1057,14 +1939,14 @@
                             </div>
 
                             <div class="mt-2 calc">
-                                <span>Cash Difference</span>
+                                <span>Selisih Kas</span>
                                 <b id="cashdiff_s2">0</b>
                             </div>
                         </div>
                     </div>
 
-                    {{-- TOTAL HARIAN --}}
-                    <div class="col-12">
+                    {{-- Total Omset HARIAN --}}
+                    <div class="col-12 mobile-order-summary">
                         <div class="panel-soft">
                             <div class="panel-soft-head">
                                 <div class="panel-soft-title">Ringkasan Harian</div>
@@ -1089,7 +1971,7 @@
                             </div>
 
                             <div class="minihelp mt-2">
-                                Rumus: <span class="mono">TOTAL = TT - Diskon - NonTunai - Expense</span>
+                                Rumus: <span class="mono">Total Omset = TT - Diskon - NonTunai - Expense</span>
                             </div>
                         </div>
                     </div>
@@ -1101,20 +1983,20 @@
         {{-- SETORAN SALES --}}
         <div class="cardx mt-3 mb-4">
             <div class="section-head">
-                <div class="title">Form Setoran Sales</div>
-                <span class="badge-wh"><i class="bi bi-cash-coin"></i> Auto hitung</span>
+                <div class="title">Isi Setoran</div>
+                <span class="badge-wh"><i class="bi bi-cash-coin"></i> Setoran sales</span>
             </div>
 
             <div class="card-body-pad">
                 <div class="row g-3">
 
                     {{-- SHIFT 1 SETORAN --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-6 mobile-order-s1-setoran">
                         <div class="panel-soft" id="shiftPanelS1Setoran">
                             <div class="panel-soft-head">
-                                <div class="panel-soft-title">Shift 1</div>
+                                <div class="panel-soft-title"><span class="step-pill">2</span> Shift 1 - Setoran</div>
                                 <span class="locked-note d-none" id="lockedNoteS1Setoran">Terkunci</span>
-                                <span class="badge-wh">Setoran S1</span>
+                                <span class="badge-wh">Langkah 2/4</span>
                             </div>
 
                             <div class="calc mb-2">
@@ -1141,7 +2023,7 @@
                             </div>
 
                             <div class="mt-2">
-                                <label class="form-label">Admin (Pot. Sales)</label>
+                                <label class="form-label">Admin / Potongan Sales</label>
                                 <input type="number" class="form-control mono set" id="admin_s1" step="1" value="0" oninput="scheduleAutoSaveShift(1)" onchange="scheduleAutoSaveShift(1)">
                             </div>
 
@@ -1162,15 +2044,14 @@
 
                             <div class="divider"></div>
 
-                            <div class="fw-bold mb-2"><i class="bi bi-camera me-1"></i>Bukti Foto Setoran (S1)</div>
+                            <div class="fw-bold mb-2"><i class="bi bi-camera me-1"></i>Foto Bukti Setoran S1</div>
 
                             <div class="photo-wrap">
                                 <div class="cam-actions">
                                     <input type="file" id="bukti_foto_s1_fallback" class="d-none" accept="image/*" required>
-                                    <input type="file" id="bukti_foto_s2_fallback" class="d-none" accept="image/*" required>
 
                                     <button type="button" class="btn btn-outline-primary" id="btnCamS1">
-                                        <i class="bi bi-camera me-1"></i>Ambil Foto Realtime
+                                        <i class="bi bi-camera me-1"></i>Ambil Foto
                                     </button>
 
                                     <button type="button" class="btn btn-outline-warning" id="btnUploadS1">
@@ -1193,18 +2074,18 @@
                                     </a>
                                 </div>
 
-                                <div id="buktiS1Empty" class="minihelp mt-2 photo-empty">anda belum upload foto</div>
+                                <div id="buktiS1Empty" class="minihelp mt-2 photo-empty">Belum ada foto</div>
                             </div>
                         </div>
                     </div>
 
                     {{-- SHIFT 2 SETORAN --}}
-                    <div class="col-lg-6">
+                    <div class="col-lg-6 mobile-order-s2-setoran">
                         <div class="panel-soft" id="shiftPanelS2Setoran">
                             <div class="panel-soft-head">
-                                <div class="panel-soft-title">Shift 2</div>
+                                <div class="panel-soft-title"><span class="step-pill">4</span> Shift 2 - Setoran</div>
                                 <span class="locked-note d-none" id="lockedNoteS2Setoran">Terkunci</span>
-                                <span class="badge-wh">Setoran S2</span>
+                                <span class="badge-wh">Langkah 4/4</span>
                             </div>
 
                             <div class="calc mb-2">
@@ -1231,7 +2112,7 @@
                             </div>
 
                             <div class="mt-2">
-                                <label class="form-label">Admin (Pot. Sales)</label>
+                                <label class="form-label">Admin / Potongan Sales</label>
                                 <input type="number" class="form-control mono set" id="admin_s2" step="1" value="0" oninput="scheduleAutoSaveShift(2)" onchange="scheduleAutoSaveShift(2)">
                             </div>
 
@@ -1252,14 +2133,14 @@
 
                             <div class="divider"></div>
 
-                            <div class="fw-bold mb-2"><i class="bi bi-camera me-1"></i>Bukti Foto Setoran (S2)</div>
+                            <div class="fw-bold mb-2"><i class="bi bi-camera me-1"></i>Foto Bukti Setoran S2</div>
 
                             <div class="photo-wrap">
                                 <div class="cam-actions">
                                     <input type="file" id="bukti_foto_s2_fallback" class="d-none" accept="image/*" capture="environment" required>
 
                                     <button type="button" class="btn btn-outline-primary" id="btnCamS2">
-                                        <i class="bi bi-camera me-1"></i>Ambil Foto Realtime
+                                        <i class="bi bi-camera me-1"></i>Ambil Foto
                                     </button>
 
                                     <button type="button" class="btn btn-outline-warning" id="btnUploadS2">
@@ -1282,7 +2163,7 @@
                                     </a>
                                 </div>
 
-                                <div id="buktiS2Empty" class="minihelp mt-2 photo-empty">anda belum upload foto</div>
+                                <div id="buktiS2Empty" class="minihelp mt-2 photo-empty">Belum ada foto</div>
                             </div>
                         </div>
                     </div>
@@ -1330,7 +2211,7 @@
                     </div>
 
                     {{-- EXTRA --}}
-                    <div class="col-12">
+                    <div class="col-12 mobile-order-extra">
                         <div class="panel-soft">
                             <div class="panel-soft-head">
                                 <div class="panel-soft-title">Catatan Tambahan</div>
@@ -1343,7 +2224,7 @@
                                     <input type="number" class="form-control mono set" id="akumulasi_selisih" step="1" value="0" oninput="scheduleAutoSaveShift(1); scheduleAutoSaveShift(2)" onchange="scheduleAutoSaveShift(1); scheduleAutoSaveShift(2)">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Kekurangan Setoran Bulan Lalu</label>
+                                    <label class="form-label">Kurang Setoran Bulan Lalu</label>
                                     <input type="number" class="form-control mono set" id="kekurangan_bulan_lalu" step="1" value="0" oninput="scheduleAutoSaveShift(1); scheduleAutoSaveShift(2)" onchange="scheduleAutoSaveShift(1); scheduleAutoSaveShift(2)">
                                 </div>
                             </div>
@@ -1402,7 +2283,7 @@
                             </div>
                             <ul class="omset-update-list">
                                 <li><b>Total</b> dihitung otomatis dari: Total Transaction - Diskon - Non Tunai - Expense.</li>
-                                <li><b>Cash Difference</b> adalah selisih antara uang fisik dan total omset tunai.</li>
+                                <li><b>Selisih Kas</b> adalah selisih antara uang fisik dan total omset tunai.</li>
                                 <li>Foto bukti setoran wajib jelas. Foto realtime lebih disarankan; upload dari galeri tetap boleh tetapi bisa masuk review finance.</li>
                             </ul>
                         </div>
@@ -1460,9 +2341,57 @@
 
 
     <script>
-        const BASE_URL = `{{ url('') }}`;
         const URL_LOAD = `{{ route('master.dscOmset.load') }}`;
-        const URL_SAVE = BASE_URL + `/master/dsc/omset/save`;
+        const URL_SAVE = `{{ route('master.dscOmset.save') }}`;
+        console.log('DSC Omset URL_SAVE:', URL_SAVE);
+
+        // ========= SAVE GUARD =========
+        // Mencegah klik Simpan berulang dan memberi pesan jelas saat CSRF token/session kadaluarsa.
+        let manualSaveRunning = false;
+
+        function setSavingUi(isSaving, message = 'Sistem sedang proses penyimpanan, harap tunggu...') {
+            manualSaveRunning = !!isSaving;
+            $('#btnLoad, #btnSaveS1, #btnSaveS2, #btnCamS1, #btnCamS2, #btnUploadS1, #btnUploadS2, #btnClearPhotoS1, #btnClearPhotoS2').prop('disabled', !!isSaving);
+            if (isSaving) setStatus(message, 'loading');
+            else refreshButtons();
+        }
+
+        window.addEventListener('beforeunload', function (e) {
+            // FINAL FIX: jangan tampilkan warning browser karena autosave background.
+            // Warning cukup saat user klik Simpan manual dan request masih berjalan.
+            if (manualSaveRunning) {
+                e.preventDefault();
+                e.returnValue = 'Data masih dalam proses penyimpanan. Tunggu sampai proses selesai.';
+            }
+        });
+
+        function pickSaveErrorMessage(res, json, raw) {
+            if (res && res.status === 419) {
+                return 'Token keamanan halaman sudah kadaluarsa / session berubah. Sistem belum bisa menyimpan. Jangan klik berulang; refresh halaman, load data terakhir, lalu lanjutkan.';
+            }
+            if (res && res.status === 0) {
+                return 'Koneksi terputus. Harap tunggu sampai internet stabil, lalu coba simpan lagi.';
+            }
+            if (json) return json.message || json.error || `HTTP ${res.status}`;
+            if (raw) return `Non-JSON response (HTTP ${res.status}): ${raw.slice(0, 400)}`;
+            return `HTTP ${res?.status || 'unknown'}`;
+        }
+
+        function handleSaveError(title, res, json, raw, err) {
+            const msg = err?.message || pickSaveErrorMessage(res, json, raw);
+            if (res && res.status === 419) {
+                return Swal.fire({
+                    icon: 'warning',
+                    title: 'Token Kadaluarsa',
+                    html: 'Simpan gagal karena token halaman sudah tidak valid.<br><b>Harap tunggu, jangan klik berulang.</b><br>Refresh halaman, klik Load, lalu cek apakah data terakhir sudah masuk.',
+                    confirmButtonText: 'Refresh Sekarang',
+                    confirmButtonColor: '#0f172a',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(() => window.location.reload());
+            }
+            return swError(title, msg);
+        }
 
         const photoState = {
             s1: { file: null, serverUrl: null, serverPath: null, source: null, reviewStatus: null, reviewReason: null },
@@ -1883,7 +2812,11 @@
                 return false;
             } finally {
                 isApplyingLoad = false;
-                refreshButtons();
+                if (!silentNoData) {
+                    setSavingUi(false);
+                } else {
+                    refreshButtons();
+                }
             }
         }
 
@@ -1915,6 +2848,10 @@
 
         async function saveOmsetShift(shiftNumber, options = {}) {
             const silent = !!options.silent;
+
+            if (!silent && manualSaveRunning) {
+                return swWarn('Harap tunggu', 'Sistem masih proses penyimpanan. Jangan klik Simpan berulang.');
+            }
             const reloadAfterSave = options.reloadAfterSave !== false;
             const deletePhoto = options.deletePhoto === true;
 
@@ -1975,7 +2912,8 @@
                 setStatus(silent ? `Auto saving S${shiftNumber}...` : `Menyimpan Shift ${shiftNumber}...`, 'info');
 
                 if (!silent) {
-                    swLoading(`Menyimpan Shift ${shiftNumber}...`);
+                    setSavingUi(true, `Menyimpan Shift ${shiftNumber}. Harap tunggu, sistem sedang proses penyimpanan...`);
+                    swLoading(`Menyimpan Shift ${shiftNumber}. Harap tunggu...`);
                 }
 
                 const res = await fetch(URL_SAVE, {
@@ -1985,19 +2923,27 @@
                 });
 
                 const ct = (res.headers.get('content-type') || '').toLowerCase();
+                let raw = '';
 
                 const json = ct.includes('application/json')
                     ? await res.json()
-                    : {
-                        ok: false,
-                        message: await res.text()
-                    };
+                    : await (async () => {
+                        raw = await res.text().catch(() => '');
+                        return {
+                            ok: false,
+                            message: pickSaveErrorMessage(res, null, raw)
+                        };
+                    })();
 
                 if (!res.ok || !json.ok) {
                     if (res.status === 409) {
                         setShiftLocked(key, false);
                     }
-                    throw new Error(json.message || 'Simpan gagal');
+                    const err = new Error(pickSaveErrorMessage(res, json, raw));
+                    err.res = res;
+                    err.json = json;
+                    err.raw = raw;
+                    throw err;
                 }
 
                 const out = json.data || {};
@@ -2056,10 +3002,11 @@
                 }
 
                 console.error(e);
-                setStatus(silent ? `Auto save S${shiftNumber} gagal` : 'Simpan gagal', 'bad');
+                const saveErrMsg = e?.message || 'Error tidak diketahui';
+                setStatus(silent ? `Auto save S${shiftNumber} gagal: ${saveErrMsg}` : 'Simpan gagal', 'bad');
 
                 if (!silent) {
-                    await swError(`Gagal Simpan Shift ${shiftNumber}`, e.message);
+                    await handleSaveError(`Gagal Simpan Shift ${shiftNumber}`, e.res || null, e.json || null, e.raw || null, e);
                 }
 
             } finally {
@@ -2070,7 +3017,11 @@
                     scheduleAutoSaveShift(shiftNumber);
                 }
 
-                refreshButtons();
+                if (!silent) {
+                    setSavingUi(false);
+                } else {
+                    refreshButtons();
+                }
             }
         }
 
@@ -2079,11 +3030,92 @@
         window.saveOmsetShift = saveOmsetShift;
         window.loadOmset = loadOmset;
 
+
+        function setupMobileShiftFlow() {
+            const mq = window.matchMedia('(max-width: 575.98px)');
+            const omsetRow = $('#shiftPanelS1Omset').closest('.row');
+            const setoranCard = $('#shiftPanelS1Setoran').closest('.cardx');
+            const setoranRow = $('#shiftPanelS1Setoran').closest('.row');
+
+            const nodes = {
+                s1Omset: $('.mobile-order-s1-omset'),
+                s2Omset: $('.mobile-order-s2-omset'),
+                summary: $('.mobile-order-summary'),
+                s1Setoran: $('.mobile-order-s1-setoran'),
+                s2Setoran: $('.mobile-order-s2-setoran'),
+                extra: $('.mobile-order-extra')
+            };
+
+            if (!omsetRow.length || !setoranRow.length || !nodes.s1Setoran.length || !nodes.s2Setoran.length) {
+                return;
+            }
+
+            omsetRow.attr('id', 'mobileShiftFlowRow');
+
+            const placeholders = {
+                s1Setoran: $('<span data-mobile-placeholder="s1-setoran" class="d-none"></span>'),
+                s2Setoran: $('<span data-mobile-placeholder="s2-setoran" class="d-none"></span>'),
+                extra: $('<span data-mobile-placeholder="extra" class="d-none"></span>')
+            };
+
+            placeholders.s1Setoran.insertBefore(nodes.s1Setoran);
+            placeholders.s2Setoran.insertBefore(nodes.s2Setoran);
+            placeholders.extra.insertBefore(nodes.extra);
+
+            const titleS1 = $('<div class="col-12 mobile-shift-title mobile-title-s1"><span><i class="bi bi-1-circle me-1"></i>Shift 1</span><span class="badge-wh">Omset lalu Setoran</span></div>');
+            const titleS2 = $('<div class="col-12 mobile-shift-title mobile-title-s2"><span><i class="bi bi-2-circle me-1"></i>Shift 2</span><span class="badge-wh">Omset lalu Setoran</span></div>');
+
+            let applied = false;
+
+            function applyMobile() {
+                if (applied) return;
+                applied = true;
+
+                titleS1.insertBefore(nodes.s1Omset);
+                nodes.s1Setoran.insertAfter(nodes.s1Omset);
+                titleS2.insertBefore(nodes.s2Omset);
+                nodes.s2Setoran.insertAfter(nodes.s2Omset);
+                nodes.extra.insertAfter(nodes.summary);
+
+                setoranCard.addClass('mobile-empty-setoran-shell');
+            }
+
+            function restoreDesktop() {
+                if (!applied) return;
+                applied = false;
+
+                titleS1.detach();
+                titleS2.detach();
+                nodes.s1Setoran.insertAfter(placeholders.s1Setoran);
+                nodes.s2Setoran.insertAfter(placeholders.s2Setoran);
+                nodes.extra.insertAfter(placeholders.extra);
+
+                setoranCard.removeClass('mobile-empty-setoran-shell');
+            }
+
+            function sync() {
+                if (mq.matches) {
+                    applyMobile();
+                } else {
+                    restoreDesktop();
+                }
+            }
+
+            sync();
+            if (mq.addEventListener) {
+                mq.addEventListener('change', sync);
+            } else if (mq.addListener) {
+                mq.addListener(sync);
+            }
+        }
+
         $(document).ready(function() {
             $('#outlet_id').select2({
                 width: '100%',
                 placeholder: '-- Pilih Outlet --'
             });
+
+            setupMobileShiftFlow();
 
             $('#outlet_id,#tanggal,#nama_petugas').on('change input', function () {
                 refreshButtons();

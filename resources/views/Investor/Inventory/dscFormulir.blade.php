@@ -1223,7 +1223,7 @@
 
 
         /* ==========================================================
-           FINAL MOBILE RESPONSIVE PATCH
+           Final MOBILE RESPONSIVE PATCH
            Fix: top buttons tidak tumpuk, spacing lebih rapi di layar kecil.
            ========================================================== */
         @media (max-width: 767.98px) {
@@ -2066,6 +2066,253 @@
             }
         }
 
+
+
+        /* ==========================================================
+           MOBILE SIMPLE READABLE PATCH - SMP FRIENDLY
+           UI only: tidak mengubah ID, route, endpoint, atau logic JS.
+           Fokus: 1 bahan per layar, istilah lebih mudah, tombol bawah tidak ribet.
+           ========================================================== */
+        @media (max-width: 767.98px) {
+            body {
+                background: #f3f6f3 !important;
+                font-size: 14px !important;
+            }
+
+            main.container.wrap {
+                max-width: 430px !important;
+                padding: 10px 10px 112px !important;
+            }
+
+            .appbar,
+            .ctx,
+            .maincard,
+            .box,
+            #cards .bcard {
+                border-radius: 16px !important;
+                box-shadow: 0 8px 18px rgba(15, 23, 42, .06) !important;
+            }
+
+            .appbar h1 {
+                font-size: 1.06rem !important;
+                font-weight: 950 !important;
+            }
+
+            .appbar-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 7px !important;
+            }
+
+            .appbar-actions .btn,
+            .appbar-actions a.btn,
+            .appbar-actions form .btn {
+                height: 40px !important;
+                min-height: 40px !important;
+                font-size: .78rem !important;
+                border-radius: 12px !important;
+            }
+
+            /* Load utama cukup di panel data awal, bukan terasa tombol kecil tersembunyi */
+            #btnLoadCta {
+                height: 46px !important;
+                font-size: .94rem !important;
+                border-radius: 13px !important;
+            }
+
+            #btnLoadCta span {
+                display: inline !important;
+                font-size: .72rem !important;
+            }
+
+            .ctx-head-v2,
+            .main-head {
+                padding: 11px 12px !important;
+            }
+
+            .ctx-title,
+            .main-head .title {
+                font-size: 1rem !important;
+                font-weight: 950 !important;
+            }
+
+            .hint,
+            .main-head .sub {
+                display: block !important;
+                font-size: .78rem !important;
+                line-height: 1.35 !important;
+                color: #6b7280 !important;
+            }
+
+            .ctx-body-v2 {
+                padding: 10px !important;
+            }
+
+            .box-head h6 {
+                font-size: .82rem !important;
+                letter-spacing: .1px !important;
+            }
+
+            .form-label {
+                font-size: .82rem !important;
+                color: #374151 !important;
+                margin-bottom: .24rem !important;
+            }
+
+            .form-control,
+            .form-select,
+            .select2-container .select2-selection--single,
+            .bcard .form-control {
+                height: 42px !important;
+                min-height: 42px !important;
+                font-size: .95rem !important;
+                border-radius: 13px !important;
+            }
+
+            .select2-container--default .select2-selection--single .select2-selection__rendered {
+                line-height: 42px !important;
+                font-size: .95rem !important;
+            }
+
+            .mobile-pager {
+                grid-template-columns: 40px minmax(0, 1fr) 40px !important;
+                padding: 8px !important;
+                background: #fff !important;
+                border-radius: 14px !important;
+                margin: 0 0 8px 0 !important;
+                border: 1px solid #e5e7eb !important;
+            }
+
+            .mobile-progress {
+                font-size: .76rem !important;
+                margin-bottom: 5px !important;
+            }
+
+            #mobJump {
+                height: 38px !important;
+                min-height: 38px !important;
+                font-size: .84rem !important;
+                border-radius: 11px !important;
+            }
+
+            #cards .bcard {
+                padding: 12px !important;
+                background: #fff !important;
+            }
+
+            .bcard .name {
+                font-size: 1.05rem !important;
+                line-height: 1.2 !important;
+            }
+
+            .bcard .meta {
+                font-size: .78rem !important;
+            }
+
+            .summary {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 8px !important;
+                margin-top: 10px !important;
+            }
+
+            .summary .kv {
+                min-height: 54px !important;
+                padding: 8px 9px !important;
+                border-radius: 13px !important;
+                background: #f9fafb !important;
+            }
+
+            .summary .kv span {
+                font-size: .7rem !important;
+                color: #6b7280 !important;
+            }
+
+            .summary .kv b {
+                font-size: .9rem !important;
+            }
+
+            .grid2,
+            .grid3 {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 9px !important;
+            }
+
+            .grid3 > div:first-child {
+                grid-column: span 2 !important;
+            }
+
+            .bcard .mt-2 {
+                margin-top: .7rem !important;
+            }
+
+            /* Bottom bar dibuat sederhana: Next, Draft, Final. History tetap ada di atas. */
+            .p-2.p-sm-3.d-md-none .wh-footer {
+                max-width: 410px !important;
+                width: calc(100% - 20px) !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                bottom: 10px !important;
+                padding: 9px !important;
+                border-radius: 18px !important;
+                background: rgba(255,255,255,.96) !important;
+                box-shadow: 0 16px 34px rgba(15, 23, 42, .18) !important;
+            }
+
+            .p-2.p-sm-3.d-md-none .wh-footer .left {
+                display: none !important;
+            }
+
+            .p-2.p-sm-3.d-md-none .wh-footer .right {
+                display: grid !important;
+                grid-template-columns: .8fr 1fr 1fr !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+
+            #btnHistoryMob {
+                display: none !important;
+            }
+
+            .p-2.p-sm-3.d-md-none .wh-footer .right .btn {
+                height: 46px !important;
+                min-height: 46px !important;
+                border-radius: 14px !important;
+                font-size: .82rem !important;
+                padding: 6px 5px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 2px !important;
+                align-items: center !important;
+                justify-content: center !important;
+                line-height: 1.05 !important;
+            }
+
+            .p-2.p-sm-3.d-md-none .wh-footer .right .btn i {
+                font-size: 1rem !important;
+            }
+
+            main {
+                padding-bottom: 116px !important;
+            }
+        }
+
+        @media (max-width: 350px) {
+            .appbar-actions {
+                grid-template-columns: 1fr !important;
+            }
+
+            .summary,
+            .grid2,
+            .grid3,
+            .p-2.p-sm-3.d-md-none .wh-footer .right {
+                grid-template-columns: 1fr !important;
+            }
+
+            .grid3 > div:first-child {
+                grid-column: auto !important;
+            }
+        }
+
     </style>
 </head>
 
@@ -2076,7 +2323,7 @@
         <div class="appbar">
             <div class="appbar-inner d-flex justify-content-between align-items-start flex-wrap gap-2">
                 <div>
-                    <h1>DSC • Warehouse Input</h1>
+                    <h1>DSC • Input Stok</h1>
                     <div class="sub">
                         Rumus:
                         <span class="mono">Total = Open + Purchase + MutIn - MutOut + Adjustment</span>,
@@ -2127,9 +2374,9 @@
                 <div>
                     <div class="ctx-title d-flex align-items-center gap-2">
                         <i class="bi bi-sliders2-vertical"></i>
-                        Konteks Input
+                        Data Awal
                     </div>
-                    <div class="hint" id="infoText">Pilih outlet/tanggal/shift/petugas lalu Load.</div>
+                    <div class="hint" id="infoText">Isi data awal lalu klik Load.</div>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -2150,7 +2397,7 @@
                     <!-- PANEL: FORM KONTEX -->
                     <div class="box">
                         <div class="box-head">
-                            <h6>1) Isi Konteks</h6>
+                            <h6>1) Data Awal</h6>
                             <span class="pill-req"><i class="bi bi-asterisk"></i> wajib</span>
                         </div>
 
@@ -2166,7 +2413,7 @@
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="help-mini">Pilih outlet terlebih dulu agar data load sesuai lokasi.</div>
+                                <div class="help-mini">Pilih outlet sesuai lokasi kerja.</div>
                             </div>
 
                             <div class="col-12 col-md-6">
@@ -2195,12 +2442,12 @@
                             </div>
 
                             <div class="col-12">
-                                <label class="form-label">Uang Plus Shift Ini</label>
+                                <label class="form-label">Uang Plus</label>
                                 <div class="input-group input-group-v2">
                                     <span class="input-group-text"><i class="bi bi-cash-coin"></i></span>
                                     <input type="number" id="uang_plus_shift" class="form-control mono" step="0.01" value="0">
                                 </div>
-                                <div class="help-mini">Cukup isi sekali untuk shift aktif. Nilai ini otomatis disimpan pada satu baris agar report tidak dobel.</div>
+                                <div class="help-mini">Isi jika ada uang plus di shift ini.</div>
                             </div>
                         </div>
 
@@ -2208,8 +2455,7 @@
                         <div class="mt-3">
                             <button class="btn btn-primary btn-lg w-100" id="btnLoadCta" type="button">
                                 <i class="bi bi-cloud-download me-1"></i> Load Data
-                                <span class="ms-2" style="font-size:.78rem; font-weight:800; opacity:.8;">Ambil
-                                    bahan & stok awal</span>
+                                <span class="ms-2" style="font-size:.78rem; font-weight:800; opacity:.8;">Ambil bahan</span>
                             </button>
                         </div>
                     </div>
@@ -2220,23 +2466,23 @@
                         <!-- SEARCH -->
                         <div class="box">
                             <div class="box-head">
-                                <h6>2) Scan / Search</h6>
+                                <h6>2) Cari Bahan</h6>
                                 <span class="pill-tip"><i class="bi bi-lightbulb"></i> tip</span>
                             </div>
 
                             <div class="scanbar mt-2">
                                 <div class="scanicon"><i class="bi bi-upc-scan"></i></div>
-                                <input id="searchAny" class="form-control" placeholder="Scan / cari bahan...">
+                                <input id="searchAny" class="form-control" placeholder="Cari nama bahan...">
                             </div>
                             <div class="help-mini mt-2">
-                                Gunakan search seperti scanner untuk lompat ke input <b>Ending</b> lebih cepat.
+                                Ketik nama bahan agar cepat ketemu.
                             </div>
                         </div>
 
                         <!-- QUICK ACTIONS -->
                         <div class="box">
                             <div class="box-head">
-                                <h6>3) Aksi Cepat</h6>
+                                <h6>3) Simpan</h6>
                                 <span class="pill-safe"><i class="bi bi-shield-check"></i> aman</span>
                             </div>
 
@@ -2244,26 +2490,26 @@
                                 <div class="col-12 col-md-6">
                                     <button class="btn btn-outline-secondary w-100" id="btnNextZeroDesk"
                                         type="button">
-                                        <i class="bi bi-arrow-right-circle me-1"></i> Next (isi 0)
+                                        <i class="bi bi-arrow-right-circle me-1"></i> Next
                                     </button>
                                 </div>
                                 <div class="col-12 col-md-6">
                                     <button class="btn btn-outline-primary w-100" id="btnSaveDraftDesk"
                                         type="button">
-                                        <i class="bi bi-pencil-square me-1"></i> Save Draft
+                                        <i class="bi bi-pencil-square me-1"></i> Simpan Draft
                                     </button>
                                 </div>
                                 <div class="col-12">
-                                    <!-- FINAL: UNIQUE ID -->
+                                    <!-- Final: UNIQUE ID -->
                                     <button class="btn btn-accent btn-lg w-100" id="btnSaveFinalDesk" type="button">
-                                        <i class="bi bi-save me-1"></i> Simpan (FINAL)
+                                        <i class="bi bi-save me-1"></i> Simpan Final
                                         <span class="ms-2"
                                             style="font-size:.78rem; font-weight:800;">Shift 1+2</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="help-mini mt-2">Shift 1 = Draft. Shift 2 = Draft / Final.</div>
+                            <div class="help-mini mt-2">Shift 1 simpan draft. Shift 2 bisa final.</div>
                         </div>
                     </div>
 
@@ -2275,10 +2521,10 @@
         <section class="maincard">
             <div class="main-head">
                 <div>
-                    <div class="title">Daftar Bahan</div>
-                    <div class="sub">NO & NAMA fixed. Kolom OPEN/Total/Used/Waste/Actual auto hitung.</div>
+                    <div class="title">Input Bahan</div>
+                    <div class="sub">Isi stok akhir dan waste. Angka lain otomatis.</div>
                 </div>
-                <span class="badge-wh"><i class="bi bi-table"></i> Input Mode</span>
+                <span class="badge-wh"><i class="bi bi-table"></i> Mode Input</span>
             </div>
 
             <!-- DESKTOP TABLE -->
@@ -2291,16 +2537,16 @@
                                 <th class="col-nama">Nama</th>
                                 <th style="width:80px;">Sat</th>
 
-                                <th style="width:120px;" title="OPEN = stok awal otomatis.">Open</th>
+                                <th style="width:120px;" title="Stok Awal = stok awal otomatis.">Open</th>
                                 <th style="width:140px;" title="PURCHASE IN = barang masuk dari pembelian.">Purchase
                                     In</th>
                                 <th style="width:140px;" title="MUTASI IN = perpindahan stok masuk.">Mutasi In</th>
                                 <th style="width:140px;" title="MUTASI OUT = perpindahan stok keluar.">Mutasi Out</th>
 
-                                <th style="width:130px;" title="TOTAL = Open + Purchase + MutIn - MutOut">Total</th>
+                                <th style="width:130px;" title="Total Stok = Open + Purchase + MutIn - MutOut">Total</th>
 
                                 <th style="width:140px;" title="ENDING = stok akhir fisik.">Ending</th>
-                                <th style="width:140px;" title="ACTUAL USED = Total - Ending">Actual Used</th>
+                                <th style="width:140px;" title="Terpakai = Total - Ending">Actual Used</th>
 
                                 <th style="width:140px;">Waste Prod</th>
                                 <th style="width:140px;">Waste Bahan</th>
@@ -2309,7 +2555,7 @@
 
                                 <th style="width:140px;" title="Khusus 'Tepung Breader'">Actual Tepung</th>
 
-                                <th style="width:280px;">Keterangan</th>
+                                <th style="width:280px;">Catatan</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2322,22 +2568,21 @@
 
                 <div class="wh-footer">
                     <div class="left">
-                        <span id="warnEmpty"><i class="bi bi-exclamation-triangle me-1"></i> Ending masih ada yang
-                            kosong.</span>
+                        <span id="warnEmpty"><i class="bi bi-exclamation-triangle me-1"></i> Stok akhir masih kosong.</span>
                     </div>
                     <div class="right">
                         <button class="btn btn-outline-secondary" id="btnNextZeroFoot" type="button">
-                            <i class="bi bi-arrow-right-circle me-1"></i>Next (isi 0)
+                            <i class="bi bi-arrow-right-circle me-1"></i>Next
                         </button>
                         <button class="btn btn-history" id="btnHistoryFoot" type="button">
                             <i class="bi bi-clock-history me-1"></i>History
                         </button>
                         <button class="btn btn-outline-primary" id="btnSaveDraftFoot" type="button">
-                            <i class="bi bi-pencil-square me-1"></i>Save Draft
+                            <i class="bi bi-pencil-square me-1"></i>Simpan Draft
                         </button>
-                        <!-- FINAL: UNIQUE ID -->
+                        <!-- Final: UNIQUE ID -->
                         <button class="btn btn-accent" id="btnSaveFinalFoot" type="button">
-                            <i class="bi bi-save me-1"></i>FINAL
+                            <i class="bi bi-save me-1"></i>Final
                         </button>
                     </div>
                 </div>
@@ -2369,15 +2614,14 @@
 
                 <div class="wh-footer">
                     <div class="left">
-                        <span id="warnEmptyM"><i class="bi bi-exclamation-triangle me-1"></i> Ending masih ada yang
-                            kosong.</span>
+                        <span id="warnEmptyM"><i class="bi bi-exclamation-triangle me-1"></i> Stok akhir masih kosong.</span>
                     </div>
                     <div class="right">
-                        <button class="btn btn-outline-secondary" id="btnNextZeroMob" type="button">Next</button>
-                        <button class="btn btn-history" id="btnHistoryMob" type="button">History</button>
-                        <button class="btn btn-outline-primary" id="btnSaveDraftM" type="button">Draft</button>
-                        <!-- FINAL: UNIQUE ID -->
-                        <button class="btn btn-accent" id="btnSaveFinalMob" type="button">FINAL</button>
+                        <button class="btn btn-outline-secondary" id="btnNextZeroMob" type="button"><i class="bi bi-arrow-right-circle"></i><span>Next</span></button>
+                        <button class="btn btn-history" id="btnHistoryMob" type="button"><i class="bi bi-clock-history"></i><span>History</span></button>
+                        <button class="btn btn-outline-primary" id="btnSaveDraftM" type="button"><i class="bi bi-pencil-square"></i><span>Draft</span></button>
+                        <!-- Final: UNIQUE ID -->
+                        <button class="btn btn-accent" id="btnSaveFinalMob" type="button"><i class="bi bi-check-circle"></i><span>Final</span></button>
                     </div>
                 </div>
             </div>
@@ -2513,7 +2757,7 @@
 
         // API (AJAX)
         const URL_LOAD = `{{ route('load') }}`; // /load
-        const URL_SAVE = `{{ route('saveSo') }}`; // /save-so  (FINAL -> tbl_stock)
+        const URL_SAVE = `{{ route('saveSo') }}`; // /save-so  (Final -> tbl_stock)
         const URL_SAVE_DRAFT = `{{ route('dsc.save-draft') }}`; // /save-draft (draft)
         const URL_HISTORY = `{{ route('dsc.history') }}`; // JSON history DSC
 
@@ -2538,7 +2782,7 @@
 
         // ========= AUTO SAVE SILENT =========
         // Mode baru: setiap user isi/edit form, sistem otomatis simpan ke DRAFT.
-        // Tidak mengubah logic Save Draft manual dan FINAL.
+        // Tidak mengubah logic Simpan Draft manual dan Final.
         let autoSaveTimer = null;
         let autoSaveRunning = false;
         let autoSaveQueued = false;
@@ -2548,9 +2792,35 @@
 
         // touched tracker (yang user pernah ubah)
         const touched = {}; // { bahan_id: true }
-        let uangPlusDirty = false; // true kalau input Uang Plus Shift Ini diubah user
+        let uangPlusDirty = false; // true kalau input Uang Plus diubah user
         let lastAutoSaveHash = null;
         let lastAutoSaveAt = null;
+
+        // ========= SAVE GUARD =========
+        // Mencegah user klik berkali-kali / pindah halaman saat request simpan masih berjalan.
+        // Ini juga memberi pesan jelas kalau token CSRF/session kadaluarsa (HTTP 419).
+        let manualSaveRunning = false;
+
+        function setSavingUi(isSaving, message = 'Sistem sedang proses penyimpanan, harap tunggu...') {
+            manualSaveRunning = !!isSaving;
+            $(BTN.load + ', ' + BTN.draft + ', ' + BTN.final + ', ' + BTN.next0).prop('disabled', !!isSaving);
+
+            if (isSaving) {
+                setStatus('loading', message);
+                $('#infoText').text(message);
+            } else {
+                refreshButtons();
+            }
+        }
+
+        window.addEventListener('beforeunload', function (e) {
+            // Final FIX: popup bawaan browser hanya muncul saat user menekan Simpan manual/final.
+            // Autosave berjalan di background dan tidak perlu mengganggu tim ops.
+            if (manualSaveRunning) {
+                e.preventDefault();
+                e.returnValue = 'Data masih dalam proses penyimpanan. Tunggu sampai proses selesai.';
+            }
+        });
 
         // ========= UTILS =========
         function apiHeaders() {
@@ -2585,9 +2855,31 @@
         }
 
         function pickErrorMessage(res, json, raw) {
+            if (res && res.status === 419) {
+                return 'Token keamanan halaman sudah kadaluarsa / session berubah. Sistem belum bisa menyimpan. Jangan input ulang dulu; refresh halaman, load data terakhir, lalu lanjutkan.';
+            }
+            if (res && res.status === 0) {
+                return 'Koneksi terputus. Harap tunggu sampai internet stabil, lalu coba simpan lagi.';
+            }
             if (json) return json.error || json.message || `HTTP ${res.status}`;
             if (raw) return `Non-JSON response (HTTP ${res.status}): ${raw.slice(0, 400)}`;
             return `HTTP ${res.status}`;
+        }
+
+        function handleSaveError(title, res, json, raw, err) {
+            const msg = err?.message || pickErrorMessage(res, json, raw);
+            if (res && res.status === 419) {
+                return Swal.fire({
+                    icon: 'warning',
+                    title: 'Token Kadaluarsa',
+                    html: 'Simpan gagal karena token halaman sudah tidak valid.<br><b>Harap tunggu, jangan klik berulang.</b><br>Refresh halaman, klik Load, lalu cek apakah draft/final terakhir sudah masuk.',
+                    confirmButtonText: 'Refresh Sekarang',
+                    confirmButtonColor: '#0f172a',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(() => window.location.reload());
+            }
+            return swError(title, msg);
         }
 
         function esc(s) {
@@ -2658,12 +2950,12 @@
             const okS1 = hasDraftS1 || hasFinalS1 || hasS1;
         
             if (isShift1()) {
-                setShiftBadge('warn', 'Shift 1: hanya boleh Save Draft (Tombol Simpan Disabled)');
+                setShiftBadge('warn', 'Shift 1: hanya boleh Simpan Draft (Tombol Simpan Disabled)');
                 return;
             }
         
             if (!okS1) {
-                setShiftBadge('bad', 'Shift 1 belum ada — FINAL Shift 2 dikunci');
+                setShiftBadge('bad', 'Shift 1 belum ada — Final Shift 2 dikunci');
                 return;
             }
         
@@ -2823,16 +3115,16 @@
           </div>
 
           <div class="summary">
-            <div class="kv"><span>OPEN</span><b>${fmt(x.open)}</b></div>
-            <div class="kv"><span>TOTAL</span><b>${fmt(c.total)}</b></div>
-            <div class="kv ${negClass}"><span>ACTUAL USED</span><b>${fmt(c.actualUsed)}</b></div>
+            <div class="kv"><span>Stok Awal</span><b>${fmt(x.open)}</b></div>
+            <div class="kv"><span>Total Stok</span><b>${fmt(c.total)}</b></div>
+            <div class="kv ${negClass}"><span>Terpakai</span><b>${fmt(c.actualUsed)}</b></div>
             <div class="kv"><span>WASTE TEPUNG</span><b>${fmt(c.wasteTepung)}</b></div>
             <div class="kv"><span>ACTUAL TEPUNG</span><b>${fmt(actualTepung)}</b></div>
           </div>
 
           <div class="grid3">
             <div>
-              <label class="form-label small mb-1">Purchase IN</label>
+              <label class="form-label small mb-1">Barang Masuk</label>
               <input class="form-control pin" type="number" step="0.01" value="${x.pin}">
             </div>
             <div>
@@ -2846,13 +3138,13 @@
           </div>
 
           <div class="mt-2">
-            <label class="form-label small mb-1">Ending <span class="text-danger">*</span></label>
+            <label class="form-label small mb-1">Stok Akhir <span class="text-danger">*</span></label>
             <input class="form-control ending" type="number" step="0.01" value="${x.ending}">
           </div>
 
           <div class="grid2">
             <div>
-              <label class="form-label small mb-1">Waste Product</label>
+              <label class="form-label small mb-1">Waste Produk</label>
               <input class="form-control wprod" type="number" step="0.01" value="${x.wProd}">
             </div>
             <div>
@@ -2862,7 +3154,7 @@
           </div>
 
           <div class="mt-2">
-            <label class="form-label small mb-1">Keterangan</label>
+            <label class="form-label small mb-1">Catatan</label>
             <input class="form-control ket" type="text" value="${esc(x.ket)}" placeholder="opsional...">
           </div>
         </div>
@@ -3161,7 +3453,7 @@
             $targets.prop('disabled', kasirClosed);
 
             if (kasirClosed) {
-                setStatus('bad', 'FINAL (LOCK)');
+                setStatus('bad', 'Final (LOCK)');
                 $('#infoText').text(`Kasir sudah ditutup${meta?.closed_at ? ' • ' + meta.closed_at : ''}`);
             }
 
@@ -3193,7 +3485,7 @@
                     json,
                     raw
                 } = await readJsonOrText(res);
-                if (!res.ok || !json || !json.ok) throw new Error(pickErrorMessage(res, json, raw));
+                if (!res.ok || !json || !json.ok) { const err = new Error(pickErrorMessage(res, json, raw)); err.res = res; err.json = json; err.raw = raw; throw err; }
 
                 // reset state
                 items = [];
@@ -3295,7 +3587,7 @@
                 // OPTIONAL: kalau backend kamu pakai finalize both
                 finalize_both: 1,
 
-                // FINAL: kirim semua rows biar tbl_stock lengkap
+                // Final: kirim semua rows biar tbl_stock lengkap
                 rows: items.map((it, i) => {
                     const x = ensure(it.id);
                     const uangPlusShift = getUangPlusShift();
@@ -3405,7 +3697,7 @@
                 console.error(e);
                 setStatus('bad', 'Auto save gagal');
                 updateLastSavedBadge('error', e.message);
-                $('#infoText').text('Auto save gagal. Tombol Save Draft manual masih bisa digunakan.');
+                $('#infoText').text('Auto save gagal. Harap tunggu sampai koneksi/token normal, lalu klik Simpan Draft manual.');
             } finally {
                 autoSaveRunning = false;
 
@@ -3422,7 +3714,9 @@
 
         // ========= DRAFT =========
         async function saveDraft() {
-            if (kasirClosed) return swWarn('Sudah FINAL', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
+            if (manualSaveRunning) return swWarn('Harap tunggu', 'Sistem masih proses penyimpanan. Jangan klik berulang.');
+            if (autoSaveRunning) return swWarn('Harap tunggu', 'Autosave masih berjalan. Tunggu sampai status selesai, lalu klik lagi.');
+            if (kasirClosed) return swWarn('Sudah Final', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
             if (!loaded) return swWarn('Belum load', 'Klik Load dulu.');
             if (!validateHeader()) return swWarn('Data belum lengkap', 'Lengkapi Outlet/Tanggal/Shift/Nama Petugas.');
 
@@ -3432,7 +3726,8 @@
             }
 
             try {
-                swLoading('Menyimpan draft...');
+                setSavingUi(true, 'Menyimpan draft. Harap tunggu, sistem sedang proses penyimpanan...');
+                swLoading('Menyimpan draft. Harap tunggu...');
                 const res = await fetch(URL_SAVE_DRAFT, {
                     method: 'POST',
                     headers: {
@@ -3443,7 +3738,7 @@
                 });
 
                 const { json, raw } = await readJsonOrText(res);
-                if (!res.ok || !json || !json.ok) throw new Error(pickErrorMessage(res, json, raw));
+                if (!res.ok || !json || !json.ok) { const err = new Error(pickErrorMessage(res, json, raw)); err.res = res; err.json = json; err.raw = raw; throw err; }
 
                 Swal.close();
                 lastAutoSaveHash = JSON.stringify(buildPayloadDraft());
@@ -3488,22 +3783,24 @@
             } catch (e) {
                 Swal.close();
                 console.error(e);
-                await swError('Draft gagal', e.message);
+                await handleSaveError('Draft gagal', e.res || null, e.json || null, e.raw || null, e);
                 throw e;
             } finally {
-                refreshButtons();
+                setSavingUi(false);
             }
         }
 
-        // ========= FINAL =========
+        // ========= Final =========
         async function saveFinal() {
-            if (kasirClosed) return swWarn('Sudah FINAL', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
+            if (manualSaveRunning) return swWarn('Harap tunggu', 'Sistem masih proses penyimpanan. Jangan klik berulang.');
+            if (autoSaveRunning) return swWarn('Harap tunggu', 'Autosave masih berjalan. Tunggu sampai status selesai, lalu klik lagi.');
+            if (kasirClosed) return swWarn('Sudah Final', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
             if (!loaded) return swWarn('Belum load', 'Klik Load dulu.');
             if (!validateHeader()) return swWarn('Data belum lengkap', 'Lengkapi Outlet/Tanggal/Shift/Nama Petugas.');
 
-            // SHIFT 1: FINAL selalu ditolak
+            // SHIFT 1: Final selalu ditolak
             if (isShift1()) {
-                return swWarn('Shift 1', 'Shift 1 hanya boleh Save Draft. Pindah ke Shift 2 untuk Simpan (FINAL).');
+                return swWarn('Shift 1', 'Shift 1 hanya boleh Simpan Draft. Pindah ke Shift 2 untuk Simpan Final.');
             }
 
             // SHIFT 2 gate: shift1 harus ada draft/final (kalau meta tersedia)
@@ -3524,7 +3821,8 @@
             const payload = buildPayloadFinal();
 
             try {
-                swLoading('Menyimpan FINAL SO...');
+                setSavingUi(true, 'Menyimpan Final SO. Harap tunggu, sistem sedang proses penyimpanan...');
+                swLoading('Menyimpan Final SO. Harap tunggu...');
                 const res = await fetch(URL_SAVE, {
                     method: 'POST',
                     headers: {
@@ -3534,11 +3832,14 @@
                     body: JSON.stringify(payload)
                 });
 
-                const {
-                    json,
-                    raw
-                } = await readJsonOrText(res);
-                if (!res.ok || !json || !json.ok) throw new Error(pickErrorMessage(res, json, raw));
+                const { json, raw } = await readJsonOrText(res);
+                if (!res.ok || !json || !json.ok) {
+                    const err = new Error(pickErrorMessage(res, json, raw));
+                    err.res = res;
+                    err.json = json;
+                    err.raw = raw;
+                    throw err;
+                }
 
                 Swal.close();
 
@@ -3562,7 +3863,9 @@
             } catch (e) {
                 Swal.close();
                 console.error(e);
-                await swError('FINAL SO gagal', e.message);
+                await handleSaveError('Final SO gagal', e.res || null, e.json || null, e.raw || null, e);
+            } finally {
+                setSavingUi(false);
             }
         }
 
@@ -3690,7 +3993,7 @@
         function historyStatusBadge(row) {
             const kind = historyStatusKind(row);
             if (kind === 'draft') return '<span class="history-status-badge draft">DRAFT</span>';
-            if (kind === 'final') return '<span class="history-status-badge final">FINAL</span>';
+            if (kind === 'final') return '<span class="history-status-badge final">Final</span>';
             return '<span class="history-status-badge other">LOG</span>';
         }
 
@@ -3717,18 +4020,18 @@
                 mutasi_out: 'Mutasi Out',
                 adjustment_qty: 'Adjustment',
                 used_qty: 'Used Qty',
-                waste_product: 'Waste Product',
+                waste_product: 'Waste Produk',
                 waste_bahan: 'Waste Bahan',
                 waste_tepung: 'Waste Tepung',
                 ending_stock: 'Ending Stock / AB',
                 actual_tepung: 'Actual Tepung',
                 uang_plus: 'Uang Plus',
-                keterangan: 'Keterangan',
+                keterangan: 'Catatan',
                 nama_petugas: 'Petugas',
                 pic: 'Petugas',
                 'Purchase In': 'Purchase In',
                 'Petugas': 'Petugas',
-                'Keterangan': 'Keterangan'
+                'Catatan': 'Catatan'
             };
             const key = String(field || '').trim();
             return map[key] || key || '-';
@@ -4100,7 +4403,7 @@
                 Swal.fire({
                     icon: 'success',
                     title: 'Koneksi Kembali Normal',
-                    text: 'Silakan cek status tersimpan atau klik Save Draft untuk memastikan data aman.',
+                    text: 'Silakan cek status tersimpan atau klik Simpan Draft untuk memastikan data aman.',
                     timer: 2200,
                     timerProgressBar: true,
                     showConfirmButton: false

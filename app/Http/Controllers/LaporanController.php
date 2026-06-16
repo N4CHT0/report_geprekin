@@ -412,18 +412,101 @@ private function dscResolveDateRange(Request $request): array
     return [$start, $end];
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Permission / Outlet Scope Helpers
+|--------------------------------------------------------------------------
+| Investor tetap dibatasi ke mitra miliknya.
+| Role operasional/non-investor mengikuti permission route dan boleh melihat
+| outlet operasional tanpa wajib punya row di tbl_investor.
+|--------------------------------------------------------------------------
+*/
+
+private function isSuperadminUser($user): bool
+{
+    return strtolower(trim((string) ($user->role ?? ''))) === 'superadmin';
+}
+
+private function isInvestorUser($user): bool
+{
+    $role = strtolower(trim((string) ($user->role ?? '')));
+
+    if ($role === 'investor') {
+        return true;
+    }
+
+    if (! $user || empty($user->id)) {
+        return false;
+    }
+
+    return DB::table('tbl_investor')
+        ->where('user_id', $user->id)
+        ->exists();
+}
+
+private function applyOperationalOutletScope($query, $user)
+{
+    /*
+     * Jika user operasional punya outlet_id, batasi ke outlet itu.
+     * Jika punya area_id, batasi ke area itu.
+     * Jika tidak punya keduanya, user boleh lihat semua outlet karena
+     * akses halaman sudah dikontrol oleh middleware permission.
+     */
+    $outletId = $user->outlet_id ?? null;
+    $areaId = $user->area_id ?? null;
+
+    if (! empty($outletId)) {
+        $query->where('o.id', $outletId);
+        return $query;
+    }
+
+    if (! empty($areaId)) {
+        $query->where('o.area_id', $areaId);
+        return $query;
+    }
+
+    return $query;
+}
+
+
 private function dscOutletBaseQuery($user)
 {
     $query = DB::table('tbl_outlets as o')
         ->leftJoin('tbl_area_outlet as a', 'a.id', '=', 'o.area_id');
 
-    if ($user && ($user->role ?? null) !== 'superadmin') {
+    /*
+    |--------------------------------------------------------------------------
+    | PERMISSION DRIVEN SCOPE
+    |--------------------------------------------------------------------------
+    | Sebelumnya semua role non-superadmin dipaksa punya data tbl_investor.
+    | Akibatnya SPV/leader/role operasional yang sudah punya permission tetap
+    | error "Investor tidak ditemukan."
+    |
+    | Sekarang:
+    | - superadmin: semua outlet
+    | - investor: outlet sesuai mitra investor
+    | - role operasional: outlet_id / area_id jika ada, selain itu semua outlet
+    |   karena akses halaman sudah dikontrol oleh middleware permission.
+    |--------------------------------------------------------------------------
+    */
+    if (! $user) {
+        $query->whereRaw('1 = 0');
+        return $query;
+    }
+
+    if ($this->isSuperadminUser($user)) {
+        return $query;
+    }
+
+    if ($this->isInvestorUser($user)) {
         $investorId = DB::table('tbl_investor')
             ->where('user_id', $user->id)
             ->value('id');
 
         if (! $investorId) {
-            abort(403, 'Investor tidak ditemukan.');
+            $query->whereRaw('1 = 0');
+            return $query;
         }
 
         $mitraIds = DB::table('tbl_mitra')
@@ -433,12 +516,14 @@ private function dscOutletBaseQuery($user)
 
         if (empty($mitraIds)) {
             $query->whereRaw('1 = 0');
-        } else {
-            $query->whereIn('o.mitra_id', $mitraIds);
+            return $query;
         }
+
+        $query->whereIn('o.mitra_id', $mitraIds);
+        return $query;
     }
 
-    return $query;
+    return $this->applyOperationalOutletScope($query, $user);
 }
 
 private function dscBuildDates(Carbon $start, Carbon $end): array

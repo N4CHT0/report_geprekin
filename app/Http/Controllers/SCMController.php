@@ -20,6 +20,193 @@ use App\Exports\StockMovementExport;
 
 class SCMController extends Controller
 {
+    public function indexDashboard()
+    {
+        $now = Carbon::now();
+
+        // ── 1. Metric Cards (Angka Ringkasan) ──
+        $kritisCount = DB::table('tbl_purchase_orders')->where('status', 'siap_kirim')->count();
+        $totalGR = DB::table('tbl_goods_receipts')->whereMonth('created_at', $now->month)->count();
+
+        // Koreksi: Cek stok kritis dari tabel master barang (asumsi: tbl_bahan)
+        // Mencari barang yang sisa stoknya kurang dari atau sama dengan 15
+        $stokKritis = DB::table('tbl_bahan_scm')->where('stok_minimal', '<=', 15)->count();
+
+        // ── 2. Operasional Row (Daftar List) ──
+        // Fast Moving: Ambil 5 teratas
+        $tanggalMulai = $now->copy()->subDays(30);
+
+        $fastMoving = DB::table('tbl_stock_transactions as st')
+            ->join('tbl_bahan as b', 'st.bahan_id', '=', 'b.id')
+            ->join('tbl_units as u', 'st.unit_id', '=', 'u.id')
+            ->select(
+                'b.nama_bahan',
+                'u.nama_unit as satuan',
+                DB::raw('SUM(st.jumlah) as total_keluar')
+            )
+            ->where('st.tipe', 'KELUAR')
+            ->where('st.created_at', '>=', $tanggalMulai)
+            ->whereNull('st.deleted_at')
+            ->groupBy('st.bahan_id', 'b.nama_bahan', 'u.nama_unit')
+            ->orderBy('total_keluar', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Criticals: Stok di bawah batas minimal (Sesuaikan dengan tabel master)
+        $criticals = DB::table('tbl_bahan_scm')
+            ->where('stok_minimal', '<=', 15)
+            ->orderBy('stok_minimal', 'asc')
+            ->limit(5)
+            ->get();
+
+        // ── 3. Chart Data (Kondisional Count) ──
+        $gdInTransit = DB::table('tbl_goods_deliveries')->where('status', 'In Transit')->count();
+        $gdDelivered = DB::table('tbl_goods_deliveries')->where('status', 'Delivered')->count();
+        $gdDraft = DB::table('tbl_goods_deliveries')->where('status', 'Draft')->count();
+        $gdCancelled = DB::table('tbl_goods_deliveries')->where('status', 'Cancelled')->count();
+
+        // ── 4. Aktivitas Terkini ──
+        // $activitiesRaw = DB::table('activity_logs')
+        //     ->orderBy('created_at', 'desc')
+        //     ->limit(10)
+        //     ->get();
+
+        // $activities = $activitiesRaw->map(function ($log) {
+        //     return [
+        //         'type' => $log->type,
+        //         'doc' => $log->document_number,
+        //         'desc' => $log->description,
+        //         'status' => $log->status,
+        //         'time' => Carbon::parse($log->created_at)->format('H:i'),
+        //         'sc' => $this->getBadgeColor($log->status)
+        //     ];
+        // });
+
+        // ── 5. Chart Pergerakan Stok (4 Minggu Terakhir) ──
+        $chartLabels = [];
+        $dataMasuk = [];
+        $dataKeluar = [];
+
+        for ($i = 3; $i >= 0; $i--) {
+            $startOfWeek = Carbon::now()->subWeeks($i)->startOfWeek();
+            $endOfWeek = Carbon::now()->subWeeks($i)->endOfWeek();
+
+            $chartLabels[] = "Mg " . $startOfWeek->format('d/m');
+
+            $totalMasuk = DB::table('tbl_stock_transactions')
+                ->where('tipe', 'MASUK')
+                ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+                ->whereNull('deleted_at')
+                ->sum('jumlah');
+
+            $totalKeluar = DB::table('tbl_stock_transactions')
+                ->whereIn('tipe', ['KELUAR', 'WASTE'])
+                ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+                ->whereNull('deleted_at')
+                ->sum('jumlah');
+
+            $dataMasuk[] = $totalMasuk ?: 0;
+            $dataKeluar[] = $totalKeluar ?: 0;
+        }
+
+        // ── 6. Chart Purchase vs Sales (6 Bulan Terakhir) ──
+        $pvLabels = [];
+        $dataPurchase = [];
+        $dataSales = [];
+
+        for ($i = 5; $i >= 0; $i--) {
+            $bulanTujuan = $now->copy()->subMonths($i);
+            $pvLabels[] = $bulanTujuan->translatedFormat('M'); // Output: Jan, Feb, dsb.
+
+            $sumPurchase = DB::table('tbl_purchase_invoices')
+                ->whereMonth('invoice_date', $bulanTujuan->month)
+                ->whereYear('invoice_date', $bulanTujuan->year)
+                ->whereNull('deleted_at')
+                ->whereNotIn('status', ['CANCELLED'])
+                ->sum('total_amount');
+            $dataPurchase[] = round($sumPurchase / 1000000, 2);
+
+            $sumSales = DB::table('tbl_sales_invoices')
+                ->whereMonth('invoice_date', $bulanTujuan->month)
+                ->whereYear('invoice_date', $bulanTujuan->year)
+                ->whereNull('deleted_at')
+                ->whereNotIn('status', ['CANCELLED'])
+                ->sum('total_amount');
+            $dataSales[] = round($sumSales / 1000000, 2);
+        }
+
+        // ── 7. Rekapitulasi Invoice & Outstanding ──
+        $piBulanIni = DB::table('tbl_purchase_invoices')
+            ->whereMonth('invoice_date', $now->month)
+            ->whereYear('invoice_date', $now->year)
+            ->whereNull('deleted_at');
+        $piBulanIniCount = $piBulanIni->count();
+        $piBulanIniSum = $piBulanIni->sum('total_amount');
+
+        $siBulanIni = DB::table('tbl_sales_invoices')
+            ->whereMonth('invoice_date', $now->month)
+            ->whereYear('invoice_date', $now->year)
+            ->whereNull('deleted_at');
+        $siBulanIniCount = $siBulanIni->count();
+        $siBulanIniSum = $siBulanIni->sum('total_amount');
+
+        $piOutstanding = DB::table('tbl_purchase_invoices')
+            ->whereIn('status', ['PENDING', 'APPROVED', 'PARTIAL_PAID'])
+            ->whereNull('deleted_at');
+        $piOutCount = $piOutstanding->count();
+        $piOutSum = $piOutstanding->sum(DB::raw('total_amount - paid_amount'));
+
+        $siOutstanding = DB::table('tbl_sales_invoices')
+            ->whereIn('status', ['ISSUED', 'PARTIAL_PAID', 'OVERDUE'])
+            ->whereNull('deleted_at');
+        $siOutCount = $siOutstanding->count();
+        $siOutSum = $siOutstanding->sum(DB::raw('total_amount - paid_amount'));
+
+        $invoiceRecap = [
+            ['label' => 'Purchase Invoice', 'meta' => 'Bulan ini', 'nilai' => 'Rp ' . number_format($piBulanIniSum / 1000000, 1, ',', '.') . ' jt', 'badge' => $piBulanIniCount . ' dokumen', 'bclass' => 'badge-green'],
+            ['label' => 'Sales Invoice', 'meta' => 'Bulan ini', 'nilai' => 'Rp ' . number_format($siBulanIniSum / 1000000, 1, ',', '.') . ' jt', 'badge' => $siBulanIniCount . ' dokumen', 'bclass' => 'badge-blue'],
+            ['label' => 'Outstanding PI', 'meta' => 'Belum lunas', 'nilai' => 'Rp ' . number_format($piOutSum / 1000000, 1, ',', '.') . ' jt', 'badge' => $piOutCount . ' dokumen', 'bclass' => 'badge-red'],
+            ['label' => 'Outstanding SI', 'meta' => 'Belum lunas', 'nilai' => 'Rp ' . number_format($siOutSum / 1000000, 1, ',', '.') . ' jt', 'badge' => $siOutCount . ' dokumen', 'bclass' => 'badge-amber'],
+        ];
+
+        // Gunakan data outstanding PI untuk Metric Card di bagian paling atas
+        $jumlahOutstanding = $piOutCount;
+        $totalOutstanding = $piOutSum;
+
+        return view('Purchasing.SCM.dashboard', compact(
+            'kritisCount',
+            'totalGR',
+            'stokKritis',
+            'jumlahOutstanding',
+            'totalOutstanding',
+            'fastMoving',
+            'criticals',
+            'gdInTransit',
+            'gdDelivered',
+            'gdDraft',
+            'gdCancelled',
+            // 'activities',
+            'chartLabels',
+            'dataMasuk',
+            'dataKeluar',
+            'pvLabels',
+            'dataPurchase',
+            'dataSales',
+            'invoiceRecap'
+        ));
+    }
+
+    private function getBadgeColor($status)
+    {
+        $colors = [
+            'RECEIVED' => 'badge-green',
+            'IN_TRANSIT' => 'badge-blue',
+            'PENDING' => 'badge-amber',
+            'DELIVERED' => 'badge-green',
+            'OVERDUE' => 'badge-red'
+        ];
+        return $colors[$status] ?? 'badge-scm';
+    }
     public function indexSCM()
     {
         $user = Auth::user();
@@ -83,7 +270,6 @@ class SCMController extends Controller
         // Perhatikan kurung tutup di compact()
         return view('Purchasing.SCM.dashboardAdminDC', compact('user', 'warehouse', 'products', 'outlets', 'stokAktual'));
     }
-
     public function userSCM()
     {
         $data = DB::table('users as u')
@@ -97,7 +283,7 @@ class SCMController extends Controller
                 'w.nama_warehouse',
                 'u.created_at'
             )
-            ->whereIn('u.role', ['admindc'])
+            ->whereIn('u.role', ['admindc', 'manager_scm', 'staff_scm', 'purchasing'])
             ->orderBy('u.name', 'asc')
             ->get();
 
@@ -120,7 +306,7 @@ class SCMController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'role' => 'required|in:admindc',
+            'role' => 'required|in:admindc,manager_scm,staff_scm,superadmin_scm,purchasing',
             'warehouse_id' => 'required', // Pastikan alokasi gudang terisi
         ]);
 
@@ -154,7 +340,7 @@ class SCMController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $id,
             'password' => 'nullable|min:6',
-            'role' => 'required|in:admindc',
+            'role' => 'required|in:admindc,manager_scm,staff_scm,superadmin_scm,purchasing',
             'warehouse_id' => 'required',
         ]);
 
@@ -205,6 +391,451 @@ class SCMController extends Controller
 
         return redirect()->route('user.account.scm')
             ->with('success', 'User SCM berhasil dihapus secara permanen.');
+    }
+
+    public function showWarehouse($warehouseId)
+    {
+        // 1. Info warehouse / DC
+        $warehouse = DB::table('tbl_warehouse')->where('id', $warehouseId)->first();
+        if (!$warehouse)
+            abort(404, 'DC tidak ditemukan.');
+
+        // 2. Outlet yang mapped ke DC ini
+        $outlets = DB::table('tbl_mapping_dc')
+            ->join('tbl_outlets', 'tbl_mapping_dc.outlet_id', '=', 'tbl_outlets.id')
+            ->where('tbl_mapping_dc.warehouse_id', $warehouseId)
+            ->select(
+                'tbl_outlets.nama_outlet', 
+                DB::raw('MAX(tbl_outlets.alamat) as alamat') // Ambil alamat yang ada isinya
+            )
+            ->groupBy('tbl_outlets.nama_outlet') // Kelompokkan berdasarkan nama
+            ->get();
+
+        // =========================================================================
+        // 3. Bangun label 4 minggu terakhir
+        //    Minggu 1 = paling lama, Minggu 4 = paling baru (minggu ini)
+        // =========================================================================
+        $weeks = [];
+        for ($w = 3; $w >= 0; $w--) {
+            $start = now()->startOfWeek()->subWeeks($w);
+            $end = now()->startOfWeek()->subWeeks($w)->endOfWeek();
+            $weeks[] = [
+                'label' => 'Minggu ' . (4 - $w) . ' (' . $start->format('d/m') . '–' . $end->format('d/m') . ')',
+                'short' => 'W' . (4 - $w),
+                'start' => $start->toDateString(),
+                'end' => $end->toDateString(),
+            ];
+        }
+
+        // =========================================================================
+        // 4. Query pemakaian (KELUAR) per bahan per minggu untuk warehouse ini
+        //    Hasilnya: { bahan_id, week_start, total_keluar }
+        // =========================================================================
+        $startRange = $weeks[0]['start'];   // 4 minggu lalu (Senin)
+        $endRange = $weeks[3]['end'];     // akhir minggu ini (Minggu)
+
+        $rawUsage = DB::table('tbl_stock_transactions')
+            ->where('warehouse_id', $warehouseId)
+            ->where('tipe', 'KELUAR')
+            ->whereNull('deleted_at')
+            ->whereBetween(DB::raw('DATE(created_at)'), [$startRange, $endRange])
+            ->select(
+                'bahan_id',
+                // Ambil Senin dari tanggal transaksi sebagai key minggu
+                DB::raw("DATE(DATE_SUB(created_at, INTERVAL WEEKDAY(created_at) DAY)) as week_start"),
+                DB::raw('SUM(jumlah) as total_keluar')
+            )
+            ->groupBy('bahan_id', 'week_start')
+            ->get();
+
+        // =========================================================================
+        // 5. Ambil semua bahan yang punya transaksi KELUAR di warehouse ini
+        //    + bahan yang memiliki stok di warehouse ini (meski 0 pemakaian)
+        // =========================================================================
+        $bahanIds = DB::table('tbl_stock_transactions')
+            ->where('warehouse_id', $warehouseId)
+            ->whereNull('deleted_at')
+            ->distinct()
+            ->pluck('bahan_id');
+
+        $products = DB::table('tbl_bahan_scm as b')
+            ->leftJoin('tbl_bahan_unit as bu', function ($j) {
+                $j->on('b.id', '=', 'bu.bahan_id')
+                    ->where('bu.is_base_unit', 1);
+            })
+            ->leftJoin('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+            ->whereIn('b.id', $bahanIds)
+            ->select(
+                'b.id',
+                'b.nama_bahan',
+                'b.stok_minimal',
+                'b.lead_time',
+                'b.rop_level',
+                DB::raw("COALESCE(u.nama_unit, 'unit') as nama_satuan")
+            )
+            ->orderBy('b.nama_bahan')
+            ->get();
+
+        // =========================================================================
+        // 6. Stok aktual per bahan (baris terakhir di warehouse ini)
+        // =========================================================================
+        $latestStok = DB::table('tbl_stock_transactions as st')
+            ->join(
+                DB::raw('(SELECT MAX(id) as max_id
+                      FROM tbl_stock_transactions
+                      WHERE warehouse_id = ' . (int) $warehouseId . '
+                      AND deleted_at IS NULL
+                      GROUP BY bahan_id) as latest'),
+                'st.id',
+                '=',
+                'latest.max_id'
+            )
+            ->where('st.warehouse_id', $warehouseId)
+            ->select('st.bahan_id', 'st.stok_sesudah')
+            ->get()
+            ->keyBy('bahan_id');
+
+        // =========================================================================
+        // 7. Susun data per bahan: pemakaian per minggu, avg, safety stock, ROP
+        // =========================================================================
+        // Index rawUsage: [bahan_id][week_start] = total_keluar
+        $usageIndex = [];
+        foreach ($rawUsage as $r) {
+            $usageIndex[$r->bahan_id][$r->week_start] = (float) $r->total_keluar;
+        }
+
+        $tableData = [];
+        foreach ($products as $p) {
+            // Pemakaian per minggu (4 minggu)
+            $weeklyUsage = [];
+            foreach ($weeks as $w) {
+                $weeklyUsage[] = $usageIndex[$p->id][$w['start']] ?? 0;
+            }
+
+            // Rata-rata pemakaian per minggu (dari 4 minggu)
+            $nonZero = array_filter($weeklyUsage, fn($v) => $v > 0);
+            $avg = count($nonZero) > 0
+                ? array_sum($weeklyUsage) / count($nonZero)  // avg dari minggu yang ada pemakaian
+                : 0;
+
+            // Safety Stock = 20% dari rata-rata
+            $safetyStock = $avg * 0.2;
+
+            // ROP = (avg * lead_time dalam minggu) + safety_stock
+            // lead_time di DB dalam hari → konversi ke minggu
+            $leadWeeks = ($p->lead_time ?? 3) / 7;
+            $rop = ($avg * $leadWeeks) + $safetyStock;
+
+            // Status stok vs ROP
+            $stokAktual = (float) ($latestStok[$p->id]->stok_sesudah ?? 0);
+            $status = 'aman';
+            if ($stokAktual <= 0)
+                $status = 'habis';
+            elseif ($stokAktual <= $rop)
+                $status = 'dibawah_rop';
+            elseif ($stokAktual <= $rop * 1.2)
+                $status = 'menipis';
+
+            $tableData[] = [
+                'id' => $p->id,
+                'nama_bahan' => $p->nama_bahan,
+                'nama_satuan' => $p->nama_satuan,
+                'stok_aktual' => $stokAktual,
+                'weekly_usage' => $weeklyUsage,         // array 4 angka
+                'avg_weekly' => round($avg, 2),
+                'safety_stock' => round($safetyStock, 2),
+                'lead_time' => $p->lead_time ?? 3,
+                'rop' => round($rop, 1),
+                'status' => $status,
+            ];
+        }
+
+        // =========================================================================
+        // 8. Summary counts
+        // =========================================================================
+        $summary = [
+            'habis' => count(array_filter($tableData, fn($r) => $r['status'] === 'habis')),
+            'dibawah_rop' => count(array_filter($tableData, fn($r) => $r['status'] === 'dibawah_rop')),
+            'menipis' => count(array_filter($tableData, fn($r) => $r['status'] === 'menipis')),
+            'aman' => count(array_filter($tableData, fn($r) => $r['status'] === 'aman')),
+        ];
+
+        return view('Purchasing.detailDC', compact(
+            'warehouse',
+            'outlets',
+            'weeks',        // label 4 minggu
+            'tableData',    // data per bahan dengan weekly_usage
+            'summary'
+        ));
+    }
+
+    public function updateRopDc(Request $request)
+    {
+        $request->validate([
+            'bahan_id' => 'required|integer',
+            'lead_time' => 'required|numeric|min:1',
+            'rop_level' => 'required|numeric|min:0',
+            'safety_stock' => 'required|numeric|min:0',
+        ]);
+
+        DB::table('tbl_bahan_scm')->where('id', $request->bahan_id)->update([
+            'lead_time' => $request->lead_time,
+            'rop_level' => $request->rop_level,
+            'stok_minimal' => $request->safety_stock,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'ROP berhasil diperbarui.']);
+    }
+
+    public function receivingReport()
+    {
+        // Mengambil data dari tabel tbl_po_receive
+        $receives = DB::table('tbl_po_receive as pr')
+            // Asumsi kamu punya tabel tbl_outlets untuk nama outlet
+            ->leftJoin('tbl_outlets as o', 'pr.outlet_id', '=', 'o.id')
+            ->select(
+                'pr.id',
+                'pr.no_po',
+                'o.nama_outlet',
+                'pr.tgl_terima' // Menggunakan kolom tgl_terima dari tabelmu
+            )
+            ->orderBy('pr.tgl_terima', 'desc')
+            ->get();
+
+        return view('Purchasing.receivedReport', compact('receives'));
+    }
+
+    /**
+     * Mengambil detail penerimaan untuk ditampilkan di Modal (via AJAX)
+     */
+    public function showReceivingReport($id)
+    {
+        try {
+            // 1. Ambil Data Header (Info Utama)
+            $headerData = DB::table('tbl_po_receive as pr')
+                ->leftJoin('tbl_outlets as o', 'pr.outlet_id', '=', 'o.id')
+                ->where('pr.id', $id)
+                ->select(
+                    'pr.no_po',
+                    'o.nama_outlet',
+                    'pr.keterangan_global as catatan' // Mapping ke variabel 'catatan'
+                )
+                ->first();
+
+            if (!$headerData) {
+                return response()->json(['status' => 'error', 'message' => 'Data tidak ditemukan.'], 404);
+            }
+
+            // 2. Ambil Data Detail Rincian Barang
+            $detailsData = DB::table('tbl_po_receive_detail as prd')
+                // Asumsi kamu punya tabel tbl_bahan dan tbl_units
+                ->leftJoin('tbl_bahan as b', 'prd.bahan_id', '=', 'b.id')
+                ->leftJoin('tbl_units as u', 'prd.unit_id', '=', 'u.id')
+                ->where('prd.receive_id', $id)
+                ->select(
+                    'b.nama_bahan',
+                    'u.nama_unit',
+                    'prd.qty_po',
+                    'prd.qty_terima',
+                    'prd.qty_kurang',
+                    'prd.alasan_kurang'
+                )
+                ->get();
+
+            // 3. Ambil Data Bukti Gambar
+            // Karena pakai tabel terpisah dengan ENUM jenis_foto, kita get() semua milik ID ini
+            $imagesData = DB::table('tbl_po_receive_images')
+                ->where('receive_id', $id)
+                ->get();
+
+            // Siapkan array kosong untuk menampung gambar
+            $images = [
+                'barang' => null,
+                'nota' => null,
+                'supir' => null,
+            ];
+
+            // Looping dan masukkan base64 ke kunci array yang sesuai
+            foreach ($imagesData as $img) {
+                if ($img->jenis_foto === 'barang') {
+                    $images['barang'] = $img->foto_base64;
+                } elseif ($img->jenis_foto === 'nota') {
+                    $images['nota'] = $img->foto_base64;
+                } elseif ($img->jenis_foto === 'supir') {
+                    $images['supir'] = $img->foto_base64;
+                }
+            }
+
+            // Return response format JSON
+            return response()->json([
+                'status' => 'success',
+                'header' => [
+                    'no_po' => $headerData->no_po,
+                    'outlet' => $headerData->nama_outlet ?: 'Outlet Tidak Diketahui',
+                    'catatan' => $headerData->catatan
+                ],
+                'details' => $detailsData,
+                'images' => $images
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function indexAreaMapping(Request $request)
+    {
+        // 1. Tarik daftar DC dari tbl_warehouse
+        // Asumsi nama kolomnya 'nama_warehouse', sesuaikan jika berbeda
+        $dcs = DB::table('tbl_warehouse')->select('id', 'nama_warehouse as nama')->get();
+
+        // Ambil ID DC pertama sebagai default jika belum ada filter yang dipilih
+        $firstDc = $dcs->first();
+        $dcId = $request->input('dc_id', $firstDc ? $firstDc->id : 1);
+
+        // 2. Tarik semua rute berdasarkan DC beserta daftar outlet di dalamnya
+        $routes = DB::table('tbl_delivery_routes as r')
+            ->leftJoin('tbl_mapping_rute_outlet as map', 'r.id', '=', 'map.route_id')
+            ->leftJoin('tbl_outlets as o', 'map.outlet_id', '=', 'o.id')
+            ->select(
+                'map.id as map_id', // ID unik untuk menghapus mapping nanti
+                'r.id as route_id',
+                'r.hari_kirim',
+                'r.nama_area',
+                'map.outlet_id',
+                'o.nama_outlet'
+            )
+            ->where('r.dc_id', $dcId)
+            ->orderBy('r.hari_kirim')
+            ->get();
+
+        // 3. Kelompokkan data menjadi bentuk Pohon (Hierarki Kanban)
+        $kanbanData = [];
+        foreach ($routes as $row) {
+            $hari = $row->hari_kirim;
+            $routeId = $row->route_id;
+
+            if (!isset($kanbanData[$hari])) {
+                $kanbanData[$hari] = [];
+            }
+
+            if (!isset($kanbanData[$hari][$routeId])) {
+                $kanbanData[$hari][$routeId] = [
+                    'nama_area' => $row->nama_area,
+                    'outlets' => []
+                ];
+            }
+
+            if ($row->outlet_id) {
+                $kanbanData[$hari][$routeId]['outlets'][] = [
+                    'map_id' => $row->map_id,
+                    'id' => $row->outlet_id,
+                    'nama' => $row->nama_outlet
+                ];
+            }
+        }
+
+        // 4. Tarik semua outlet untuk modal dropdown
+        $allOutlets = DB::table('tbl_outlets')->select('id', 'nama_outlet')->get();
+
+        // Kita kirim juga data DC yang sedang dipilih untuk nama di modal
+        $selectedDc = $dcs->where('id', $dcId)->first();
+
+        return view('Purchasing.areaMapping', compact('kanbanData', 'dcs', 'dcId', 'allOutlets', 'selectedDc'));
+    }
+    public function storeRoute(Request $request)
+    {
+        // Validasi inputan form
+        $request->validate([
+            'dc_id' => 'required|integer',
+            'hari_kirim' => 'required|string',
+            'nama_area' => 'required|string|max:100',
+        ]);
+
+        // Masukkan data ke database
+        DB::table('tbl_delivery_routes')->insert([
+            'dc_id' => $request->dc_id,
+            'hari_kirim' => $request->hari_kirim,
+            'nama_area' => mb_strtoupper($request->nama_area), // Pastikan huruf besar semua
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Karena kita belum pasang session sweetalert, cukup kembalikan ke halaman semula
+        return redirect()->back();
+    }
+
+    // Fungsi untuk menghapus Rute beserta isi mapping-nya
+    public function deleteRoute(Request $request)
+    {
+        $request->validate([
+            'route_id' => 'required|integer'
+        ]);
+
+        // Hapus mapping outlet yang ada di dalam rute ini terlebih dahulu
+        DB::table('tbl_mapping_rute_outlet')->where('route_id', $request->route_id)->delete();
+
+        // Hapus kerangka rute utamanya
+        DB::table('tbl_delivery_routes')->where('id', $request->route_id)->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Blok rute beserta jadwalnya berhasil dihapus.'
+        ]);
+    }
+
+    // Fungsi untuk Menyisipkan Outlet ke Rute
+    public function storeMapping(Request $request)
+    {
+        // Validasi input
+        $request->validate([
+            'route_id' => 'required|integer',
+            'outlet_ids' => 'required|array', // Karena dari Select2 multiple
+            'outlet_ids.*' => 'integer'
+        ]);
+
+        $routeId = $request->route_id;
+        $outletIds = $request->outlet_ids;
+
+        $dataToInsert = [];
+        $now = now();
+
+        foreach ($outletIds as $outletId) {
+            $dataToInsert[] = [
+                'route_id' => $routeId,
+                'outlet_id' => $outletId,
+                'created_at' => $now,
+            ];
+        }
+
+        // Gunakan insertOrIgnore agar kalau ada outlet yang sudah pernah 
+        // dimasukkan ke rute ini tidak terjadi error duplicate
+        DB::table('tbl_mapping_rute_outlet')->insertOrIgnore($dataToInsert);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Outlet berhasil ditambahkan ke rute jadwal!'
+        ]);
+    }
+
+    // Fungsi untuk Mengeluarkan Outlet dari Rute
+    public function removeMapping(Request $request)
+    {
+        $request->validate([
+            'map_id' => 'required|integer'
+        ]);
+
+        // Hapus mapping berdasarkan ID uniknya
+        DB::table('tbl_mapping_rute_outlet')->where('id', $request->map_id)->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Outlet berhasil dikeluarkan.'
+        ]);
     }
 
     // ── PRINT SALES INVOICE ──────────────────────────────────────
@@ -486,7 +1117,7 @@ class SCMController extends Controller
                 'discount' => $discount,
                 'vat_amount' => $vat,
                 'total_amount' => $total,
-                'status' => 'PENDING',
+                'status' => 'APPROVED',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -2604,6 +3235,549 @@ class SCMController extends Controller
         ]);
     }
 
+
+    // === GOODS TRANFER ===
+    public function indexGoodsTransfer()
+    {
+        $transfers = DB::table('tbl_goods_transfers as gt')
+            ->join('tbl_outlets as wf', 'gt.send_from_id', '=', 'wf.id')
+            ->join('tbl_outlets as wt', 'gt.send_to_id', '=', 'wt.id')
+            ->whereNull('gt.deleted_at')
+            ->select(
+                'gt.id',
+                'gt.gt_number',
+                'gt.transfer_date',
+                'gt.actual_arrival',
+                'gt.status',
+                'gt.total_amount',
+                'gt.driver_name',
+                'gt.vehicle_plate',
+                'gt.notes',
+                'gt.created_at',
+                'wf.nama_outlet as send_from',
+                'wt.nama_outlet as send_to',
+            )
+            ->orderBy('gt.created_at', 'desc')
+            ->get();
+
+        // Hitung jumlah item per transfer
+        foreach ($transfers as $gt) {
+            $gt->item_count = DB::table('tbl_goods_transfer_details')
+                ->where('goods_transfer_id', $gt->id)
+                ->count();
+        }
+
+        // Daftar warehouse untuk dropdown form
+        $warehouses = DB::table('tbl_warehouse')->orderBy('nama_warehouse')->get();
+
+        // Daftar bahan untuk form item
+        $products = DB::table('tbl_bahan_scm as b')
+            ->leftJoin('tbl_bahan_unit as bu', function ($join) {
+                $join->on('b.id', '=', 'bu.bahan_id')->where('bu.is_base_unit', 1);
+            })
+            ->leftJoin('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+            ->select(
+                'b.id',
+                'b.nama_bahan',
+                'bu.unit_id',
+                'bu.base_price as harga_satuan',
+                'u.nama_unit',
+            )
+            ->orderBy('b.nama_bahan')
+            ->get();
+
+        // Summary widgets
+        $summary = [
+            'total' => DB::table('tbl_goods_transfers')->whereNull('deleted_at')->count(),
+            'draft' => DB::table('tbl_goods_transfers')->where('status', 'DRAFT')->count(),
+            'in_transit' => DB::table('tbl_goods_transfers')->where('status', 'IN_TRANSIT')->count(),
+            'completed' => DB::table('tbl_goods_transfers')->where('status', 'COMPLETED')->count(),
+        ];
+
+        return view('Purchasing.SCM.goodsTransfer', compact(
+            'transfers',
+            'warehouses',
+            'products',
+            'summary'
+        ));
+    }
+
+    public function getWarehouseStock($warehouseId)
+    {
+        try {
+            $warehouse = DB::table('tbl_warehouse')->where('id', $warehouseId)->first();
+            if (!$warehouse) {
+                return response()->json(['status' => 'error', 'message' => 'Warehouse tidak ditemukan.'], 404);
+            }
+
+            // Ambil stok aktual dari tbl_stock_transactions
+            // stok_sesudah dari baris terakhir (MAX id) per bahan di warehouse ini
+            $stocks = DB::table('tbl_stock_transactions as st')
+                ->join(
+                    DB::raw('(SELECT bahan_id, MAX(id) as max_id
+                              FROM tbl_stock_transactions
+                              WHERE warehouse_id = ' . (int) $warehouseId . '
+                              AND deleted_at IS NULL
+                              GROUP BY bahan_id) as latest'),
+                    function ($join) {
+                        $join->on('st.bahan_id', '=', 'latest.bahan_id')
+                            ->on('st.id', '=', 'latest.max_id');
+                    }
+                )
+                ->join('tbl_bahan_scm as b', 'st.bahan_id', '=', 'b.id')
+                ->leftJoin('tbl_bahan_unit as bu', function ($join) {
+                    $join->on('b.id', '=', 'bu.bahan_id')->where('bu.is_base_unit', 1);
+                })
+                ->leftJoin('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+                ->where('st.stok_sesudah', '>', 0)  // hanya tampilkan yang ada stoknya
+                ->select(
+                    'st.bahan_id',
+                    'st.stok_sesudah as stok_aktual',
+                    'bu.unit_id',
+                    'bu.base_price as harga_satuan',
+                    'b.nama_bahan',
+                    DB::raw("COALESCE(u.nama_unit, '-') as nama_unit"),
+                )
+                ->orderBy('b.nama_bahan')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'warehouse' => $warehouse,
+                'stocks' => $stocks,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('getWarehouseStock error: ' . $e->getMessage(), [
+                'warehouse_id' => $warehouseId,
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memuat stok: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function storeGoodsTransfer(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'from_warehouse_id' => 'required|integer|exists:tbl_warehouse,id',
+            'to_warehouse_id' => 'required|integer|exists:tbl_warehouse,id|different:from_warehouse_id',
+            'transfer_date' => 'required|date',
+            'items' => 'required|array|min:1',
+            'items.*.bahan_id' => 'required|integer|exists:tbl_bahan_scm,id',
+            'items.*.unit_id' => 'required|integer',
+            'items.*.qty_requested' => 'required|numeric|min:0.01',
+            'items.*.harga_satuan' => 'nullable|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        if ($request->from_warehouse_id == $request->to_warehouse_id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Warehouse asal dan tujuan tidak boleh sama.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            // --- Validasi stok cukup di warehouse asal ---
+            foreach ($request->items as $item) {
+                $qtyReq = (float) $item['qty_requested'];
+                if ($qtyReq <= 0)
+                    continue;
+
+                $stokAktual = DB::table('tbl_stock_transactions')
+                    ->where('bahan_id', $item['bahan_id'])
+                    ->where('warehouse_id', $request->from_warehouse_id)
+                    ->whereNull('deleted_at')
+                    ->orderByDesc('id')
+                    ->value('stok_sesudah') ?? 0;
+
+                if ($stokAktual < $qtyReq) {
+                    DB::rollBack();
+                    $nama = DB::table('tbl_bahan_scm')
+                        ->where('id', $item['bahan_id'])
+                        ->value('nama_bahan');
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Stok '{$nama}' tidak cukup. Tersedia: {$stokAktual}, diminta: {$qtyReq}.",
+                    ], 422);
+                }
+            }
+
+            // --- Generate GT number dengan lockForUpdate ---
+            $today = Carbon::now()->format('Ymd');
+            $prefix = 'GT' . $today;
+
+            $lastGt = DB::table('tbl_goods_transfers')
+                ->where('gt_number', 'LIKE', $prefix . '%')
+                ->orderBy('gt_number', 'desc')
+                ->lockForUpdate()
+                ->value('gt_number');
+
+            $nextNum = $lastGt
+                ? str_pad((int) substr($lastGt, -4) + 1, 4, '0', STR_PAD_LEFT)
+                : '0001';
+            $gtNumber = $prefix . $nextNum;
+
+            // --- Hitung total amount ---
+            $totalAmount = 0;
+            foreach ($request->items as $item) {
+                $totalAmount += (float) ($item['qty_requested'] ?? 0) * (float) ($item['harga_satuan'] ?? 0);
+            }
+
+            // --- Simpan header ---
+            $gtId = DB::table('tbl_goods_transfers')->insertGetId([
+                'gt_number' => $gtNumber,
+                'from_warehouse_id' => $request->from_warehouse_id,
+                'to_warehouse_id' => $request->to_warehouse_id,
+                'transfer_date' => $request->transfer_date,
+                'estimated_arrival' => $request->estimated_arrival,
+                'driver_name' => $request->driver_name,
+                'vehicle_plate' => $request->vehicle_plate,
+                'status' => 'DRAFT',
+                'total_amount' => $totalAmount,
+                'notes' => $request->notes,
+                'created_by' => Auth::id(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // --- Simpan detail ---
+            foreach ($request->items as $item) {
+                $qty = (float) ($item['qty_requested'] ?? 0);
+                $harga = (float) ($item['harga_satuan'] ?? 0);
+                if ($qty <= 0)
+                    continue;
+
+                DB::table('tbl_goods_transfer_details')->insert([
+                    'goods_transfer_id' => $gtId,
+                    'bahan_id' => $item['bahan_id'],
+                    'unit_id' => $item['unit_id'],
+                    'qty_requested' => $qty,
+                    'qty_transferred' => 0,
+                    'qty_received' => 0,
+                    'harga_satuan' => $harga,
+                    'subtotal' => $qty * $harga,
+                    'notes' => $item['notes'] ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            Log::info("GT {$gtNumber} dibuat oleh user " . Auth::id());
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Goods Transfer {$gtNumber} berhasil dibuat sebagai DRAFT.",
+                'gt_number' => $gtNumber,
+                'gt_id' => $gtId,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('GoodsTransfer store failed: ' . $e->getMessage(), [
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menyimpan: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function dispatchGoodsTransfer($id)
+    {
+        DB::beginTransaction();
+        try {
+            $gt = DB::table('tbl_goods_transfers')->where('id', $id)->first();
+
+            if (!$gt) {
+                return response()->json(['status' => 'error', 'message' => 'Transfer tidak ditemukan.'], 404);
+            }
+
+            if ($gt->status !== 'DRAFT') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Hanya transfer berstatus DRAFT yang bisa di-dispatch. Status: {$gt->status}",
+                ], 422);
+            }
+
+            $details = DB::table('tbl_goods_transfer_details')
+                ->where('goods_transfer_id', $id)
+                ->get();
+
+            foreach ($details as $detail) {
+                $qty = (float) $detail->qty_requested;
+                if ($qty <= 0)
+                    continue;
+
+                // Lock dan baca stok sebelum
+                $stokSebelum = DB::table('tbl_stock_transactions')
+                    ->where('bahan_id', $detail->bahan_id)
+                    ->where('warehouse_id', $gt->from_warehouse_id)
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->orderByDesc('id')
+                    ->value('stok_sesudah') ?? 0;
+
+                // Cek stok masih cukup (bisa berubah sejak DRAFT dibuat)
+                if ($stokSebelum < $qty) {
+                    DB::rollBack();
+                    $nama = DB::table('tbl_bahan_scm')->where('id', $detail->bahan_id)->value('nama_bahan');
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Stok '{$nama}' tidak cukup lagi. Tersedia: {$stokSebelum}, dibutuhkan: {$qty}.",
+                    ], 422);
+                }
+
+                $stokSesudah = $stokSebelum - $qty;
+
+                // Catat KELUAR dari warehouse asal
+                $stockOutId = DB::table('tbl_stock_transactions')->insertGetId([
+                    'bahan_id' => $detail->bahan_id,
+                    'unit_id' => $detail->unit_id,
+                    'warehouse_id' => $gt->from_warehouse_id,
+                    'jumlah' => $qty,
+                    'stok_sebelum' => $stokSebelum,
+                    'stok_sesudah' => $stokSesudah,
+                    'tipe' => 'KELUAR',
+                    'reference_type' => 'goods_transfer',
+                    'reference_id' => $gt->id,
+                    'harga_satuan' => $detail->harga_satuan,
+                    'total_nilai' => $qty * $detail->harga_satuan,
+                    'keterangan' => 'Transfer keluar ke warehouse #' . $gt->to_warehouse_id . ' (' . $gt->gt_number . ')',
+                    'created_by' => Auth::id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Update detail: catat qty_transferred dan link ke stock_out_id
+                DB::table('tbl_goods_transfer_details')
+                    ->where('id', $detail->id)
+                    ->update([
+                        'qty_transferred' => $qty,
+                        'stock_out_id' => $stockOutId,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            // Update status header
+            DB::table('tbl_goods_transfers')->where('id', $id)->update([
+                'status' => 'IN_TRANSIT',
+                'dispatched_by' => Auth::id(),
+                'updated_at' => now(),
+            ]);
+
+            DB::commit();
+
+            Log::info("GT {$gt->gt_number} dispatched. Stok keluar dari warehouse #{$gt->from_warehouse_id}");
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "GT {$gt->gt_number} berhasil di-dispatch. Stok keluar dari warehouse asal sudah dicatat.",
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('GoodsTransfer dispatch failed: ' . $e->getMessage(), [
+                'gt_id' => $id,
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal dispatch: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function completeGoodsTransfer(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.detail_id' => 'required|integer',
+            'items.*.qty_received' => 'required|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $gt = DB::table('tbl_goods_transfers')->where('id', $id)->first();
+
+            if (!$gt) {
+                return response()->json(['status' => 'error', 'message' => 'Transfer tidak ditemukan.'], 404);
+            }
+
+            if ($gt->status !== 'IN_TRANSIT') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Hanya transfer IN_TRANSIT yang bisa di-complete. Status: {$gt->status}",
+                ], 422);
+            }
+
+            // Index items by detail_id
+            $itemMap = collect($request->items)->keyBy('detail_id');
+
+            $details = DB::table('tbl_goods_transfer_details')
+                ->where('goods_transfer_id', $id)
+                ->get();
+
+            foreach ($details as $detail) {
+                $qtyReceived = (float) ($itemMap[$detail->id]['qty_received'] ?? 0);
+                if ($qtyReceived <= 0)
+                    continue;
+
+                // Tidak boleh melebihi qty_transferred
+                if ($qtyReceived > $detail->qty_transferred) {
+                    DB::rollBack();
+                    $nama = DB::table('tbl_bahan_scm')->where('id', $detail->bahan_id)->value('nama_bahan');
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "'{$nama}': qty diterima ({$qtyReceived}) melebihi qty dikirim ({$detail->qty_transferred}).",
+                    ], 422);
+                }
+
+                // Baca stok sebelum di warehouse TUJUAN — dengan lock
+                $stokSebelum = DB::table('tbl_stock_transactions')
+                    ->where('bahan_id', $detail->bahan_id)
+                    ->where('warehouse_id', $gt->to_warehouse_id)
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->orderByDesc('id')
+                    ->value('stok_sesudah') ?? 0;
+
+                $stokSesudah = $stokSebelum + $qtyReceived;
+
+                // Catat MASUK ke warehouse tujuan
+                $stockInId = DB::table('tbl_stock_transactions')->insertGetId([
+                    'bahan_id' => $detail->bahan_id,
+                    'unit_id' => $detail->unit_id,
+                    'warehouse_id' => $gt->to_warehouse_id,
+                    'jumlah' => $qtyReceived,
+                    'stok_sebelum' => $stokSebelum,
+                    'stok_sesudah' => $stokSesudah,
+                    'tipe' => 'MASUK',
+                    'reference_type' => 'goods_transfer',
+                    'reference_id' => $gt->id,
+                    'harga_satuan' => $detail->harga_satuan,
+                    'total_nilai' => $qtyReceived * $detail->harga_satuan,
+                    'keterangan' => 'Transfer masuk dari warehouse #' . $gt->from_warehouse_id . ' (' . $gt->gt_number . ')',
+                    'created_by' => Auth::id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Update detail
+                DB::table('tbl_goods_transfer_details')
+                    ->where('id', $detail->id)
+                    ->update([
+                        'qty_received' => $qtyReceived,
+                        'stock_in_id' => $stockInId,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            // Update status header
+            DB::table('tbl_goods_transfers')->where('id', $id)->update([
+                'status' => 'COMPLETED',
+                'actual_arrival' => now()->toDateString(),
+                'completed_by' => Auth::id(),
+                'updated_at' => now(),
+            ]);
+
+            DB::commit();
+
+            Log::info("GT {$gt->gt_number} COMPLETED. Stok masuk ke warehouse #{$gt->to_warehouse_id}");
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "GT {$gt->gt_number} selesai. Stok masuk ke warehouse tujuan sudah dicatat.",
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('GoodsTransfer complete failed: ' . $e->getMessage(), [
+                'gt_id' => $id,
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal complete: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function cancelGoodsTransfer($id)
+    {
+        $gt = DB::table('tbl_goods_transfers')->where('id', $id)->first();
+
+        if (!$gt) {
+            return response()->json(['status' => 'error', 'message' => 'Transfer tidak ditemukan.'], 404);
+        }
+
+        if ($gt->status !== 'DRAFT') {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Hanya transfer DRAFT yang bisa dibatalkan. Status: {$gt->status}. Jika sudah IN_TRANSIT, hubungi admin.",
+            ], 422);
+        }
+
+        DB::table('tbl_goods_transfers')->where('id', $id)->update([
+            'status' => 'CANCELLED',
+            'updated_at' => now(),
+        ]);
+
+        Log::info("GT {$gt->gt_number} dibatalkan oleh user " . Auth::id());
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Transfer {$gt->gt_number} berhasil dibatalkan.",
+        ]);
+    }
+    public function showGoodsTransfer($id)
+    {
+        $gt = DB::table('tbl_goods_transfers as gt')
+            ->join('tbl_warehouse as wf', 'gt.from_warehouse_id', '=', 'wf.id')
+            ->join('tbl_warehouse as wt', 'gt.to_warehouse_id', '=', 'wt.id')
+            ->where('gt.id', $id)
+            ->select('gt.*', 'wf.nama_warehouse as from_warehouse', 'wt.nama_warehouse as to_warehouse')
+            ->first();
+
+        if (!$gt) {
+            return response()->json(['status' => 'error', 'message' => 'Transfer tidak ditemukan.'], 404);
+        }
+
+        $details = DB::table('tbl_goods_transfer_details as d')
+            ->join('tbl_bahan_scm as b', 'd.bahan_id', '=', 'b.id')
+            ->leftJoin('tbl_units as u', 'd.unit_id', '=', 'u.id')
+            ->where('d.goods_transfer_id', $id)
+            ->select('d.*', 'b.nama_bahan', 'u.nama_unit')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'gt' => $gt,
+            'details' => $details,
+        ]);
+    }
+
     // === SALES INVOICE ===
     public function indexSalesInvoice()
     {
@@ -3503,6 +4677,307 @@ class SCMController extends Controller
             'pi' => $pi,
             'details' => $details,
         ]);
+    }
+
+    private function generateRequestNumber(): string
+    {
+        $today  = now()->format('Ymd');
+        $prefix = "TR-{$today}-";
+ 
+        $last = DB::table('tbl_transfer_request')
+            ->where('request_number', 'like', $prefix . '%')
+            ->orderBy('id', 'desc')
+            ->value('request_number');
+ 
+        $seq = $last ? ((int) substr($last, -3)) + 1 : 1;
+        return $prefix . str_pad($seq, 3, '0', STR_PAD_LEFT);
+    }
+ 
+    // =========================================================================
+    // INDEX — daftar semua transfer request
+    // GET /purchasing/transfer-request
+    // =========================================================================
+    public function index(Request $request)
+    {
+        $query = DB::table('tbl_transfer_request as tr')
+            ->join('tbl_warehouse as wf', 'tr.from_warehouse_id', '=', 'wf.id')
+            ->join('tbl_warehouse as wt', 'tr.to_warehouse_id',   '=', 'wt.id')
+            ->whereNull('tr.deleted_at');
+ 
+        // Filter status
+        if ($request->filled('status')) {
+            $query->where('tr.status', $request->status);
+        }
+ 
+        // Filter dari warehouse
+        if ($request->filled('from_warehouse_id')) {
+            $query->where('tr.from_warehouse_id', $request->from_warehouse_id);
+        }
+ 
+        // Filter ke warehouse
+        if ($request->filled('to_warehouse_id')) {
+            $query->where('tr.to_warehouse_id', $request->to_warehouse_id);
+        }
+ 
+        // Filter tanggal
+        if ($request->filled('start_date')) {
+            $query->where('tr.request_date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $query->where('tr.request_date', '<=', $request->end_date);
+        }
+ 
+        $requests = $query->select(
+            'tr.id', 'tr.request_number', 'tr.request_date',
+            'tr.needed_date', 'tr.status', 'tr.notes',
+            'tr.created_at',
+            'wf.nama_warehouse as from_warehouse',
+            'wt.nama_warehouse as to_warehouse',
+            DB::raw('(SELECT COUNT(*) FROM tbl_transfer_request_details WHERE request_id = tr.id) as item_count')
+        )
+        ->orderBy('tr.created_at', 'desc')
+        ->paginate(20)
+        ->withQueryString();
+ 
+        // Summary counts
+        $summary = [
+            'pending'     => DB::table('tbl_transfer_request')->whereNull('deleted_at')->where('status', 'PENDING')->count(),
+            'approved'    => DB::table('tbl_transfer_request')->whereNull('deleted_at')->where('status', 'APPROVED')->count(),
+            'rejected'    => DB::table('tbl_transfer_request')->whereNull('deleted_at')->where('status', 'REJECTED')->count(),
+            'transferred' => DB::table('tbl_transfer_request')->whereNull('deleted_at')->where('status', 'TRANSFERRED')->count(),
+        ];
+ 
+        $warehouses = DB::table('tbl_warehouse')->select('id', 'nama_warehouse')->orderBy('nama_warehouse')->get();
+ 
+        return view('Purchasing.SCM.purchaseRequest', compact('requests', 'summary', 'warehouses'));
+    }
+ 
+    // =========================================================================
+    // CREATE — form buat request baru
+    // GET /purchasing/transfer-request/create
+    // =========================================================================
+    public function create()
+    {
+        $warehouses = DB::table('tbl_warehouse')
+            ->select('id', 'nama_warehouse')
+            ->orderBy('nama_warehouse')
+            ->get();
+ 
+        $products = DB::table('tbl_bahan_scm as b')
+            ->leftJoin('tbl_bahan_unit as bu', function ($j) {
+                $j->on('b.id', '=', 'bu.bahan_id')->where('bu.is_base_unit', 1);
+            })
+            ->leftJoin('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+            ->select(
+                'b.id', 'b.nama_bahan', 'b.product_code',
+                'bu.unit_id', 'bu.id as bahan_unit_id',
+                DB::raw("COALESCE(u.nama_unit, 'unit') as nama_satuan")
+            )
+            ->orderBy('b.nama_bahan')
+            ->get();
+ 
+        // DC user yang login (jika ada warehouse_id di user)
+        $myWarehouseId = Auth::user()->warehouse_id ?? null;
+ 
+        return view('Purchasing.SCM.createPurchaseRequest', compact(
+            'warehouses', 'products', 'myWarehouseId'
+        ));
+    }
+ 
+    // =========================================================================
+    // STORE — simpan request baru
+    // POST /purchasing/transfer-request
+    // =========================================================================
+    public function store(Request $request)
+    {
+        $request->validate([
+            'from_warehouse_id' => 'required|integer|exists:tbl_warehouse,id',
+            'to_warehouse_id'   => 'required|integer|exists:tbl_warehouse,id|different:from_warehouse_id',
+            'request_date'      => 'required|date',
+            'needed_date'       => 'nullable|date|after_or_equal:request_date',
+            'items'             => 'required|array|min:1',
+            'items.*.bahan_id'  => 'required|integer|exists:tbl_bahan_scm,id',
+            'items.*.unit_id'   => 'nullable|integer',
+            'items.*.qty'       => 'required|numeric|min:0.01',
+        ]);
+ 
+        DB::beginTransaction();
+        try {
+            // Insert header
+            $requestId = DB::table('tbl_transfer_request')->insertGetId([
+                'request_number'    => $this->generateRequestNumber(),
+                'from_warehouse_id' => $request->from_warehouse_id,
+                'to_warehouse_id'   => $request->to_warehouse_id,
+                'request_date'      => $request->request_date,
+                'needed_date'       => $request->needed_date,
+                'status'            => 'PENDING',
+                'notes'             => $request->notes,
+                'created_by'        => Auth::id(),
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+ 
+            // Insert detail items
+            foreach ($request->items as $item) {
+                DB::table('tbl_transfer_request_details')->insert([
+                    'request_id'  => $requestId,
+                    'bahan_id'    => $item['bahan_id'],
+                    'unit_id'     => $item['unit_id'] ?? null,
+                    'qty_request' => $item['qty'],
+                    'qty_approved'=> 0,
+                    'notes'       => $item['notes'] ?? null,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+ 
+            DB::commit();
+ 
+            $num = DB::table('tbl_transfer_request')->where('id', $requestId)->value('request_number');
+            return redirect()->route('transfer-request.index')
+                ->with('success', "Transfer Request {$num} berhasil dibuat dan menunggu approval.");
+ 
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return redirect()->back()->withInput()
+                ->with('error', 'Gagal menyimpan: ' . $e->getMessage());
+        }
+    }
+ 
+    // =========================================================================
+    // SHOW — detail request + approval form
+    // GET /purchasing/transfer-request/{id}
+    // =========================================================================
+    public function show($id)
+    {
+        $tr = DB::table('tbl_transfer_request as tr')
+            ->join('tbl_warehouse as wf', 'tr.from_warehouse_id', '=', 'wf.id')
+            ->join('tbl_warehouse as wt', 'tr.to_warehouse_id',   '=', 'wt.id')
+            ->where('tr.id', $id)
+            ->whereNull('tr.deleted_at')
+            ->select(
+                'tr.*',
+                'wf.nama_warehouse as from_warehouse',
+                'wt.nama_warehouse as to_warehouse'
+            )
+            ->first();
+ 
+        if (!$tr) abort(404, 'Transfer Request tidak ditemukan.');
+ 
+        $details = DB::table('tbl_transfer_request_details as d')
+            ->join('tbl_bahan_scm as b', 'd.bahan_id', '=', 'b.id')
+            ->leftJoin('tbl_units as u', 'd.unit_id', '=', 'u.id')
+            ->where('d.request_id', $id)
+            ->select(
+                'd.*',
+                'b.nama_bahan', 'b.product_code',
+                DB::raw("COALESCE(u.nama_unit, 'unit') as nama_satuan")
+            )
+            ->get();
+ 
+        // Stok bahan di DC tujuan (yang dimintai)
+        $stokDcTujuan = DB::table('tbl_stock_transactions as st')
+            ->join(
+                DB::raw('(SELECT MAX(id) as max_id
+                          FROM tbl_stock_transactions
+                          WHERE warehouse_id = ' . (int)$tr->to_warehouse_id . '
+                          AND deleted_at IS NULL
+                          GROUP BY bahan_id) as latest'),
+                'st.id', '=', 'latest.max_id'
+            )
+            ->where('st.warehouse_id', $tr->to_warehouse_id)
+            ->select('st.bahan_id', 'st.stok_sesudah')
+            ->get()
+            ->keyBy('bahan_id');
+ 
+        return view('Purchasing.TransferRequest.show', compact('tr', 'details', 'stokDcTujuan'));
+    }
+ 
+    // =========================================================================
+    // APPROVE — setujui request (bisa ubah qty_approved per item)
+    // POST /purchasing/transfer-request/{id}/approve
+    // =========================================================================
+    public function approve(Request $request, $id)
+    {
+        $request->validate([
+            'items'             => 'required|array|min:1',
+            'items.*.detail_id' => 'required|integer',
+            'items.*.qty_approved' => 'required|numeric|min:0',
+        ]);
+ 
+        $tr = DB::table('tbl_transfer_request')
+            ->where('id', $id)->whereNull('deleted_at')->first();
+ 
+        if (!$tr) abort(404);
+        if ($tr->status !== 'PENDING') {
+            return redirect()->back()
+                ->with('error', 'Request ini sudah diproses sebelumnya (status: ' . $tr->status . ').');
+        }
+ 
+        DB::beginTransaction();
+        try {
+            // Update qty_approved per item
+            foreach ($request->items as $item) {
+                DB::table('tbl_transfer_request_details')
+                    ->where('id', $item['detail_id'])
+                    ->where('request_id', $id)
+                    ->update([
+                        'qty_approved' => $item['qty_approved'],
+                        'updated_at'   => now(),
+                    ]);
+            }
+ 
+            // Update status header
+            DB::table('tbl_transfer_request')->where('id', $id)->update([
+                'status'      => 'APPROVED',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'notes'       => $request->approval_notes ?? null,
+                'updated_at'  => now(),
+            ]);
+ 
+            DB::commit();
+ 
+            $num = $tr->request_number;
+            return redirect()->route('transfer-request.show', $id)
+                ->with('success', "Transfer Request {$num} berhasil di-APPROVE.");
+ 
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Gagal approve: ' . $e->getMessage());
+        }
+    }
+ 
+    // =========================================================================
+    // REJECT — tolak request
+    // POST /purchasing/transfer-request/{id}/reject
+    // =========================================================================
+    public function reject(Request $request, $id)
+    {
+        $request->validate([
+            'rejection_reason' => 'required|string|min:5|max:500',
+        ]);
+ 
+        $tr = DB::table('tbl_transfer_request')
+            ->where('id', $id)->whereNull('deleted_at')->first();
+ 
+        if (!$tr) abort(404);
+        if ($tr->status !== 'PENDING') {
+            return redirect()->back()
+                ->with('error', 'Request ini sudah diproses sebelumnya.');
+        }
+ 
+        DB::table('tbl_transfer_request')->where('id', $id)->update([
+            'status'           => 'REJECTED',
+            'rejection_reason' => $request->rejection_reason,
+            'approved_by'      => Auth::id(),
+            'approved_at'      => now(),
+            'updated_at'       => now(),
+        ]);
+ 
+        $num = $tr->request_number;
+        return redirect()->route('transfer-request.index')
+            ->with('success', "Transfer Request {$num} telah di-REJECT.");
     }
 
     public function indexTransfer()

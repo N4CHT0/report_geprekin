@@ -67,7 +67,19 @@ class AuthController extends Controller
             'password' => $request->password,
         ];
 
-        if (!Auth::attempt($credentials, $request->boolean('remember'))) {
+        try {
+            $loginOk = Auth::attempt($credentials, $request->boolean('remember'));
+        } catch (\RuntimeException $e) {
+            RateLimiter::hit($throttleKey, 60);
+
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'Password akun ini masih memakai format lama. Silakan reset password atau hubungi admin.',
+                ]);
+        }
+
+        if (!$loginOk) {
             RateLimiter::hit($throttleKey, 60);
 
             return back()
@@ -116,11 +128,23 @@ class AuthController extends Controller
 
         // SCM / DC
         if ($user->role === 'admindc') {
-            return redirect()->route('dashboard.scm.dc');
+            return redirect()->route('purchasing.dashboardSCM');
+        }
+
+        if ($user->role === 'superadmin_scm') {
+            return redirect()->route('purchasing.dashboardSCM');
+        }
+
+        if ($user->role === 'purchasing') {
+            return redirect()->route('purchase-order.index');
         }
 
         // Maintenance
         if ($user->role === 'maintenance') {
+            return redirect()->route('ticketing.index');
+        }
+
+        if ($user->role === 'ticketing_scm') {
             return redirect()->route('ticketing.index');
         }
 
@@ -135,7 +159,7 @@ class AuthController extends Controller
             return redirect()
                 ->route('login')
                 ->withErrors([
-                    'email' => 'Akun tidak terkait investor.',
+                    'email' => 'Akun tidak terkait dengan daftar role.',
                 ]);
         }
 

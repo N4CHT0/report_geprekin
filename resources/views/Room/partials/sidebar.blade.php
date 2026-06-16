@@ -131,6 +131,57 @@
             <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Pengaturan</span>
         </a>
         @endif
+
+        <div x-show="desktopSidebarOpen" class="my-2 border-t border-slate-500/30 mr-5"></div>
+        
+        <div x-show="desktopSidebarOpen" class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 whitespace-nowrap">Inventaris IT</div>
+
+        <a href="{{ route('inventory.dashboard') }}" title="Analitik Inventaris"
+            class="group flex items-center gap-3 py-2.5 px-4 transition-all overflow-hidden {{ request()->routeIs('inventory.dashboard') ? 'nav-item-active' : 'hover:bg-[#3D5B7A] hover:text-white rounded-l-xl' }}"
+            :class="!desktopSidebarOpen ? 'rounded-xl justify-center px-0' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+            </svg>
+            <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Analitik Inventaris</span>
+        </a>
+
+        <a href="{{ route('inventory.master') }}" title="Master Barang IT"
+            class="group flex items-center gap-3 py-2.5 px-4 transition-all overflow-hidden {{ request()->routeIs('inventory.master') || request()->routeIs('inventory.assign') ? 'nav-item-active' : 'hover:bg-[#3D5B7A] hover:text-white rounded-l-xl' }}"
+            :class="!desktopSidebarOpen ? 'rounded-xl justify-center px-0' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+            </svg>
+            <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Master Barang IT</span>
+        </a>
+
+        <a href="{{ route('inventory.audit') }}" title="Audit & Scanner"
+            class="group flex items-center gap-3 py-2.5 px-4 transition-all overflow-hidden {{ request()->routeIs('inventory.audit') ? 'nav-item-active' : 'hover:bg-[#3D5B7A] hover:text-white rounded-l-xl' }}"
+            :class="!desktopSidebarOpen ? 'rounded-xl justify-center px-0' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+            </svg>
+            <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Audit Scanner</span>
+        </a>
+
+        <a href="{{ route('inventory.tickets') }}" title="Maintenance Tiket"
+            class="group flex items-center gap-3 py-2.5 px-4 transition-all overflow-hidden {{ request()->routeIs('inventory.tickets') ? 'nav-item-active' : 'hover:bg-[#3D5B7A] hover:text-white rounded-l-xl' }}"
+            :class="!desktopSidebarOpen ? 'rounded-xl justify-center px-0' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Maintenance Tiket</span>
+        </a>
+
+        <a href="{{ route('inventory.disposals') }}" title="Approval Disposal"
+            class="group flex items-center gap-3 py-2.5 px-4 transition-all overflow-hidden {{ request()->routeIs('inventory.disposals') ? 'nav-item-active' : 'hover:bg-[#3D5B7A] hover:text-white rounded-l-xl' }}"
+            :class="!desktopSidebarOpen ? 'rounded-xl justify-center px-0' : ''">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            <span x-show="desktopSidebarOpen" class="text-[13px] font-medium whitespace-nowrap">Approval Disposal</span>
+        </a>
+
     </nav>
 
     <div class="p-5 mb-1 mt-auto border-t border-slate-500/20">

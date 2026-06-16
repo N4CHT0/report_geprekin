@@ -36,7 +36,7 @@ use App\Services\EsbLedgerService;
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use Maatwebsite\Excel\Concerns\WithEvents;
-use App\Jobs\SyncPnlLiveAllBranchesJob;
+use App\Jobs\SyncPnlLivePreparePagesJob;
 
 class InvestorReportController extends Controller
 {
@@ -188,7 +188,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -213,7 +213,7 @@ class InvestorReportController extends Controller
             ->select('o.id', 'o.nama_outlet')
             ->orderBy('o.nama_outlet');
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -511,7 +511,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -790,9 +790,15 @@ class InvestorReportController extends Controller
 
         [$tahun, $bulan] = explode('-', $bulanTahun);
 
-        if ($user->role === 'superadmin') {
-            $mitraIds = DB::table('tbl_mitra')->pluck('id')->toArray();
-        } else {
+        /*
+         |--------------------------------------------------------------------------
+         | Permission-driven outlet scope
+         |--------------------------------------------------------------------------
+         | Role investor tetap dibatasi berdasarkan relasi tbl_investor -> tbl_mitra.
+         | Role operasional seperti spv/leader/crew tidak wajib punya data investor.
+         | Akses halaman sudah dikontrol oleh middleware permission di route.
+         */
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -805,6 +811,8 @@ class InvestorReportController extends Controller
                 ->where('investor_id', $investorId)
                 ->pluck('id')
                 ->toArray();
+        } else {
+            $mitraIds = DB::table('tbl_mitra')->pluck('id')->toArray();
         }
 
         $outlets = DB::table('tbl_outlets as o')
@@ -960,7 +968,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -985,7 +993,7 @@ class InvestorReportController extends Controller
             ->select('o.id', 'o.nama_outlet')
             ->orderBy('o.nama_outlet');
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -1266,7 +1274,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -1566,7 +1574,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -1591,7 +1599,7 @@ class InvestorReportController extends Controller
             ->select('o.id', 'o.nama_outlet')
             ->orderBy('o.nama_outlet');
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -1785,7 +1793,7 @@ class InvestorReportController extends Controller
                 'a.nama_area'
             );
 
-        if ($user->role !== 'superadmin') {
+        if (strtolower((string) ($user->role ?? '')) === 'investor') {
             $investorId = DB::table('tbl_investor')
                 ->where('user_id', $user->id)
                 ->value('id');
@@ -2073,26 +2081,39 @@ class InvestorReportController extends Controller
             )
             ->orderBy('o.nama_outlet');
 
-        if ($user->role === 'superadmin') {
-            return $query->get();
+        $role = strtolower((string) ($user->role ?? ''));
+
+        if ($role === 'investor') {
+            $investorId = DB::table('tbl_investor')
+                ->where('user_id', $user->id)
+                ->value('id');
+
+            if (!$investorId) {
+                abort(403, 'Investor tidak ditemukan.');
+            }
+
+            $mitraIds = DB::table('tbl_mitra')
+                ->where('investor_id', $investorId)
+                ->pluck('id')
+                ->toArray();
+
+            return $query
+                ->whereIn('o.mitra_id', $mitraIds)
+                ->get();
         }
 
-        $investorId = DB::table('tbl_investor')
-            ->where('user_id', $user->id)
-            ->value('id');
-
-        if (!$investorId) {
-            abort(403, 'Investor tidak ditemukan.');
+        /*
+         * Role non-investor seperti spv/leader/crew tidak wajib ada di tbl_investor.
+         * Akses halaman dikontrol oleh middleware permission.
+         * Jika user punya outlet_id/area_id, scope data otomatis dipersempit.
+         */
+        if (!empty($user->outlet_id)) {
+            $query->where('o.id', (int) $user->outlet_id);
+        } elseif (!empty($user->area_id)) {
+            $query->where('o.area_id', (int) $user->area_id);
         }
 
-        $mitraIds = DB::table('tbl_mitra')
-            ->where('investor_id', $investorId)
-            ->pluck('id')
-            ->toArray();
-
-        return $query
-            ->whereIn('o.mitra_id', $mitraIds)
-            ->get();
+        return $query->get();
     }
 
     private function resolveEsbTokenKeyFromOutlet(object $outlet): string
@@ -2335,8 +2356,8 @@ class InvestorReportController extends Controller
             'end_date' => ['required', 'date'],
         ]);
 
-        $start = Carbon::parse($request->start_date)->startOfDay();
-        $end = Carbon::parse($request->end_date)->startOfDay();
+        $start = \Carbon\Carbon::parse($request->start_date)->startOfDay();
+        $end = \Carbon\Carbon::parse($request->end_date)->startOfDay();
 
         if ($start->gt($end)) {
             $message = 'Tanggal mulai tidak boleh lebih besar dari tanggal akhir.';
@@ -2352,7 +2373,7 @@ class InvestorReportController extends Controller
                 : back()->with('error', $message);
         }
 
-        $credential = DB::table('tbl_api_credentials')
+        $credential = \Illuminate\Support\Facades\DB::table('tbl_api_credentials')
             ->where('credential_code', 'OKNHO')
             ->where('is_active', 1)
             ->first();
@@ -2364,7 +2385,7 @@ class InvestorReportController extends Controller
                 : back()->with('error', $message);
         }
 
-        $units = DB::table('tbl_outlets')
+        $units = \Illuminate\Support\Facades\DB::table('tbl_outlets')
             ->where('credential_id', $credential->id)
             ->whereNotNull('esb_branch_code')
             ->where('esb_branch_code', '!=', '')
@@ -2379,7 +2400,16 @@ class InvestorReportController extends Controller
                 : back()->with('error', $message);
         }
 
-        $lock = Cache::lock('pnl_live_sync_oknho_start_lock', 10);
+        $branchCodes = $units
+            ->pluck('esb_branch_code')
+            ->filter()
+            ->map(fn ($v) => strtoupper(trim((string) $v)))
+            ->filter(fn ($v) => $v !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $lock = \Illuminate\Support\Facades\Cache::store('redis')->lock('pnl_live_sync_oknho_start_lock', 10);
 
         if (! $lock->get()) {
             $message = 'Masih ada proses start sync PNL live yang sedang berjalan.';
@@ -2389,21 +2419,21 @@ class InvestorReportController extends Controller
         }
 
         try {
-            $activeKey = Cache::get('pnl_live_sync_oknho_active_key');
+            $activeKey = \Illuminate\Support\Facades\Cache::store('redis')->get('pnl_live_sync_oknho_active_key');
 
             if ($activeKey) {
-                $existing = Cache::get("pnl_live_sync:{$activeKey}");
+                $existing = \Illuminate\Support\Facades\Cache::store('redis')->get("pnl_live_sync:{$activeKey}");
 
                 if (! $existing) {
-                    Cache::forget('pnl_live_sync_oknho_active_key');
+                    \Illuminate\Support\Facades\Cache::store('redis')->forget('pnl_live_sync_oknho_active_key');
                 } else {
                     $existingStatus = $existing['status'] ?? null;
                     $updatedAt = isset($existing['updated_at']) ? strtotime($existing['updated_at']) : null;
                     $isStale = $updatedAt ? ((time() - $updatedAt) > 1800) : true;
 
-                    if (in_array($existingStatus, ['done', 'failed'], true) || $isStale) {
-                        Cache::forget('pnl_live_sync_oknho_active_key');
-                        Cache::forget("pnl_live_sync:{$activeKey}");
+                    if (in_array($existingStatus, ['done', 'done_with_errors', 'failed'], true) || $isStale) {
+                        \Illuminate\Support\Facades\Cache::store('redis')->forget('pnl_live_sync_oknho_active_key');
+                        \Illuminate\Support\Facades\Cache::store('redis')->forget("pnl_live_sync:{$activeKey}");
                     } else {
                         $message = 'Masih ada sync PNL live yang sedang berjalan.';
                         return $request->expectsJson()
@@ -2413,21 +2443,31 @@ class InvestorReportController extends Controller
                 }
             }
 
-            $syncKey = 'pnl-live-oknho-' . Str::uuid()->toString();
+            $syncKey = 'pnl-live-oknho-' . \Illuminate\Support\Str::uuid()->toString();
 
-            Cache::put('pnl_live_sync_oknho_active_key', $syncKey, now()->addHours(6));
+            \Illuminate\Support\Facades\Cache::store('redis')->put('pnl_live_sync_oknho_active_key', $syncKey, now()->addHours(12));
 
-            Cache::put("pnl_live_sync:{$syncKey}", [
+            \Illuminate\Support\Facades\Cache::store('redis')->put("pnl_live_sync:{$syncKey}", [
                 'status' => 'queued',
-                'message' => 'Sync PNL live masuk antrian.',
+                'message' => 'Sync PNL live masuk antrian paralel.',
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date,
                 'credential_id' => (int) $credential->id,
                 'credential_code' => 'OKNHO',
-                'total_branches' => 0,
-                'processed_branches' => 0,
-                'success_branches' => 0,
-                'failed_branches' => 0,
+                'total_outlets' => $units->count(),
+                'total_unique_branches' => count($branchCodes),
+                'total_branch_tasks' => 0,
+                'prepared_branch_tasks' => 0,
+                'success_branch_tasks' => 0,
+                'failed_branch_tasks' => 0,
+                'total_pages' => 0,
+                'dispatched_pages' => 0,
+                'processed_pages' => 0,
+                'success_pages' => 0,
+                'failed_pages' => 0,
+                'total_api_rows' => 0,
+                'total_saved_rows' => 0,
+                'total_skipped_rows' => 0,
                 'progress' => 0,
                 'requested_at' => now()->toDateTimeString(),
                 'started_at' => null,
@@ -2437,17 +2477,21 @@ class InvestorReportController extends Controller
                 'logs' => [],
                 'rows' => $this->buildDefaultRows($units->count()),
                 'units' => $units->map(fn ($u) => (array) $u)->values()->all(),
+                'branch_codes' => $branchCodes,
                 'grandPendapatan' => 0,
                 'grandLaba' => 0,
                 'grandNpm' => 0,
-            ], now()->addHours(6));
+                'finalize_dispatched' => false,
+                'finalized' => false,
+            ], now()->addHours(12));
 
-            SyncPnlLiveAllBranchesJob::dispatch(
-                $syncKey,
-                'OKNHO',
-                (int) $credential->id,
-                $request->start_date,
-                $request->end_date
+            SyncPnlLivePreparePagesJob::dispatch(
+                syncKey: $syncKey,
+                credentialCode: 'OKNHO',
+                credentialId: (int) $credential->id,
+                startDate: $request->start_date,
+                endDate: $request->end_date,
+                limit: 100
             )->onConnection('redis')->onQueue('esb-pnl');
 
             $redirectUrl = route('investor.laporan.profitnloss.oknho', [
@@ -2459,15 +2503,17 @@ class InvestorReportController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'status' => 'queued',
-                    'message' => 'Sync PNL live sedang diproses di background.',
+                    'message' => 'Sync PNL live paralel sedang diproses di background.',
                     'sync_key' => $syncKey,
                     'redirect_url' => $redirectUrl,
+                    'total_outlets' => $units->count(),
+                    'total_unique_branches' => count($branchCodes),
                 ]);
             }
 
             return redirect()->to($redirectUrl);
         } catch (\Throwable $e) {
-            Log::error('START SYNC PNL LIVE FAILED', [
+            \Illuminate\Support\Facades\Log::error('START SYNC PNL LIVE OPTIMIZED FAILED', [
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date,
                 'message' => $e->getMessage(),

@@ -98,7 +98,7 @@
                                 <button type="button" class="btn btn-outline-secondary d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#importModal">
                                     <i class="bi bi-upload me-1"></i> Import Excel
                                 </button>
-                                <a href="{{ route('products.create') }}" class="btn btn-primary px-3 shadow-sm d-flex align-items-center text-white" style="background-color: #696cff; border-color: #696cff;">
+                                <a href="{{ route('scm.create-bahan') }}" class="btn btn-primary px-3 shadow-sm d-flex align-items-center text-white" style="background-color: #696cff; border-color: #696cff;">
                                     <i class="bi bi-plus-circle me-1"></i> Add Product
                                 </a>
                             </div>

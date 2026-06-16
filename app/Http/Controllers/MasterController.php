@@ -35,11 +35,15 @@ class MasterController extends Controller
         $request->validate([
             'nama_outlet' => 'required|string|max:255',
             'status' => 'required|in:existing,new',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         DB::table('tbl_outlets')->insert([
             'nama_outlet' => $request->nama_outlet,
             'status'      => $request->status,
+            'latitude'    => $request->latitude,
+            'longitude'   => $request->longitude,
             'created_at'  => now(),
             'updated_at'  => now(),
         ]);
@@ -51,13 +55,17 @@ class MasterController extends Controller
     {
         $request->validate([
             'nama_outlet' => 'required|string|max:255',
-            'status'      => 'required|in:existing,go,tutup'
+            'status'      => 'required|in:existing,go,tutup',
+            'latitude'    => 'nullable|numeric',
+            'longitude'   => 'nullable|numeric',
         ]);
 
         $outlet = M_Outlet::findOrFail($id);
         $outlet->update([
             'nama_outlet' => $request->nama_outlet,
             'status'      => $request->status,
+            'latitude'    => $request->latitude,
+            'longitude'   => $request->longitude,
         ]);
 
         return redirect()->route('outlet.master')->with('success', 'Outlet berhasil diupdate.');

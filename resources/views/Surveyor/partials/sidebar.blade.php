@@ -153,6 +153,20 @@
             <span>Heatmap Lokasi</span>
         </a>
 
+        <div class="nav-section">Data Master (Admin)</div>
+
+        <a href="{{ route('master.boq.index') }}"
+           class="side-link {{ request()->routeIs('master.boq.*') ? 'active' : '' }}">
+            <i class="bi bi-wallet2"></i>
+            <span>Master BOQ</span>
+        </a>
+
+        <a href="{{ route('ai.collector.index') }}"
+           class="side-link {{ request()->routeIs('ai.collector.*') ? 'active' : '' }}">
+            <i class="bi bi-database-check"></i>
+            <span>AI Dataset Collector</span>
+        </a>
+
     </nav>
 
     <div class="sidebar-footer">

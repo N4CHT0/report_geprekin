@@ -483,160 +483,194 @@ class MasterInvestorController extends Controller
     }
     
     // Master Users Operasional (multi outlet)
-    public function userOperasional()
-    {
-        $data = DB::table('users as u')
-            ->leftJoin('tbl_users_outlet as uo', 'uo.user_id', '=', 'u.id')
-            ->leftJoin('tbl_outlets as o', 'o.id', '=', 'uo.outlet_id')
-            ->select(
-                'u.id',
-                'u.name',
-                'u.email',
-                'u.role',
-                'u.created_at',
-                DB::raw("GROUP_CONCAT(o.nama_outlet ORDER BY o.nama_outlet SEPARATOR ', ') as nama_outlets"),
-                DB::raw("GROUP_CONCAT(uo.outlet_id ORDER BY uo.outlet_id SEPARATOR ',') as outlet_ids")
-            )
-            ->whereIn('u.role', ['crew', 'leader', 'spv', 'tm_manager'])
-            ->groupBy('u.id', 'u.name', 'u.email', 'u.role', 'u.created_at')
-            ->orderBy('u.name', 'asc')
-            ->get();
-    
-        $outlets = DB::table('tbl_outlets')
-            ->select('id', 'nama_outlet')
-            ->orderBy('nama_outlet', 'asc')
-            ->get();
-    
-        return view('Investor.Master.userOperasional', compact('data', 'outlets'));
+public function userOperasional($role = null)
+{
+    $roles = ['crew', 'leader', 'spv', 'tm_manager'];
+
+    if ($role !== null && !in_array($role, $roles)) {
+        abort(404);
     }
 
-    public function storeUserOperasional(Request $request)
-    {
-        $request->validate([
-            'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email',
-            'password'     => 'required|min:6',
-            'role'         => 'required|in:crew,leader,spv,tm_manager',
-            'outlet_ids'   => 'required|array|min:1',
-            'outlet_ids.*' => 'exists:tbl_outlets,id',
+    $query = DB::table('users as u')
+        ->leftJoin('tbl_users_outlet as uo', 'uo.user_id', '=', 'u.id')
+        ->leftJoin('tbl_outlets as o', 'o.id', '=', 'uo.outlet_id')
+        ->select(
+            'u.id',
+            'u.name',
+            'u.email',
+            'u.role',
+            'u.created_at',
+            DB::raw("GROUP_CONCAT(o.nama_outlet ORDER BY o.nama_outlet SEPARATOR ', ') as nama_outlets"),
+            DB::raw("GROUP_CONCAT(uo.outlet_id ORDER BY uo.outlet_id SEPARATOR ',') as outlet_ids")
+        )
+        ->whereIn('u.role', $roles);
+
+    if ($role !== null) {
+        $query->where('u.role', $role);
+    }
+
+    $data = $query
+        ->groupBy('u.id', 'u.name', 'u.email', 'u.role', 'u.created_at')
+        ->orderBy('u.name', 'asc')
+        ->get();
+
+    $outlets = DB::table('tbl_outlets')
+        ->select('id', 'nama_outlet')
+        ->orderBy('nama_outlet', 'asc')
+        ->get();
+
+    return view('Investor.Master.userOperasional', compact('data', 'outlets', 'role'));
+}
+
+public function storeUserOperasional(Request $request)
+{
+    $request->validate([
+        'name'         => 'required|string|max:255',
+        'email'        => 'required|email|unique:users,email',
+        'password'     => 'required|min:6',
+        'role'         => 'required|in:crew,leader,spv,tm_manager',
+        'outlet_ids'   => 'required|array|min:1',
+        'outlet_ids.*' => 'exists:tbl_outlets,id',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $outletIds = array_values(array_unique($request->outlet_ids ?? []));
+
+        $userId = DB::table('users')->insertGetId([
+            'name'       => $request->name,
+            'email'      => $request->email,
+            'password'   => Hash::make($request->password),
+            'role'       => $request->role,
+            'outlet_id'  => $outletIds[0] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-    
-        DB::beginTransaction();
-    
-        try {
-            $outletIds = array_values(array_unique($request->outlet_ids ?? []));
-    
-            $userId = DB::table('users')->insertGetId([
-                'name'       => $request->name,
-                'email'      => $request->email,
-                'password'   => Hash::make($request->password),
-                'role'       => $request->role,
-                'outlet_id'  => $outletIds[0] ?? null,
+
+        $rows = [];
+
+        foreach ($outletIds as $i => $oid) {
+            $rows[] = [
+                'user_id'    => $userId,
+                'outlet_id'  => $oid,
+                'is_primary' => $i === 0 ? 1 : 0,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
-    
-            $rows = [];
-            foreach ($outletIds as $i => $oid) {
-                $rows[] = [
-                    'user_id'    => $userId,
-                    'outlet_id'  => $oid,
-                    'is_primary' => $i === 0 ? 1 : 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-    
-            DB::table('tbl_users_outlet')->insert($rows);
-    
-            DB::commit();
-    
-            return redirect()->route('investor.user.operasional')
-                ->with('success', 'User operasional berhasil ditambahkan.');
-        } catch (\Throwable $e) {
-            DB::rollBack();
-    
-            return redirect()->route('investor.user.operasional')
-                ->with('error', 'Gagal menambahkan user operasional: ' . $e->getMessage());
+            ];
         }
-    }
 
-    public function updateUserOperasional(Request $request, $id)
-    {
-        $request->validate([
-            'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email,' . $id,
-            'password'     => 'nullable|min:6',
-            'role'         => 'required|in:crew,leader,spv,tm_manager',
-            'outlet_ids'   => 'required|array|min:1',
-            'outlet_ids.*' => 'exists:tbl_outlets,id',
-        ]);
-    
-        DB::beginTransaction();
-    
-        try {
-            $outletIds = array_values(array_unique($request->outlet_ids ?? []));
-    
-            $payload = [
-                'name'       => $request->name,
-                'email'      => $request->email,
-                'role'       => $request->role,
-                'outlet_id'  => $outletIds[0] ?? null,
+        if (!empty($rows)) {
+            DB::table('tbl_users_outlet')->insert($rows);
+        }
+
+        DB::commit();
+
+        return redirect()->route('investor.user.operasional.role', $request->role)
+            ->with('success', 'User operasional berhasil ditambahkan.');
+    } catch (\Throwable $e) {
+        DB::rollBack();
+
+        return redirect()->back()
+            ->withInput()
+            ->with('error', 'Gagal menambahkan user operasional: ' . $e->getMessage());
+    }
+}
+
+public function updateUserOperasional(Request $request, $id)
+{
+    $request->validate([
+        'name'         => 'required|string|max:255',
+        'email'        => 'required|email|unique:users,email,' . $id,
+        'password'     => 'nullable|min:6',
+        'role'         => 'required|in:crew,leader,spv,tm_manager',
+        'outlet_ids'   => 'required|array|min:1',
+        'outlet_ids.*' => 'exists:tbl_outlets,id',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $outletIds = array_values(array_unique($request->outlet_ids ?? []));
+
+        $payload = [
+            'name'       => $request->name,
+            'email'      => $request->email,
+            'role'       => $request->role,
+            'outlet_id'  => $outletIds[0] ?? null,
+            'updated_at' => now(),
+        ];
+
+        if ($request->filled('password')) {
+            $payload['password'] = Hash::make($request->password);
+        }
+
+        DB::table('users')->where('id', $id)->update($payload);
+
+        DB::table('tbl_users_outlet')->where('user_id', $id)->delete();
+
+        $rows = [];
+
+        foreach ($outletIds as $i => $oid) {
+            $rows[] = [
+                'user_id'    => $id,
+                'outlet_id'  => $oid,
+                'is_primary' => $i === 0 ? 1 : 0,
+                'created_at' => now(),
                 'updated_at' => now(),
             ];
-    
-            if ($request->filled('password')) {
-                $payload['password'] = Hash::make($request->password);
-            }
-    
-            DB::table('users')->where('id', $id)->update($payload);
-    
-            DB::table('tbl_users_outlet')->where('user_id', $id)->delete();
-    
-            $rows = [];
-            foreach ($outletIds as $i => $oid) {
-                $rows[] = [
-                    'user_id'    => $id,
-                    'outlet_id'  => $oid,
-                    'is_primary' => $i === 0 ? 1 : 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-    
-            DB::table('tbl_users_outlet')->insert($rows);
-    
-            DB::commit();
-    
-            return redirect()->route('investor.user.operasional')
-                ->with('success', 'User operasional berhasil diperbarui.');
-        } catch (\Throwable $e) {
-            DB::rollBack();
-    
-            return redirect()->route('investor.user.operasional')
-                ->with('error', 'Gagal update user operasional: ' . $e->getMessage());
         }
+
+        if (!empty($rows)) {
+            DB::table('tbl_users_outlet')->insert($rows);
+        }
+
+        DB::commit();
+
+        return redirect()->route('investor.user.operasional.role', $request->role)
+            ->with('success', 'User operasional berhasil diperbarui.');
+    } catch (\Throwable $e) {
+        DB::rollBack();
+
+        return redirect()->back()
+            ->withInput()
+            ->with('error', 'Gagal update user operasional: ' . $e->getMessage());
+    }
+}
+
+public function destroyUserOperasional($id)
+{
+    $roles = ['crew', 'leader', 'spv', 'tm_manager'];
+
+    $user = DB::table('users')->where('id', $id)->first();
+
+    if (!$user) {
+        return redirect()->route('investor.user.operasional')
+            ->with('error', 'User tidak ditemukan.');
     }
 
-    public function destroyUserOperasional($id)
-    {
-        $user = DB::table('users')->where('id', $id)->first();
-    
-        if (!$user) {
-            return redirect()->route('investor.user.operasional')
-                ->with('error', 'User tidak ditemukan.');
-        }
-    
-        if (!in_array($user->role, ['crew', 'leader', 'spv', 'tm_manager'])) {
-            return redirect()->route('investor.user.operasional')
-                ->with('error', 'User bukan kategori operasional.');
-        }
-    
-        DB::table('users')->where('id', $id)->delete();
-    
+    if (!in_array($user->role, $roles)) {
         return redirect()->route('investor.user.operasional')
-            ->with('success', 'User operasional berhasil dihapus.');
+            ->with('error', 'User bukan kategori operasional.');
     }
+
+    DB::beginTransaction();
+
+    try {
+        DB::table('tbl_users_outlet')->where('user_id', $id)->delete();
+        DB::table('users')->where('id', $id)->delete();
+
+        DB::commit();
+
+        return redirect()->route('investor.user.operasional.role', $user->role)
+            ->with('success', 'User operasional berhasil dihapus.');
+    } catch (\Throwable $e) {
+        DB::rollBack();
+
+        return redirect()->back()
+            ->with('error', 'Gagal menghapus user operasional: ' . $e->getMessage());
+    }
+}
 
     // Import file Excel
     public function importOutlet(Request $request)
@@ -3064,4 +3098,398 @@ class MasterInvestorController extends Controller
             ])
         );
     }
+
+// ===================== MASTER ALL USERS =====================
+private function allUserRoles(): array
+{
+    return [
+        'admindc',
+        'crew',
+        'investor',
+        'leader',
+        'maintenance',
+        'purchasing',
+        'spv',
+        'superadmin',
+        'superadmin_audit',
+        'ticketing_scm',
+        'tm',
+        'tm_manager',
+        'userhospace',
+        'superadmin_scm',
+    ];
+}
+
+public function allUsers()
+{
+    $roles = $this->allUserRoles();
+
+    $outlets = Cache::remember('all_users:outlets', now()->addMinutes(10), function () {
+        return DB::table('tbl_outlets')
+            ->select('id', 'nama_outlet')
+            ->orderBy('nama_outlet', 'asc')
+            ->get();
+    });
+
+    return view('Investor.Master.userMasterAll', compact('roles', 'outlets'));
+}
+
+public function allUsersData(Request $request)
+{
+    $roles = $this->allUserRoles();
+
+    $query = DB::table('users as u')
+        ->leftJoin('tbl_outlets as o', 'o.id', '=', 'u.outlet_id')
+        ->select(
+            'u.id',
+            'u.name',
+            'u.email',
+            'u.role',
+            'u.outlet_id',
+            'u.area_id',
+            'u.previous_role',
+            'u.created_at',
+            'o.nama_outlet'
+        )
+        ->whereIn('u.role', $roles);
+
+    return DataTables::of($query)
+        ->addIndexColumn()
+        ->editColumn('role', function ($row) {
+            return '<span class="badge bg-dark">' . e($row->role) . '</span>';
+        })
+        ->addColumn('outlet', function ($row) {
+            return $row->nama_outlet ?: '-';
+        })
+        ->editColumn('area_id', function ($row) {
+            return $row->area_id ?: '-';
+        })
+        ->editColumn('previous_role', function ($row) {
+            return $row->previous_role ?: '-';
+        })
+        ->editColumn('created_at', function ($row) {
+            return $row->created_at ?: '-';
+        })
+        ->addColumn('aksi', function ($row) {
+            $deleteUrl = route('investor.user.all.delete', $row->id);
+
+            return '
+                <button type="button"
+                    class="btn btn-sm btn-outline-primary me-1 btn-edit"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editAllUserModal"
+                    data-id="' . e($row->id) . '"
+                    data-name="' . e($row->name) . '"
+                    data-email="' . e($row->email) . '"
+                    data-role="' . e($row->role) . '"
+                    data-outlet_id="' . e($row->outlet_id) . '"
+                    data-area_id="' . e($row->area_id) . '">
+                    <i class="bi bi-pencil-square me-1"></i> Ubah
+                </button>
+
+                <form action="' . $deleteUrl . '"
+                    method="POST"
+                    class="d-inline form-delete">
+                    ' . csrf_field() . method_field('DELETE') . '
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1"></i> Hapus
+                    </button>
+                </form>
+            ';
+        })
+        ->rawColumns(['role', 'aksi'])
+        ->make(true);
+}
+
+public function storeAllUser(Request $request)
+{
+    $roles = $this->allUserRoles();
+
+    $request->validate([
+        'name'      => 'required|string|max:255',
+        'email'     => 'required|email|unique:users,email',
+        'password'  => 'required|min:6',
+        'role'      => 'required|in:' . implode(',', $roles),
+        'outlet_id' => 'nullable|exists:tbl_outlets,id',
+        'area_id'   => 'nullable|integer',
+    ]);
+
+    DB::table('users')->insert([
+        'name'       => $request->name,
+        'email'      => strtolower(trim($request->email)),
+        'password'   => Hash::make($request->password),
+        'role'       => $request->role,
+        'outlet_id'  => $request->outlet_id ?: null,
+        'area_id'    => $request->area_id ?: null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return redirect()
+        ->route('investor.user.all')
+        ->with('success', 'User berhasil ditambahkan.');
+}
+
+public function updateAllUser(Request $request, $id)
+{
+    $roles = $this->allUserRoles();
+
+    $request->validate([
+        'name'      => 'required|string|max:255',
+        'email'     => 'required|email|unique:users,email,' . $id,
+        'password'  => 'nullable|min:6',
+        'role'      => 'required|in:' . implode(',', $roles),
+        'outlet_id' => 'nullable|exists:tbl_outlets,id',
+        'area_id'   => 'nullable|integer',
+    ]);
+
+    $payload = [
+        'name'       => $request->name,
+        'email'      => strtolower(trim($request->email)),
+        'role'       => $request->role,
+        'outlet_id'  => $request->outlet_id ?: null,
+        'area_id'    => $request->area_id ?: null,
+        'updated_at' => now(),
+    ];
+
+    if ($request->filled('password')) {
+        $payload['password'] = Hash::make($request->password);
+    }
+
+    DB::table('users')
+        ->where('id', $id)
+        ->update($payload);
+
+    return redirect()
+        ->route('investor.user.all')
+        ->with('success', 'User berhasil diperbarui.');
+}
+
+public function destroyAllUser($id)
+{
+    $user = DB::table('users')->where('id', $id)->first();
+
+    if (!$user) {
+        return redirect()
+            ->route('investor.user.all')
+            ->with('error', 'User tidak ditemukan.');
+    }
+
+    DB::table('users')
+        ->where('id', $id)
+        ->delete();
+
+    return redirect()
+        ->route('investor.user.all')
+        ->with('success', 'User berhasil dihapus.');
+}
+
+    /*
+     |--------------------------------------------------------------------------
+     | MASTER BAHAN HO & MITRA
+     |--------------------------------------------------------------------------
+     | Submenu baru untuk mengelola harga bahan berdasarkan kategori_harga.
+     | Tidak mengubah nama outlet dan tidak mengubah logika master lain.
+     */
+
+    private function parseOutletIdsForBahanHoMitra($value): array
+    {
+        if (is_array($value)) {
+            $raw = $value;
+        } else {
+            $raw = explode(',', (string) $value);
+        }
+
+        return collect($raw)
+            ->map(fn ($id) => (int) trim((string) $id))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function getKategoriHargaFromOutletIds(array $outletIds): ?string
+    {
+        if (empty($outletIds)) {
+            return null;
+        }
+
+        return DB::table('tbl_outlets')
+            ->whereIn('id', $outletIds)
+            ->whereNotNull('kategori_harga')
+            ->orderByRaw("FIELD(kategori_harga, 'HO', 'MITRA')")
+            ->value('kategori_harga');
+    }
+
+    public function bahanHoMitraList(Request $request)
+    {
+        $kategoriHarga = strtoupper((string) $request->get('kategori_harga', 'all'));
+        $kategoriHarga = in_array($kategoriHarga, ['HO', 'MITRA'], true) ? $kategoriHarga : 'all';
+
+        $outletIds = $this->parseOutletIdsForBahanHoMitra($request->get('outlet_id', ''));
+
+        if (!empty($outletIds)) {
+            $kategoriOutlet = $this->getKategoriHargaFromOutletIds($outletIds);
+
+            if (!$kategoriOutlet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kategori harga outlet belum diset.',
+                    'data' => [],
+                ], 422);
+            }
+
+            // Jika kategori = semua tetapi user pilih outlet, data mengikuti kategori outlet tersebut.
+            if ($kategoriHarga === 'all') {
+                $kategoriHarga = $kategoriOutlet;
+            }
+        }
+
+        $rows = DB::table('tbl_bahan_mapping as bm')
+            ->join('tbl_bahan as b', 'b.id', '=', 'bm.bahan_id')
+            ->leftJoin('tbl_bahan_harga as bh_ho', function ($join) {
+                $join->on('bh_ho.bahan_id', '=', 'b.id')
+                    ->where('bh_ho.kategori_harga', '=', 'HO');
+            })
+            ->leftJoin('tbl_bahan_harga as bh_mitra', function ($join) {
+                $join->on('bh_mitra.bahan_id', '=', 'b.id')
+                    ->where('bh_mitra.kategori_harga', '=', 'MITRA');
+            })
+            ->select(
+                'b.id',
+                'bm.nama_sheet',
+                'b.nama_bahan',
+                DB::raw('COALESCE(b.harga_bahan, 0) as harga_master'),
+                DB::raw('COALESCE(bh_ho.harga, b.harga_bahan, 0) as harga_ho'),
+                DB::raw('COALESCE(bh_mitra.harga, b.harga_bahan, 0) as harga_mitra')
+            )
+            ->orderBy('bm.id')
+            ->get();
+
+        $data = collect();
+
+        foreach ($rows as $row) {
+            if ($kategoriHarga === 'HO' || $kategoriHarga === 'all') {
+                $data->push((object) [
+                    'id' => (int) $row->id,
+                    'nama_sheet' => $row->nama_sheet,
+                    'nama_bahan' => $row->nama_bahan,
+                    'kategori_harga' => 'HO',
+                    'harga_master' => (float) $row->harga_master,
+                    'harga_bahan' => (float) $row->harga_ho,
+                ]);
+            }
+
+            if ($kategoriHarga === 'MITRA' || $kategoriHarga === 'all') {
+                $data->push((object) [
+                    'id' => (int) $row->id,
+                    'nama_sheet' => $row->nama_sheet,
+                    'nama_bahan' => $row->nama_bahan,
+                    'kategori_harga' => 'MITRA',
+                    'harga_master' => (float) $row->harga_master,
+                    'harga_bahan' => (float) $row->harga_mitra,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'kategori_harga' => $kategoriHarga,
+            'data' => $data->values(),
+        ]);
+    }
+
+
+    public function bahanHoMitraUpdateAllKategori(Request $request)
+    {
+        $request->validate([
+            'bahan_id' => ['required', 'integer', 'exists:tbl_bahan,id'],
+            'kategori_harga' => ['required', 'in:HO,MITRA'],
+            'harga' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $bahanId = (int) $request->bahan_id;
+        $kategoriHarga = strtoupper((string) $request->kategori_harga);
+        $harga = (float) $request->harga;
+
+        DB::table('tbl_bahan_harga')->updateOrInsert(
+            [
+                'bahan_id' => $bahanId,
+                'kategori_harga' => $kategoriHarga,
+            ],
+            [
+                'harga' => $harga,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        $totalOutlet = DB::table('tbl_outlets')
+            ->where('kategori_harga', $kategoriHarga)
+            ->distinct()
+            ->count('nama_outlet');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Harga bahan untuk semua outlet {$kategoriHarga} berhasil diupdate. Total outlet unik terdampak: {$totalOutlet}.",
+        ]);
+    }
+
+    public function bahanHoMitraBulkUpdate(Request $request)
+    {
+        $request->validate([
+            'harga' => ['required', 'array'],
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($request->harga as $bahanId => $hargaByKategori) {
+                $bahanId = (int) $bahanId;
+
+                if ($bahanId <= 0 || !is_array($hargaByKategori)) {
+                    continue;
+                }
+
+                foreach ($hargaByKategori as $kategoriHarga => $harga) {
+                    $kategoriHarga = strtoupper((string) $kategoriHarga);
+
+                    if (!in_array($kategoriHarga, ['HO', 'MITRA'], true)) {
+                        continue;
+                    }
+
+                    if ($harga === null || $harga === '') {
+                        continue;
+                    }
+
+                    DB::table('tbl_bahan_harga')->updateOrInsert(
+                        [
+                            'bahan_id' => $bahanId,
+                            'kategori_harga' => $kategoriHarga,
+                        ],
+                        [
+                            'harga' => (float) $harga,
+                            'updated_at' => now(),
+                            'created_at' => now(),
+                        ]
+                    );
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Harga bahan HO & MITRA berhasil disimpan.',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan harga bahan HO & MITRA: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

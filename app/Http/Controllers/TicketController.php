@@ -257,8 +257,53 @@ class TicketController extends Controller
         return view('Ticketing.tickets.index', compact('tickets', 'lookups', 'role'));
     }
 
+    // public function create()
+    // {
+    //     $provinces = [
+    //         'Jawa Timur',
+    //         'Jawa Tengah',
+    //         'Jawa Barat',
+    //         'DKI Jakarta',
+    //         'Daerah Istimewa Yogyakarta',
+    //         'Banten',
+    //         'Lampung',
+    //     ];
+
+    //     $outlets = DB::table('tbl_outlets')
+    //         ->selectRaw('
+    //             MIN(id) as id,
+    //             TRIM(UPPER(nama_outlet)) as nama_outlet,
+    //             MAX(kota) as kota
+    //         ')
+    //         ->where('is_active', 1)
+    //         ->whereNotNull('nama_outlet')
+    //         ->where('nama_outlet', '!=', '')
+    //         ->groupBy(DB::raw('TRIM(UPPER(nama_outlet))'))
+    //         ->orderBy('nama_outlet')
+    //         ->get();
+
+    //     $itemColumns = ['item', 'owner'];
+
+    //     if (Schema::hasColumn('ticket_items', 'category')) {
+    //         $itemColumns[] = 'category';
+    //     }
+
+    //     $itemsWithOwner = DB::table('ticket_items')
+    //         ->where('is_active', 1)
+    //         ->orderBy('item')
+    //         ->get($itemColumns);
+
+    //     return view('Ticketing.tickets.create', [
+    //         'lookups' => $this->lookups(),
+    //         'outlets' => $outlets,
+    //         'provinces' => $provinces,
+    //         'itemsWithOwner' => $itemsWithOwner,
+    //     ]);
+    // }
+
     public function create()
     {
+        // Tetap dibiarkan jika sewaktu-waktu dibutuhkan untuk fallback
         $provinces = [
             'Jawa Timur',
             'Jawa Tengah',
@@ -269,16 +314,19 @@ class TicketController extends Controller
             'Lampung',
         ];
 
+        // 1. Ambil semua data outlet (Untuk Backoffice) di-JOIN dengan tabel area
         $outlets = DB::table('tbl_outlets')
+            ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
             ->selectRaw('
-                MIN(id) as id,
-                TRIM(UPPER(nama_outlet)) as nama_outlet,
-                MAX(kota) as kota
+                MIN(tbl_outlets.id) as id,
+                TRIM(UPPER(tbl_outlets.nama_outlet)) as nama_outlet,
+                MAX(tbl_area_outlet.area_kota) as kota,
+                MAX(tbl_area_outlet.area_provinsi) as provinsi
             ')
-            ->where('is_active', 1)
-            ->whereNotNull('nama_outlet')
-            ->where('nama_outlet', '!=', '')
-            ->groupBy(DB::raw('TRIM(UPPER(nama_outlet))'))
+            ->where('tbl_outlets.is_active', 1)
+            ->whereNotNull('tbl_outlets.nama_outlet')
+            ->where('tbl_outlets.nama_outlet', '!=', '')
+            ->groupBy(DB::raw('TRIM(UPPER(tbl_outlets.nama_outlet))'))
             ->orderBy('nama_outlet')
             ->get();
 
@@ -293,11 +341,31 @@ class TicketController extends Controller
             ->orderBy('item')
             ->get($itemColumns);
 
+        // ==========================================
+        // LOGIK BARU: Ambil data outlet dari outlet_id user login (Khusus Crew)
+        // ==========================================
+        $user = Auth::user();
+        $userOutlet = null;
+
+        if ($user->outlet_id) {
+            $userOutlet = DB::table('tbl_outlets')
+                ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
+                ->where('tbl_outlets.id', $user->outlet_id)
+                // Filter is_active TIDAK DIPAKAI di sini, agar outlet yang statusnya 0 tetap bisa muncul untuk crew
+                ->select(
+                    'tbl_outlets.*',
+                    'tbl_area_outlet.area_kota as kota',
+                    'tbl_area_outlet.area_provinsi as provinsi'
+                )
+                ->first();
+        }
+
         return view('Ticketing.tickets.create', [
             'lookups' => $this->lookups(),
             'outlets' => $outlets,
             'provinces' => $provinces,
             'itemsWithOwner' => $itemsWithOwner,
+            'userOutlet' => $userOutlet,
         ]);
     }
 
@@ -339,23 +407,9 @@ class TicketController extends Controller
             10
         );
 
-        return $lock->block(5, function () use (
-            $data,
-            $uploadedPaths,
-            $attachment,
-            $mapping,
-            $status,
-            $user
-        ) {
+        return $lock->block(5, function () use ($data, $uploadedPaths, $attachment, $mapping, $status, $user) {
 
-            return DB::transaction(function () use (
-                $data,
-                $uploadedPaths,
-                $attachment,
-                $mapping,
-                $status,
-                $user
-            ) {
+            return DB::transaction(function () use ($data, $uploadedPaths, $attachment, $mapping, $status, $user) {
 
                 $id = $this->createTicket(
                     $data,
@@ -395,26 +449,26 @@ class TicketController extends Controller
     private function validateTicketRequest(Request $request): array
     {
         return $request->validate([
-            'outlet_id'       => ['required', 'integer'],
+            'outlet_id' => ['required', 'integer'],
 
-            'province'        => ['required', 'string', 'max:100'],
-            'city'            => ['required', 'string', 'max:100'],
-            'area'            => ['required', 'string', 'max:100'],
+            'province' => ['required', 'string', 'max:100'],
+            'city' => ['required', 'string', 'max:100'],
+            'area' => ['required', 'string', 'max:100'],
 
-            'division'        => ['required', 'string', 'max:100'],
-            'ticket_type'     => ['required', 'string', 'max:100'],
+            'division' => ['required', 'string', 'max:100'],
+            'ticket_type' => ['required', 'string', 'max:100'],
 
-            'item'            => ['nullable', 'string', 'max:150'],
-            'custom_item'     => ['nullable', 'string', 'max:150'],
+            'item' => ['nullable', 'string', 'max:150'],
+            'custom_item' => ['nullable', 'string', 'max:150'],
 
-            'description'     => ['required', 'string'],
+            'description' => ['required', 'string'],
 
-            'leader_name'     => ['nullable', 'string', 'max:150'],
-            'reporter_phone'  => ['nullable', 'string', 'max:30'],
-            'additional_notes'=> ['nullable', 'string'],
+            'leader_name' => ['nullable', 'string', 'max:150'],
+            'reporter_phone' => ['nullable', 'string', 'max:30'],
+            'additional_notes' => ['nullable', 'string'],
 
-            'photos'          => ['nullable', 'array'],
-            'photos.*'        => ['image', 'max:10240'],
+            'photos' => ['nullable', 'array'],
+            'photos.*' => ['image', 'max:10240'],
         ]);
     }
 
@@ -493,7 +547,7 @@ class TicketController extends Controller
 
         return back()->with('success', 'Divisi ticket berhasil diperbarui.');
     }
-    
+
     // private function buildTicketDescription(array $data): string
     // {
     //     $description = trim($data['description']);
@@ -609,7 +663,7 @@ class TicketController extends Controller
             DB::table('ticket_attachments')->insert($rows);
         }
     }
-    
+
     public function show(int $ticket)
     {
         $user = Auth::user();
@@ -1024,94 +1078,94 @@ class TicketController extends Controller
         return back()->with('success', 'Mapping dihapus.');
     }
 
-public function exportCsv(): StreamedResponse
-{
-    Auth::user() ?: abort(403);
+    public function exportCsv(): StreamedResponse
+    {
+        Auth::user() ?: abort(403);
 
-    return response()->streamDownload(function () {
-        $out = fopen('php://output', 'w');
+        return response()->streamDownload(function () {
+            $out = fopen('php://output', 'w');
 
-        $mapColumn = collect([
-            'google_maps_link',
-            'link_maps',
-            'maps_url',
-            'google_maps',
-            'google_maps_url',
-            'map_url',
-            'maps',
-            'url_maps',
-        ])->first(function ($column) {
-            return Schema::hasColumn('tbl_outlets', $column);
-        });
+            $mapColumn = collect([
+                'google_maps_link',
+                'link_maps',
+                'maps_url',
+                'google_maps',
+                'google_maps_url',
+                'map_url',
+                'maps',
+                'url_maps',
+            ])->first(function ($column) {
+                return Schema::hasColumn('tbl_outlets', $column);
+            });
 
-        $mapSelect = $mapColumn
-            ? DB::raw('tbl_outlets.`' . $mapColumn . '` as maps_url')
-            : DB::raw('NULL as maps_url');
+            $mapSelect = $mapColumn
+                ? DB::raw('tbl_outlets.`' . $mapColumn . '` as maps_url')
+                : DB::raw('NULL as maps_url');
 
-        fputcsv($out, [
-            'No Ticket',
-            'Outlet',
-            'Kota',
-            'Area',
-            'Link Maps',
-            'Divisi',
-            'Jenis',
-            'Item',
-            'Priority',
-            'Status',
-            'Lead Time Menit',
-            'Dibuat'
-        ]);
+            fputcsv($out, [
+                'No Ticket',
+                'Outlet',
+                'Kota',
+                'Area',
+                'Link Maps',
+                'Divisi',
+                'Jenis',
+                'Item',
+                'Priority',
+                'Status',
+                'Lead Time Menit',
+                'Dibuat'
+            ]);
 
-        DB::table('tickets')
+            DB::table('tickets')
+                ->leftJoin('tbl_outlets', 'tbl_outlets.id', '=', 'tickets.outlet_id')
+                ->select(
+                    'tickets.*',
+                    'tbl_outlets.nama_outlet',
+                    'tbl_outlets.kota',
+                    $mapSelect
+                )
+                ->orderByDesc('tickets.id')
+                ->chunk(500, function ($rows) use ($out) {
+                    foreach ($rows as $r) {
+                        fputcsv($out, [
+                            $r->ticket_number,
+                            $r->nama_outlet,
+                            $r->kota,
+                            $r->area,
+                            $r->maps_url,
+                            $r->division,
+                            $r->ticket_type,
+                            $r->item,
+                            $r->priority,
+                            $r->status,
+                            $r->lead_time_minutes,
+                            $r->created_at,
+                        ]);
+                    }
+                });
+
+            fclose($out);
+        }, 'rekap-ticketing-' . now()->format('Ymd') . '.csv');
+    }
+
+    public function print()
+    {
+        Auth::user() ?: abort(403);
+
+        $tickets = DB::table('tickets')
             ->leftJoin('tbl_outlets', 'tbl_outlets.id', '=', 'tickets.outlet_id')
             ->select(
                 'tickets.*',
                 'tbl_outlets.nama_outlet',
-                'tbl_outlets.kota',
-                $mapSelect
+                'tbl_outlets.kota'
             )
             ->orderByDesc('tickets.id')
-            ->chunk(500, function ($rows) use ($out) {
-                foreach ($rows as $r) {
-                    fputcsv($out, [
-                        $r->ticket_number,
-                        $r->nama_outlet,
-                        $r->kota,
-                        $r->area,
-                        $r->maps_url,
-                        $r->division,
-                        $r->ticket_type,
-                        $r->item,
-                        $r->priority,
-                        $r->status,
-                        $r->lead_time_minutes,
-                        $r->created_at,
-                    ]);
-                }
-            });
+            ->limit(300)
+            ->get();
 
-        fclose($out);
-    }, 'rekap-ticketing-' . now()->format('Ymd') . '.csv');
-}
-
-public function print()
-{
-    Auth::user() ?: abort(403);
-
-    $tickets = DB::table('tickets')
-        ->leftJoin('tbl_outlets', 'tbl_outlets.id', '=', 'tickets.outlet_id')
-        ->select(
-            'tickets.*',
-            'tbl_outlets.nama_outlet',
-            'tbl_outlets.kota'
-        )
-        ->orderByDesc('tickets.id')
-        ->limit(300)
-        ->get();
-
-    return view('Ticketing.dashboard.print', compact('tickets'));
-}
+        return view('Ticketing.dashboard.print', compact('tickets'));
+    }
 
     private function changeStatus(int $ticket, object $user, string $status, array $extra, string $note)
     {
@@ -1244,6 +1298,12 @@ public function print()
                     ->pluck('area')
                     ->toArray(),
 
+                // 'areas' => DB::table('tbl_area_outlet')
+                //     ->distinct()
+                //     ->orderBy('pemilik_area')
+                //     ->pluck('pemilik_area')
+                //     ->toArray(),
+                    
                 'types' => DB::table('ticket_types')
                     ->where('is_active', 1)
                     ->orderBy('ticket_type')
@@ -1291,7 +1351,8 @@ public function print()
     {
         $role = $this->ticketRole($user);
 
-        if ($role === 'admin') return;
+        if ($role === 'admin')
+            return;
 
         if ($role === 'maintenance') {
             $areaNames = $this->userAreaNames($user);
@@ -1303,16 +1364,20 @@ public function print()
             abort(403, 'Tidak punya akses ke ticket area ini.');
         }
 
-        if ($role === 'pelapor' && (int) $row->created_by === (int) $user->id) return;
-        if ($role === 'pic' && (int) $row->pic_user_id === (int) $user->id) return;
-        if ($role === 'vendor' && (int) $row->vendor_user_id === (int) $user->id) return;
+        if ($role === 'pelapor' && (int) $row->created_by === (int) $user->id)
+            return;
+        if ($role === 'pic' && (int) $row->pic_user_id === (int) $user->id)
+            return;
+        if ($role === 'vendor' && (int) $row->vendor_user_id === (int) $user->id)
+            return;
 
         abort(403, 'Tidak punya akses ke ticket ini.');
     }
 
     private function ticketRole(?object $user): string
     {
-        if (!$user) return 'guest';
+        if (!$user)
+            return 'guest';
 
         $role = strtolower((string) ($user->role ?? ''));
 

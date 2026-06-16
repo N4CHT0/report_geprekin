@@ -271,6 +271,15 @@
             color: #C8860A;
             letter-spacing: 2pt;
         }
+
+        /* QR Code */
+        .qr-code {
+            position: absolute;
+            bottom: 35pt;
+            right: 20pt;
+            width: 45pt;
+            height: 45pt;
+        }
     </style>
 </head>
 <body>
@@ -339,6 +348,11 @@
         @if(!empty($data->outlet_kota) && $data->outlet_kota !== '-')
             <div class="ik c2r3-k">Kota</div>
             <div class="iv c2r3-v">{{ $data->outlet_kota }}</div>
+        @endif
+
+        {{-- QR Code --}}
+        @if(!empty($data->qr_code))
+            <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data={{ urlencode($data->qr_code) }}" alt="QR Code">
         @endif
 
         {{-- Bottom --}}

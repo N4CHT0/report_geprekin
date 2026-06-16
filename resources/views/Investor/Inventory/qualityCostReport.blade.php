@@ -1,3 +1,7 @@
+{{-- FIX TEPUNG BREADER FULL BOM PIPELINE --}}
+{{-- FIX TEPUNG BREADER TAMPIL DI TABEL QCR --}}
+{{-- FIX KOLOM TEPUNG QCR UTAMA --}}
+{{-- FIX KOLOM TEPUNG QCR UTAMA V2 SAFE --}}
 @section('title', 'Quality Cost Report')
 @section('breadcrumb', 'Inventory / QCR')
 
@@ -1807,11 +1811,22 @@
                     <input type="date" name="start_date" id="startDateInput" class="form-control" value="{{ $start_date }}">
                   </div>
 
-                  <div class="col-6 col-md-3 col-xl-3">
+                  <div class="col-6 col-md-3 col-xl-2">
                     <label for="endDateInput" class="form-label">
                       <i class="bi bi-calendar-date me-1 text-primary"></i> End
                     </label>
                     <input type="date" name="end_date" id="endDateInput" class="form-control" value="{{ $end_date }}">
+                  </div>
+
+                  <div class="col-6 col-md-3 col-xl-2">
+                    <label for="shiftFilterInput" class="form-label">
+                      <i class="bi bi-clock-history me-1 text-primary"></i> Shift
+                    </label>
+                    <select name="shift_filter" id="shiftFilterInput" class="form-select">
+                      <option value="all" {{ ($shiftFilter ?? 'all') === 'all' ? 'selected' : '' }}>Semua Shift</option>
+                      <option value="1" {{ ($shiftFilter ?? 'all') === '1' ? 'selected' : '' }}>Shift 1 (05:00 - 12:59)</option>
+                      <option value="2" {{ ($shiftFilter ?? 'all') === '2' ? 'selected' : '' }}>Shift 2 (13:00 - Tutup)</option>
+                    </select>
                   </div>
 
                   <div class="col-12 col-xl-2 d-grid">
@@ -1952,7 +1967,9 @@
       <div class="card qcr-card mb-4">
         <div class="card-header">
           <div class="qcr-toolbar w-100 justify-content-between">
-            <h5 class="qcr-section-title">Tabel QCR</h5>
+            
+
+<h5 class="qcr-section-title">Tabel QCR</h5>
 
             <div class="qcr-actions">
               <input type="text" id="customSearch" class="form-control qcr-search" placeholder="Cari data...">
@@ -1984,22 +2001,126 @@
         </div>
 
         @php
-          $bahanTerpakai = collect($bahanPrice)->filter(function ($b) use ($menuData) {
-              $namaBahan = strtolower(trim((string) $b->nama_bahan));
-              $namaBahan = preg_replace('/\s+/', ' ', $namaBahan);
+          /*
+           |--------------------------------------------------------------------------
+           | FIX TEPUNG BREADER TAMPIL DI TABEL QCR UTAMA
+           |--------------------------------------------------------------------------
+           | Penyebab lama:
+           | - Kolom QCR utama dibuat ulang dari $bahanPrice.
+           | - Di blok lama, bahan dengan nama tepung breader / breader di-return false.
+           | - Akibatnya data muncul di Summary, tapi tidak muncul sebagai kolom QCR utama.
+           |
+           | Fix:
+           | - Jangan reject Tepung Breader.
+           | - Bahan dianggap tampil jika dipakai di BOM/menuData.
+           | - Tepung Breader tetap dipaksa tampil dari bahanPrice atau bahanSummary.
+           | - Lookup nama bahan dibuat normalisasi supaya aman dari beda spasi/huruf besar-kecil.
+           */
 
-              // Tepung breader tidak ditampilkan di kolom QCR.
-              if (str_contains($namaBahan, 'tepung breader') || str_contains($namaBahan, 'breader')) {
+          $normalizeBahanQcrName = function ($name) {
+              $name = strtolower(trim((string) $name));
+              return preg_replace('/\s+/', ' ', $name);
+          };
+
+          $isTepungBreaderQcr = function ($name) use ($normalizeBahanQcrName) {
+              $nama = $normalizeBahanQcrName($name);
+              return $nama === 'tepung breader' || str_contains($nama, 'breader');
+          };
+
+          $findBahanSummaryRow = function ($namaBahan) use ($bahanSummary, $normalizeBahanQcrName) {
+              if (isset($bahanSummary[$namaBahan])) {
+                  return $bahanSummary[$namaBahan];
+              }
+
+              $target = $normalizeBahanQcrName($namaBahan);
+
+              foreach (($bahanSummary ?? []) as $summaryName => $summaryRow) {
+                  if ($normalizeBahanQcrName($summaryName) === $target) {
+                      return $summaryRow;
+                  }
+              }
+
+              return [];
+          };
+
+          $getMenuBahanValue = function ($bahanMenu, $namaBahan) use ($normalizeBahanQcrName) {
+              if (isset($bahanMenu[$namaBahan])) {
+                  return (float) $bahanMenu[$namaBahan];
+              }
+
+              $target = $normalizeBahanQcrName($namaBahan);
+
+              foreach (($bahanMenu ?? []) as $menuBahanName => $value) {
+                  if ($normalizeBahanQcrName($menuBahanName) === $target) {
+                      return (float) $value;
+                  }
+              }
+
+              return 0.0;
+          };
+
+          $bahanTerpakai = collect($bahanPrice ?? [])->filter(function ($b) use ($menuData, $bahanSummary, $normalizeBahanQcrName, $isTepungBreaderQcr) {
+              $namaBahan = (string) ($b->nama_bahan ?? '');
+              $namaNorm = $normalizeBahanQcrName($namaBahan);
+
+              if ($namaNorm === '') {
                   return false;
               }
 
-              foreach ($menuData as $menu) {
-                  if (($menu['bahan'][$b->nama_bahan] ?? 0) > 0) {
+              // Khusus Tepung Breader: jangan pernah dibuang dari kolom QCR utama.
+              if ($isTepungBreaderQcr($namaBahan)) {
+                  return true;
+              }
+
+              foreach (($menuData ?? []) as $menu) {
+                  foreach (($menu['bahan'] ?? []) as $menuBahanName => $qty) {
+                      if ($normalizeBahanQcrName($menuBahanName) === $namaNorm && (float) $qty > 0) {
+                          return true;
+                      }
+                  }
+              }
+
+              foreach (($bahanSummary ?? []) as $summaryName => $summaryRow) {
+                  if ($normalizeBahanQcrName($summaryName) !== $namaNorm) {
+                      continue;
+                  }
+
+                  $qtyResep = (float) ($summaryRow['qty_resep'] ?? 0);
+                  $qtyStock = (float) ($summaryRow['qty_stock'] ?? 0);
+                  $hpp = (float) ($summaryRow['hpp'] ?? 0);
+
+                  if ($qtyResep != 0 || $qtyStock != 0 || $hpp != 0) {
                       return true;
                   }
               }
+
               return false;
-          })->values();
+          });
+
+          // Fallback dari Summary: jika Tepung Breader ada di Summary tapi tidak ada di bahanPrice,
+          // tetap buat object kolom agar muncul di tabel utama.
+          foreach (($bahanSummary ?? []) as $summaryName => $summaryRow) {
+              if (! $isTepungBreaderQcr($summaryName)) {
+                  continue;
+              }
+
+              $exists = $bahanTerpakai->contains(function ($b) use ($summaryName, $normalizeBahanQcrName) {
+                  return $normalizeBahanQcrName($b->nama_bahan ?? '') === $normalizeBahanQcrName($summaryName);
+              });
+
+              if (! $exists) {
+                  $bahanTerpakai->push((object) [
+                      'nama_bahan'  => $summaryName,
+                      'satuan'      => $summaryRow['satuan'] ?? 'gram',
+                      'harga_bahan' => $summaryRow['harga_bahan'] ?? ($summaryRow['harga'] ?? 0),
+                  ]);
+              }
+          }
+
+          $bahanTerpakai = $bahanTerpakai
+              ->filter(fn ($b) => trim((string) ($b->nama_bahan ?? '')) !== '')
+              ->unique(fn ($b) => $normalizeBahanQcrName($b->nama_bahan ?? ''))
+              ->values();
 
           $jumlahKolomLaporan = 6 + $bahanTerpakai->count();
         @endphp
@@ -2019,8 +2140,9 @@
 
                   @foreach ($bahanTerpakai as $b)
                     @php
-                      $usageHeader = $bahanSummary[$b->nama_bahan]['qty_resep'] ?? null;
-                      $satHeader = $b->satuan ?? '-';
+                      $summaryRowHeader = $findBahanSummaryRow($b->nama_bahan);
+                      $usageHeader = $summaryRowHeader['qty_resep'] ?? null;
+                      $satHeader = $summaryRowHeader['satuan'] ?? ($b->satuan ?? '-');
                     @endphp
                     <th class="text-center" style="font-weight:600;">
                       <small class="text-muted d-block">
@@ -2067,7 +2189,7 @@
 
                     @foreach ($bahanTerpakai as $b)
                       @php
-                        $val = $data['bahan'][$b->nama_bahan] ?? 0;
+                        $val = $getMenuBahanValue($data['bahan'] ?? [], $b->nama_bahan);
                         $bg = $val > 0 ? 'qcr-highlight' : '';
                       @endphp
                       <td class="text-center {{ $bg }}">
@@ -2132,7 +2254,23 @@
         <div class="card-body p-0">
           <div class="qcr-table-wrap">
             @php
-              $visibleBahan = $bahanTerpakai;
+              /*
+               |--------------------------------------------------------------------------
+               | FIX TEPUNG BREADER FULL BOM PIPELINE
+               |--------------------------------------------------------------------------
+               | $bahanTerpakai sekarang harus sudah membawa Tepung Breader dari BOM.
+               | Tambahan fallback dari $bahanPrice dipakai kalau data lama belum memasukkan
+               | Tepung ke bahanTerpakai.
+               */
+              $tepungFallback = collect($bahanPrice ?? [])->filter(function ($b) {
+                  $nama = strtolower(trim((string) ($b->nama_bahan ?? '')));
+                  return str_contains($nama, 'tepung breader') || str_contains($nama, 'breader');
+              });
+
+              $visibleBahan = collect($bahanTerpakai ?? [])
+                  ->concat($tepungFallback)
+                  ->unique(fn ($b) => strtolower(trim((string) ($b->nama_bahan ?? ''))))
+                  ->values();
 
               $integerUnits = ['pcs','pc','cup','sachet','botol','bottle','pack','pax','box','buah','lembar'];
               $isIntegerUnit = function($satuan) use ($integerUnits) {
@@ -2260,11 +2398,10 @@
                     </td>
                   @endforeach
                 </tr>
-
-                <!-- <tr>
+                <tr>
                   <th class="qcr-sticky-col">
                     Waste Tepung Qty
-                    <small class="text-muted d-block">Dipisah, tidak masuk selisih utama</small>
+                    <small class="text-muted d-block">Waste khusus tepung</small>
                   </th>
                   @foreach ($visibleBahan as $b)
                     @php
@@ -2277,7 +2414,7 @@
                       {{ number_format($val, $dec, ',', '.') }}
                     </td>
                   @endforeach
-                </tr> -->
+                </tr>
 
                 <tr>
                   <th class="qcr-sticky-col">Waste Rp</th>
@@ -2291,22 +2428,7 @@
                     </td>
                   @endforeach
                 </tr>
-
-                <!-- <tr>
-                  <th class="qcr-sticky-col">
-                    Waste Tepung Rp
-                    <small class="text-muted d-block">Info operasional</small>
-                  </th>
-                  @foreach ($visibleBahan as $b)
-                    @php
-                      $row = $bahanSummary[$b->nama_bahan] ?? [];
-                      $val = (float) ($row['waste_tepung_rp'] ?? 0);
-                    @endphp
-                    <td class="text-center {{ $val > 0 ? 'text-warning fw-bold' : '' }}">
-                      Rp {{ number_format($val, 0, ',', '.') }}
-                    </td>
-                  @endforeach
-                </tr> -->
+                
 
                 <tr>
                   <th class="qcr-sticky-col">Difference (Visible)</th>
@@ -2430,7 +2552,8 @@
             return $row;
         });
 
-        $nonBomDisplayRows = $nonBomRows->reject(fn ($row) => (bool) ($row['is_company_burden'] ?? false))->values();
+        // $nonBomDisplayRows = $nonBomRows->reject(fn ($row) => (bool) ($row['is_company_burden'] ?? false))->values();
+        $nonBomDisplayRows = $nonBomRows->values();
 
         $nonBomMinusCount = $nonBomDisplayRows->where('status', 'Minus')->count();
         $nonBomPlusCount = $nonBomDisplayRows->where('status', 'Plus')->count();
@@ -3651,7 +3774,8 @@
             reference_key: item.reference_key,
             reference_name: item.reference_name,
             qty_abs: Number(item.qty_abs || 0),
-            qty_hidden: Number(item.qty_hidden || 0)
+            qty_hidden: Number(item.qty_hidden || 0),
+            satuan: item.satuan || ''
           }))
         };
 

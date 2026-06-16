@@ -1,13 +1,13 @@
 {{--
     resources/views/Purchasing/cetakRekap.blade.php  (Packing List)
     Controller harus kirim:
-    - $sj           → object tbl_surat_jalan
-    - $poDetails    → collection rekap barang
-                      kolom: nama_bahan, total_qty, satuan, berat_per_unit, harga_satuan
-    - $totalTonase  → float (kg)
-    - $pos          → collection tbl_po yang linked
-    - $dc           → object warehouse/DC pengirim (TAMBAHAN BARU)
-                      kolom: nama_warehouse, alamat, telepon (opsional)
+    - $sj          → object tbl_surat_jalan
+    - $poDetails   → collection rekap barang
+                     kolom: nama_bahan, total_qty, satuan, berat_per_unit
+    - $totalTonase → float (kg)
+    - $pos         → collection tbl_po yang linked
+    - $dc          → object warehouse/DC pengirim (TAMBAHAN BARU)
+                     kolom: nama_warehouse, alamat, telepon (opsional)
 --}}
 <!DOCTYPE html>
 <html lang="id">
@@ -201,7 +201,7 @@
         /* ── Summary cards ── */
         .summary-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr); /* Diubah jadi 3 kolom karena estimasi harga dihapus */
             gap: 10px;
             margin-bottom: 16px;
         }
@@ -242,12 +242,20 @@
         table.doc-table tfoot .tr { text-align: right; }
         table.doc-table tfoot .tc { text-align: center; }
 
-        /* ── No badge (row number with color) ── */
+        /* ── No badge & Checklist ── */
         .row-no {
             display: inline-flex; align-items: center; justify-content: center;
             width: 22px; height: 22px; border-radius: 6px;
             background: #eeeeff; color: #696cff;
             font-size: 10px; font-weight: 700;
+        }
+        .check-box {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 1.5px solid #a6adc8;
+            border-radius: 3px;
+            background: #fff;
+            vertical-align: middle;
         }
 
         /* ── Signature ── */
@@ -276,6 +284,8 @@
             body { background: #fff; padding-top: 0; }
             .toolbar { display: none !important; }
             .paper { box-shadow: none; margin: 0; border-radius: 0; width: 100%; }
+            /* Memastikan border checkbox tetap terlihat saat di print */
+            .check-box { border-color: #555 !important; } 
         }
         @page { size: A4 portrait; margin: 0; }
     </style>
@@ -401,7 +411,6 @@
         @php
             $totalQty   = $poDetails->sum('total_qty');
             $totalBerat = $poDetails->sum(fn($i) => $i->total_qty * (($i->berat_per_unit ?? 0) / 1000));
-            $totalNilai = $poDetails->sum(fn($i) => $i->total_qty * ($i->harga_satuan ?? 0));
             $totalItem  = $poDetails->count();
         @endphp
         <div class="summary-row">
@@ -417,10 +426,6 @@
                 <div class="sc-label">Total Berat</div>
                 <div class="sc-value">{{ number_format($totalBerat, 1) }}<span class="sc-unit">Kg</span></div>
             </div>
-            <div class="s-card">
-                <div class="sc-label">Est. Nilai</div>
-                <div class="sc-value" style="font-size:12px;">Rp {{ number_format($totalNilai, 0, ',', '.') }}</div>
-            </div>
         </div>
 
         {{-- ── Tabel Barang ── --}}
@@ -429,18 +434,16 @@
                 <tr>
                     <th style="width:32px;" class="tc">#</th>
                     <th>Nama Barang</th>
-                    <th class="tc" style="width:72px;">Total Qty</th>
-                    <th class="tc" style="width:58px;">Satuan</th>
-                    <th class="tr" style="width:90px;">Est. Berat</th>
-                    <th class="tr" style="width:110px;">Harga Satuan</th>
-                    <th class="tr" style="width:120px;">Subtotal</th>
+                    <th class="tc" style="width:90px;">Total Qty</th>
+                    <th class="tc" style="width:80px;">Satuan</th>
+                    <th class="tr" style="width:110px;">Est. Berat</th>
+                    <th class="tc" style="width:70px;">Cek</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($poDetails as $item)
                 @php
-                    $berat    = $item->total_qty * (($item->berat_per_unit ?? 0) / 1000);
-                    $subtotal = $item->total_qty * ($item->harga_satuan ?? 0);
+                    $berat = $item->total_qty * (($item->berat_per_unit ?? 0) / 1000);
                 @endphp
                 <tr>
                     <td class="tc"><span class="row-no">{{ $loop->iteration }}</span></td>
@@ -448,8 +451,7 @@
                     <td class="tc">{{ number_format($item->total_qty, 2, ',', '.') }}</td>
                     <td class="tc">{{ $item->satuan }}</td>
                     <td class="tr">{{ number_format($berat, 2, ',', '.') }} kg</td>
-                    <td class="tr">Rp {{ number_format($item->harga_satuan ?? 0, 0, ',', '.') }}</td>
-                    <td class="tr"><strong>Rp {{ number_format($subtotal, 0, ',', '.') }}</strong></td>
+                    <td class="tc"><div class="check-box"></div></td>
                 </tr>
                 @endforeach
             </tbody>
@@ -460,7 +462,6 @@
                     <td></td>
                     <td class="tr">{{ number_format($totalBerat, 2, ',', '.') }} kg</td>
                     <td></td>
-                    <td class="tr">Rp {{ number_format($totalNilai, 0, ',', '.') }}</td>
                 </tr>
             </tfoot>
         </table>

@@ -296,6 +296,16 @@
                                                       {{ $outlet->status == 'tutup' ? 'selected' : '' }}>Tutup</option>
                                               </select>
                                           </div>
+                                          <div class="row">
+                                              <div class="col-md-6 form-group">
+                                                  <label>Latitude (Opsional)</label>
+                                                  <input type="text" name="latitude" class="form-control" value="{{ $outlet->latitude ?? '' }}" placeholder="-7.250445">
+                                              </div>
+                                              <div class="col-md-6 form-group">
+                                                  <label>Longitude (Opsional)</label>
+                                                  <input type="text" name="longitude" class="form-control" value="{{ $outlet->longitude ?? '' }}" placeholder="112.768845">
+                                              </div>
+                                          </div>
                                       </div>
 
                                       <div class="modal-footer">
@@ -333,6 +343,16 @@
                                               <option value="existing">Existing</option>
                                               <option value="new">New</option>
                                           </select>
+                                      </div>
+                                      <div class="row">
+                                          <div class="col-md-6 form-group">
+                                              <label>Latitude (Opsional)</label>
+                                              <input type="text" name="latitude" class="form-control" placeholder="-7.250445">
+                                          </div>
+                                          <div class="col-md-6 form-group">
+                                              <label>Longitude (Opsional)</label>
+                                              <input type="text" name="longitude" class="form-control" placeholder="112.768845">
+                                          </div>
                                       </div>
                                   </div>
                                   <div class="modal-footer">

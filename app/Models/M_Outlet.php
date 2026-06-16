@@ -13,7 +13,7 @@ class M_Outlet extends Model
     protected $primaryKey = 'id';
     public $incrementing = true;
     protected $keyType = 'int';
-    protected $fillable = ['nama_outlet', 'status'];
+    protected $fillable = ['nama_outlet', 'status', 'latitude', 'longitude'];
     public $timestamps = true;
 
     // Kalau mau proteksi kolom (opsional, kebalikan dari fillable)

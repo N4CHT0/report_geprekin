@@ -1,114 +1,172 @@
 {{-- resources/views/purchasing/dashboardOutlet.blade.php --}}
-@if(auth()->user()->role === 'superadmin')
-    @include('Temp.Investor.header') {{-- Ganti dengan path header backoffice kamu --}}
-@else
-    @include('Temp.DC.header') {{-- Ganti dengan path header DC kamu --}}
-@endif
+@include('Temp.Investor.header')
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    /* Select2 dropdown scroll */
-    .select2-container .select2-dropdown {
-        max-height: 260px;
-        overflow-y: auto;
-        overflow-x: hidden;
+    /* 1. Warna Utama & Typography */
+    :root {
+        --primary-color: #696cff;
+        --primary-hover: #5f61e6;
+        --light-bg: #f5f5f9;
+        --text-muted: #697a8d;
     }
 
-    /* Biar table gak mepet */
-    table.dataTable td,
-    table.dataTable th {
-        vertical-align: middle !important;
-        white-space: nowrap;
+    body { background-color: var(--light-bg); }
+
+    /* 2. Kartu dengan Border Radius Lembut */
+    .card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 12px rgba(105, 108, 255, 0.08);
     }
 
-    /* Kolom text panjang boleh wrap */
-    .td-wrap {
-        white-space: normal !important;
-        word-break: break-word;
-        min-width: 220px;
+    /* 3. Tabel yang lebih "Clean" */
+    .table thead th {
+        background-color: #fcfcfd !important;
+        font-size: 0.7rem !important;
+        color: #566a7f !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 18px 20px !important;
+        border-bottom: 2px solid #f0f0f4 !important;
     }
 
-    /* Biar tombol rapih */
-    .btn-group-gap>* {
-        margin-right: .35rem;
+    .table tbody td {
+        padding: 16px 20px !important;
+        color: #435971;
+        font-weight: 500;
     }
 
-    .btn-group-gap>*:last-child {
-        margin-right: 0;
+    /* 4. Tombol Indigo */
+    .btn-primary {
+        background: var(--primary-color) !important;
+        border-color: var(--primary-color) !important;
+        padding: 0.5rem 1.2rem;
+        border-radius: 8px;
+        transition: all 0.2s;
     }
 
-    .card { border-radius: 10px; }
-    .table thead th { 
-        font-size: 0.8rem; 
-        text-transform: uppercase; 
-        color: #8898aa !important;
-        border-bottom: 2px solid #f4f7f6;
+    .btn-primary:hover { background: var(--primary-hover) !important; transform: translateY(-1px); }
+
+    /* 5. Input Field */
+    .form-select {
+        border: 1px solid #d9dee3;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        transition: border 0.3s;
     }
-    .table tbody td { padding: 15px 10px; }
-    .form-check-input { width: 1.2rem; height: 1.2rem; cursor: pointer; }
-    .btn-primary { background: #3b82f6; border: none; }
-    .btn-primary:hover { background: #2563eb; }
+
+    .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(105, 108, 255, 0.15);
+    }
+
+    /* 6. Badge Status yang Elegan */
+    .badge.bg-primary {
+        background-color: #e7e7ff !important;
+        color: var(--primary-color) !important;
+        padding: 0.4em 0.8em;
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
 </style>
 
 <main class="app-main">
     <div class="app-content">
         <div class="container-fluid py-4">
-            
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-header bg-white border-0 pt-4 pb-0">
-                    <h5 class="fw-bold text-primary mb-0"><i class="fas fa-truck-loading me-2"></i>Daftar PO Siap Kirim</h5>
-                </div>
-                
-                <div class="card-body">
-                    {{-- Form hidden di luar tabel agar tidak dirusak DataTable --}}
+
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold text-dark mb-1">Daftar PO Siap Kirim</h5>
+                    <p class="text-muted small mb-4">Pilih rute area untuk mengelompokkan barang yang searah.</p>
+
+                    {{-- FILTER --}}
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <form action="" method="GET" id="filterForm">
+                                <label class="form-label fw-bold small text-uppercase text-muted">Rute
+                                    Pengiriman</label>
+                                <select name="route_id" class="form-select shadow-none"
+                                    onchange="document.getElementById('filterForm').submit()">
+                                    <option value="">-- Pilih Rute --</option>
+                                    @foreach($routes ?? [] as $route)
+                                        <option value="{{ $route->id }}" {{ request('route_id') == $route->id ? 'selected' : '' }}>
+                                            {{ mb_strtoupper($route->hari_kirim) }} - {{ mb_strtoupper($route->nama_area) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+
                     <form id="formBuatSJ" action="{{ route('scm.buat-sj') }}" method="POST">
                         @csrf
-                        {{-- po_ids akan diisi via JS saat submit --}}
+                        <input type="hidden" name="route_id" id="hidden_route_id" value="{{ request('route_id') }}">
                     </form>
 
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle" id="orderTable">
-                            <thead class="table-light">
+                        <table class="table table-hover" id="orderTable">
+                            <thead>
                                 <tr>
                                     <th class="text-center" style="width: 50px;">
                                         <input type="checkbox" id="selectAll" class="form-check-input">
                                     </th>
-                                    <th class="text-center">No PO</th>
-                                    <th class="text-center">Outlet</th>
+                                    <th>No PO</th>
+                                    <th>Outlet</th>
                                     <th class="text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($listPO as $po)
-                                <tr>
-                                    <td class="text-center">
-                                        <input type="checkbox"
-                                               class="form-check-input po-checkbox"
-                                               value="{{ $po->id }}">
-                                    </td>
-                                    <td class="fw-bold text-dark">{{ $po->no_po }}</td>
-                                    <td class="text-muted">{{ $po->outlet_name }}</td>
-                                    <td class="text-center">
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-secondary px-3 btn-view-po"
-                                                data-id="{{ $po->id }}"
-                                                data-no-po="{{ $po->no_po }}">
-                                            Detail
-                                        </button>
-                                    </td>
-                                </tr>
-                                @endforeach
+                                @forelse($listPO as $po)
+                                    <tr>
+                                        <td class="text-center"><input type="checkbox" class="form-check-input po-checkbox"
+                                                value="{{ $po->id }}"></td>
+                                        <td class="fw-bold text-dark">{{ $po->no_po }}</td>
+                                        <td>{{ $po->outlet_name }}</td>
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-outline-secondary btn-view-po"
+                                                data-id="{{ $po->id }}" data-no-po="{{ $po->no_po }}"
+                                                data-status="{{ $po->status }}">
+                                                <i class="bi bi-eye"></i> Detail
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4 text-muted">Data tidak ditemukan.</td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="mt-3 d-flex justify-content-between align-items-center">
-                        <span class="text-muted small" id="selectedCount">0 PO dipilih</span>
-                        <button type="button" id="btnBuatSJ"
-                                class="btn btn-primary px-4 py-2 shadow-sm fw-bold" disabled>
-                            <i class="fas fa-file-invoice me-2"></i> Buat Surat Jalan
+                    <div class="mt-4 p-3 d-flex justify-content-between align-items-center">
+                        <span class="text-dark fw-semibold" id="selectedCount">0 PO dipilih</span>
+                        <button type="button" id="btnBuatSJ" class="btn btn-primary px-4" disabled>
+                            Buat Surat Jalan
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal (Struktur tetap sama agar JS tidak error) --}}
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Detail PO</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalContent">Loading...</div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-primary btn-update-status" id="btn-approve"
+                        data-status="Approved">Approve</button>
+                    <button type="button" class="btn btn-danger btn-update-status" id="btn-reject"
+                        data-status="Rejected">Reject</button>
                 </div>
             </div>
         </div>
@@ -116,182 +174,132 @@
 </main>
 
 @push('scripts')
-<script>
-// Select all checkboxes
-$('#selectAll').on('change', function() {
-    $('.po-checkbox').prop('checked', $(this).prop('checked'));
-    updateSelectedCount();
-});
+    <script>
+        $(document).ready(function () {
+            // 1. Inisialisasi DataTable
+            $('#orderTable').DataTable({
+                responsive: true,
+                autoWidth: false,
+                pageLength: 10,
+                columnDefs: [
+                    { targets: 0, orderable: false } // Checkbox tidak perlu di-sort
+                ]
+            });
 
-// Update counter & tombol saat checkbox berubah
-$(document).on('change', '.po-checkbox', function() {
-    const total    = $('.po-checkbox').length;
-    const checked  = $('.po-checkbox:checked').length;
-    $('#selectAll').prop('indeterminate', checked > 0 && checked < total);
-    $('#selectAll').prop('checked', checked === total);
-    updateSelectedCount();
-});
+            // 2. Logika Checkbox "Pilih Semua"
+            $('#selectAll').on('change', function () {
+                $('.po-checkbox').prop('checked', $(this).prop('checked'));
+                updateSelectedCount();
+            });
 
-function updateSelectedCount() {
-    const count = $('.po-checkbox:checked').length;
-    $('#selectedCount').text(count + ' PO dipilih');
-    $('#btnBuatSJ').prop('disabled', count === 0);
-}
+            $(document).on('change', '.po-checkbox', function () {
+                const total = $('.po-checkbox').length;
+                const checked = $('.po-checkbox:checked').length;
+                $('#selectAll').prop('indeterminate', checked > 0 && checked < total);
+                $('#selectAll').prop('checked', checked === total);
+                updateSelectedCount();
+            });
 
-// Submit form dengan po_ids yang dipilih
-$('#btnBuatSJ').on('click', function() {
-    const checkedIds = $('.po-checkbox:checked').map(function() {
-        return $(this).val();
-    }).get();
+            function updateSelectedCount() {
+                const count = $('.po-checkbox:checked').length;
+                $('#selectedCount').text(count + ' PO dipilih');
+                $('#btnBuatSJ').prop('disabled', count === 0);
+            }
 
-    if (checkedIds.length === 0) {
-        Swal.fire('Perhatian', 'Pilih minimal 1 PO terlebih dahulu!', 'warning');
-        return;
-    }
+            // 3. Submit form Buat Surat Jalan
+            $('#btnBuatSJ').on('click', function () {
+                // Validasi: Pastikan rute sudah dipilih
+                const routeId = $('#hidden_route_id').val();
+                if (!routeId) {
+                    Swal.fire('Perhatian', 'Anda harus memilih Rute Pengiriman di atas terlebih dahulu!', 'warning');
+                    return;
+                }
 
-    // Hapus input lama lalu tambah yang baru ke form hidden
-    $('#formBuatSJ input[name="po_ids[]"]').remove();
-    checkedIds.forEach(function(id) {
-        $('#formBuatSJ').append(
-            $('<input>').attr({ type: 'hidden', name: 'po_ids[]', value: id })
-        );
-    });
+                const checkedIds = $('.po-checkbox:checked').map(function () {
+                    return $(this).val();
+                }).get();
 
-    $('#formBuatSJ').submit();
-});
-</script>
+                if (checkedIds.length === 0) {
+                    Swal.fire('Perhatian', 'Pilih minimal 1 PO terlebih dahulu!', 'warning');
+                    return;
+                }
 
-<script>
-    $(document).ready(function() {
-        $('#orderTable').DataTable({
-            responsive: true,
-            autoWidth: false,
-            pageLength: 10,
-        });
-    });
-</script>
+                // Hapus input lama lalu tambah yang baru ke form hidden
+                $('#formBuatSJ input[name="po_ids[]"]').remove();
+                checkedIds.forEach(function (id) {
+                    $('#formBuatSJ').append(
+                        $('<input>').attr({ type: 'hidden', name: 'po_ids[]', value: id })
+                    );
+                });
 
-<script>
-    $(document).ready(function() {
-        // Saat modal benar-benar tertutup (hidden.bs.modal)
-        $('#detailModal').on('hidden.bs.modal', function() {
-            // 1. Hapus backdrop hitam yang bandel
-            $('.modal-backdrop').remove();
+                $('#formBuatSJ').submit();
+            });
 
-            // 2. Hapus class 'modal-open' dari body agar bisa di-scroll
-            $('body').removeClass('modal-open');
-            $('body').css('overflow', '');
-            $('body').css('padding-right', '');
-        });
-    });
-</script>
+            // 4. Logika Tombol Detail & Modal
+            $('.btn-view-po').click(function () {
+                let id = $(this).data('id');
+                let noPo = $(this).data('no-po');
+                let status = $(this).data('status');
 
-<script>
-    $('.btn-view-po').click(function() {
-        let id = $(this).data('id');
-        let status = $(this).data('status'); // Pastikan tombol View di tabel punya data-status
+                $('#detailModal').data('current-id', id);
 
-        // Simpan ID ke modal
-        $('#detailModal').data('current-id', id);
+                if (status !== 'Waiting') {
+                    $('#btn-approve, #btn-reject').prop('disabled', true).text('Sudah diproses');
+                } else {
+                    $('#btn-approve').prop('disabled', false).text('Approve');
+                    $('#btn-reject').prop('disabled', false).text('Reject');
+                }
 
-        // LOGIKA TOMBOL:
-        // Jika status BUKAN 'Waiting', disable tombol
-        if (status !== 'Waiting') {
-            $('#btn-approve, #btn-reject').prop('disabled', true);
-            $('#btn-approve, #btn-reject').text('Sudah diproses'); // Opsional: ganti teks
-        } else {
-            // Jika status 'Waiting', aktifkan kembali
-            $('#btn-approve').prop('disabled', false).text('Approved');
-            $('#btn-reject').prop('disabled', false).text('Rejected');
-        }
+                $('#modalContent').html(`
+                        <table class="table table-bordered mb-0">
+                            <tr><th style="width: 40%;">No. PO</th><td>${noPo}</td></tr>
+                            <tr><th>Status Saat Ini</th><td><span class="badge bg-primary">${status}</span></td></tr>
+                        </table>
+                    `);
 
-        // Masukkan data ke modal
-        $('#modalContent').html(`
-            <table class="table table-bordered">
-                <tr><th>No. PO</th><td>${noPo}</td></tr>
-                <tr><th>Tanggal Permintaan</th><td>${tglReq}</td></tr>
-                <tr><th>Tanggal Kedatangan</th><td>${tglDatang}</td></tr>
-            </table>
-        `);
+                var myModal = new bootstrap.Modal(document.getElementById('detailModal'));
+                myModal.show();
+            });
 
-        // Buka modal
-        var myModal = new bootstrap.Modal(document.getElementById('detailModal'));
-        myModal.show();
-    });
-</script>
+            // 5. Submit Update Status PO via AJAX
+            $('.btn-update-status').click(function () {
+                let status = $(this).data('status');
+                let id = $('#detailModal').data('current-id');
 
-<script>
-    $(document).ready(function() {
-        // 1. Saat tombol View diklik, simpan ID ke modal
-        $('.btn-view-po').click(function() {
-            let id = $(this).data('id');
-            let noPo = $(this).data('no-po');
-
-            // Simpan ID ke attribute modal agar bisa dipakai tombol di dalam modal
-            $('#detailModal').data('current-id', id);
-
-            // Isi konten modal
-            $('#modalContent').html('Detail untuk PO: ' + noPo);
-        });
-
-        // 2. Saat tombol Approved/Rejected diklik
-        $('.btn-update-status').click(function() {
-            let status = $(this).data('status');
-            let id = $('#detailModal').data('current-id'); // Ambil ID yang disimpan tadi
-
-            $.ajax({
-                url: "{{ route('update.status.po') }}",
-                type: 'POST',
-                data: {
-                    _token: "{{ csrf_token() }}",
-                    id: id,
-                    status: status
-                },
-                success: function(response) {
-                    Swal.fire({
+                $.ajax({
+                    url: "{{ route('update.status.po') }}",
+                    type: 'POST',
+                    data: {
+                        _token: "{{ csrf_token() }}",
+                        id: id,
+                        status: status
+                    },
+                    success: function (response) {
+                        Swal.fire({
                             icon: 'success',
                             title: 'Berhasil',
                             text: 'Status diubah ke ' + status
-                        })
-                        .then(() => {
+                        }).then(() => {
                             location.reload();
                         });
-                },
-                error: function(xhr) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal',
-                        text: 'Terjadi kesalahan'
-                    });
-                }
+                    },
+                    error: function (xhr) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: 'Terjadi kesalahan sistem'
+                        });
+                    }
+                });
+            });
+
+            // Bersihkan sisa backdrop modal jika nyangkut
+            $('#detailModal').on('hidden.bs.modal', function () {
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open').css({ 'overflow': '', 'padding-right': '' });
             });
         });
-    });
-</script>
-
-<script>
-    function confirmDelete(id) {
-        Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: "Data yang dihapus tidak dapat dikembalikan!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!',
-            cancelButtonText: 'Batal'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Jika user klik "Ya", maka form di-submit
-                document.getElementById('deleteForm' + id).submit();
-            }
-        })
-    }
-</script>
+    </script>
 @endpush
 
-@if(auth()->user()->role === 'superadmin')
-    @include('Temp.Investor.footer')
-@else
-    @include('Temp.DC.footer')
-@endif
+@include('Temp.Investor.footer')

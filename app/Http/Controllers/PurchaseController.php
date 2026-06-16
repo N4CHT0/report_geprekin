@@ -114,20 +114,23 @@ class PurchaseController extends Controller
 
         $outlets = DB::table('tbl_outlets')->get();
         // --- CARI BAGIAN INI DI CONTROLLER KAMU DAN GANTI DENGAN KODE DI BAWAH ---
-        $bahans = DB::table('tbl_bahan_scm')
-            // 1. Join ke tabel jembatan (tbl_bahan_unit) ambil yang is_purchase_unit = 1
+        $allBahans = DB::table('tbl_bahan_scm')
             ->leftJoin('tbl_bahan_unit', function ($join) {
                 $join->on('tbl_bahan_scm.id', '=', 'tbl_bahan_unit.bahan_id')
                     ->where('tbl_bahan_unit.is_purchase_unit', '=', 1);
             })
-            // 2. Join ke master tabel unit (tbl_units) untuk mengambil nama teks unitnya
             ->leftJoin('tbl_units', 'tbl_bahan_unit.unit_id', '=', 'tbl_units.id')
             ->select(
                 'tbl_bahan_scm.*',
-                'tbl_bahan_unit.unit_id as purchase_unit_id', // Kita simpan ID unitnya
-                'tbl_units.nama_unit as nama_purchase_unit'   // Kita ambil nama aslinya dari tbl_units (e.g. PACK @50PCS)
+                'tbl_bahan_unit.unit_id as purchase_unit_id',
+                'tbl_units.nama_unit as nama_purchase_unit'
             )
             ->get();
+
+        // 2. Pecah menjadi 2 variabel berdasarkan sumber_barang menggunakan Collection ->where()
+        // Gunakan ->values() agar index array-nya ker-reset dan tidak error saat di-loop di blade
+        $bahansDC = $allBahans->where('sumber_barang', 'GUDANG')->values();
+        $bahansSupplier = $allBahans->where('sumber_barang', 'SUPPLIER')->values();
 
         // Ambil data PO untuk ditampilkan di tabel dashboard
         $dataPO = DB::table('tbl_po')
@@ -158,12 +161,14 @@ class PurchaseController extends Controller
         return view('Purchasing.Operasional.purchaseRequestForm', [
             'myOutlet' => $myOutlet,
             'outlets' => $outlets,
-            'bahans' => $bahans,
+            'allBahans' => $allBahans,
             'dataPO' => $dataPO,
             'total_po' => $total_po,
             'menunggu' => $menunggu,
             'disetujui' => $disetujui,
-            'ditolak' => $ditolak
+            'ditolak' => $ditolak,
+            'bahansDC' => $bahansDC,
+            'bahansSupplier' => $bahansSupplier
         ]);
     }
 
@@ -240,79 +245,207 @@ class PurchaseController extends Controller
     //     ]);
     // }
 
+    // public function storePO(Request $request)
+    // {
+    //     // PERBAIKAN: Validasi array dirancang lebih spesifik untuk tipe data kargo SCM
+    //     $request->validate([
+    //         'outlet_id' => 'required',
+    //         'nama_pemesan' => 'required|string|max:255',
+    //         'tgl_permintaan' => 'required|date',
+    //         'bahan_id' => 'required|array|min:1',
+    //         'bahan_id.*' => 'required', // Memastikan setiap baris bahan terisi
+    //         'jumlah' => 'required|array|min:1',
+    //         'jumlah.*' => 'required|numeric|min:0.01', // Validasi angka qty order
+    //         'unit_id' => 'required|array|min:1',
+    //         'unit_id.*' => 'required', // Memastikan unit purchase terikat sempurna
+    //     ], [
+    //         // Custom pesan error bahasa Indonesia agar user outlet tidak bingung
+    //         'bahan_id.*.required' => 'Ada produk/bahan baku yang belum dipilih.',
+    //         'jumlah.*.min' => 'Kuantitas pesanan minimal bernilai 0.01.',
+    //         'unit_id.*.required' => 'Gagal memuat sistem satuan pembelian. Pastikan master data unit aman.',
+    //     ]);
+
+    //     // 1. Cari dulu DC mana yang melayani outlet ini
+    //     $mapping = DB::table('tbl_mapping_dc')
+    //         ->where('outlet_id', $request->outlet_id)
+    //         ->first();
+
+    //     if (!$mapping) {
+    //         return redirect()->back()->with('error', 'Outlet ini belum di-mapping ke DC manapun.');
+    //     }
+
+    //     $warehouseId = $mapping->warehouse_id;
+
+    //     DB::beginTransaction();
+
+    //     try {
+    //         // A. Insert ke tbl_po
+    //         $poId = DB::table('tbl_po')->insertGetId([
+    //             'no_po' => 'PO-' . date('YmdHis'),
+    //             'outlet_id' => $request->outlet_id,
+    //             'warehouse_id' => $warehouseId,
+    //             'nama_pemesan' => $request->nama_pemesan,
+    //             'tgl_permintaan' => $request->tgl_permintaan,
+    //             'catatan' => $request->catatan,
+    //             'status' => 'Waiting',
+    //             'created_at' => now(),
+    //             'updated_at' => now(),
+    //         ]);
+
+    //         // B. Insert ke tbl_po_detail 
+    //         foreach ($request->bahan_id as $index => $bahanId) {
+    //             $jumlah = $request->jumlah[$index];
+    //             $unitId = $request->unit_id[$index];
+
+    //             // Pengaman tambahan di tingkat query loop jika ada data corrupt lolos validasi
+    //             if (empty($unitId) || empty($bahanId)) {
+    //                 continue;
+    //             }
+
+    //             // Insert detail PO
+    //             DB::table('tbl_po_detail')->insert([
+    //                 'po_id' => $poId,
+    //                 'bahan_id' => $bahanId,
+    //                 'unit_id' => $unitId,
+    //                 'jumlah' => $jumlah,
+    //                 'created_at' => now(),
+    //             ]);
+    //         }
+
+    //         DB::commit();
+    //         return redirect()->back()->with('success', 'PO berhasil dibuat dan dikirim ke backoffice!');
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         // Disarankan menggunakan log error agar history development tercatat rapi
+    //         \Log::error('Gagal Create PO SCM: ' . $e->getMessage());
+    //         return redirect()->back()->with('error', 'Gagal memproses data: ' . $e->getMessage())->withInput();
+    //     }
+    // }
+
     public function storePO(Request $request)
     {
-        // PERBAIKAN: Validasi array dirancang lebih spesifik untuk tipe data kargo SCM
-        $request->validate([
-            'outlet_id' => 'required',
-            'nama_pemesan' => 'required|string|max:255',
-            'tgl_permintaan' => 'required|date',
-            'bahan_id' => 'required|array|min:1',
-            'bahan_id.*' => 'required', // Memastikan setiap baris bahan terisi
-            'jumlah' => 'required|array|min:1',
-            'jumlah.*' => 'required|numeric|min:0.01', // Validasi angka qty order
-            'unit_id' => 'required|array|min:1',
-            'unit_id.*' => 'required', // Memastikan unit purchase terikat sempurna
-        ], [
-            // Custom pesan error bahasa Indonesia agar user outlet tidak bingung
-            'bahan_id.*.required' => 'Ada produk/bahan baku yang belum dipilih.',
-            'jumlah.*.min' => 'Kuantitas pesanan minimal bernilai 0.01.',
-            'unit_id.*.required' => 'Gagal memuat sistem satuan pembelian. Pastikan master data unit aman.',
-        ]);
+        // 1. Bersihkan array untuk mengecek tab mana yang diisi oleh user
+        $bahanDC = array_filter($request->bahan_id_dc ?? []);
+        $bahanSup = array_filter($request->bahan_id_supplier ?? []);
 
-        // 1. Cari dulu DC mana yang melayani outlet ini
-        $mapping = DB::table('tbl_mapping_dc')
-            ->where('outlet_id', $request->outlet_id)
-            ->first();
-
-        if (!$mapping) {
-            return redirect()->back()->with('error', 'Outlet ini belum di-mapping ke DC manapun.');
+        // 2. Validasi Custom: Minimal salah satu tab harus ada isinya
+        if (count($bahanDC) === 0 && count($bahanSup) === 0) {
+            return redirect()->back()->with('error', 'Harap isi minimal 1 produk di tab PO DC atau PO Supplier!');
         }
-
-        $warehouseId = $mapping->warehouse_id;
 
         DB::beginTransaction();
 
         try {
-            // A. Insert ke tbl_po
-            $poId = DB::table('tbl_po')->insertGetId([
-                'no_po' => 'PO-' . date('YmdHis'),
-                'outlet_id' => $request->outlet_id,
-                'warehouse_id' => $warehouseId,
-                'nama_pemesan' => $request->nama_pemesan,
-                'tgl_permintaan' => $request->tgl_permintaan,
-                'catatan' => $request->catatan,
-                'status' => 'Waiting',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $waktu = date('YmdHis'); // Prefix waktu untuk No PO
 
-            // B. Insert ke tbl_po_detail 
-            foreach ($request->bahan_id as $index => $bahanId) {
-                $jumlah = $request->jumlah[$index];
-                $unitId = $request->unit_id[$index];
+            // ==========================================
+            // BLOK 1: EKSEKUSI JIKA TAB PO DC DIISI
+            // ==========================================
+            if (count($bahanDC) > 0) {
 
-                // Pengaman tambahan di tingkat query loop jika ada data corrupt lolos validasi
-                if (empty($unitId) || empty($bahanId)) {
-                    continue;
+                // Cari DC yang melayani outlet ini
+                $mapping = DB::table('tbl_mapping_dc')
+                    ->where('outlet_id', $request->outlet_id_dc)
+                    ->first();
+
+                if (!$mapping) {
+                    throw new \Exception("Outlet ini belum di-mapping ke Gudang/DC manapun.");
                 }
 
-                // Insert detail PO
-                DB::table('tbl_po_detail')->insert([
-                    'po_id' => $poId,
-                    'bahan_id' => $bahanId,
-                    'unit_id' => $unitId,
-                    'jumlah' => $jumlah,
+                // Insert Header PO DC
+                $poIdDC = DB::table('tbl_po')->insertGetId([
+                    'no_po' => 'PO-DC-' . $waktu,
+                    'outlet_id' => $request->outlet_id_dc,
+                    'warehouse_id' => $mapping->warehouse_id,
+                    'nama_pemesan' => $request->nama_pemesan_dc,
+                    'tgl_permintaan' => $request->tgl_permintaan_dc,
+                    // 'tipe_po'        => 'DC', // Penanda untuk backend
+                    'catatan' => $request->catatan,
+                    'status' => 'Waiting',
                     'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
+
+                // Insert Detail Item DC
+                foreach ($bahanDC as $index => $bahanId) {
+                    $jumlah = $request->jumlah_dc[$index] ?? 0;
+                    $unitId = $request->unit_id_dc[$index] ?? null;
+
+                    // Pengaman tambahan jika ada baris error/kosong
+                    if (empty($unitId) || empty($bahanId) || $jumlah < 0.01)
+                        continue;
+
+                    DB::table('tbl_po_detail')->insert([
+                        'po_id' => $poIdDC,
+                        'bahan_id' => $bahanId,
+                        'unit_id' => $unitId,
+                        'jumlah' => $jumlah,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            // ==========================================
+            // BLOK 2: EKSEKUSI JIKA TAB PO SUPPLIER DIISI
+            // ==========================================
+            if (count($bahanSup) > 0) {
+
+                // Jeda 1 detik agar format YmdHis tidak duplikat dengan PO DC
+                if (count($bahanDC) > 0) {
+                    sleep(1);
+                    $waktu = date('YmdHis');
+                }
+
+                // Arahkan langsung ke DC Supplier (Asumsi ID = 3 di tabel master warehouse)
+                $dcSupplier = DB::table('tbl_warehouse') // Sesuaikan dengan nama tabel gudangmu
+                    ->where('nama_warehouse', 'LIKE', '%Supplier%') // Sesuaikan nama kolomnya
+                    ->first();
+
+                if (!$dcSupplier) {
+                    throw new \Exception("Gudang DC khusus Supplier tidak ditemukan di database.");
+                }
+
+                $warehouseIdSup = $dcSupplier->id;
+
+                // Insert Header PO Supplier
+                $poIdSup = DB::table('tbl_po')->insertGetId([
+                    'no_po' => 'PO-SUP-' . $waktu,
+                    'outlet_id' => $request->outlet_id_supplier,
+                    'warehouse_id' => $warehouseIdSup,
+                    'nama_pemesan' => $request->nama_pemesan_supplier,
+                    'tgl_permintaan' => $request->tgl_permintaan_supplier,
+                    // 'tipe_po'        => 'SUPPLIER', // Penanda untuk backend
+                    'catatan' => $request->catatan,
+                    'status' => 'Waiting',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Insert Detail Item Supplier
+                foreach ($bahanSup as $index => $bahanId) {
+                    $jumlah = $request->jumlah_supplier[$index] ?? 0;
+                    $unitId = $request->unit_id_supplier[$index] ?? null;
+
+                    // Pengaman tambahan jika ada baris error/kosong
+                    if (empty($unitId) || empty($bahanId) || $jumlah < 0.01)
+                        continue;
+
+                    DB::table('tbl_po_detail')->insert([
+                        'po_id' => $poIdSup,
+                        'bahan_id' => $bahanId,
+                        'unit_id' => $unitId,
+                        'jumlah' => $jumlah,
+                        'created_at' => now(),
+                    ]);
+                }
             }
 
             DB::commit();
-            return redirect()->back()->with('success', 'PO berhasil dibuat dan dikirim ke backoffice!');
+            return redirect()->back()->with('success', 'Purchase Order berhasil dibuat dan dikirim ke backoffice!');
+
         } catch (\Exception $e) {
             DB::rollBack();
-            // Disarankan menggunakan log error agar history development tercatat rapi
-            \Log::error('Gagal Create PO SCM: ' . $e->getMessage());
+            \Log::error('Gagal Create Split PO SCM: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal memproses data: ' . $e->getMessage())->withInput();
         }
     }
@@ -886,7 +1019,7 @@ class PurchaseController extends Controller
             if ($totalQtyAktual >= $totalQtyPO) {
                 $statusPO = 'Received';
             } elseif ($totalQtyAktual > 0) {
-                $statusPO = 'Sebagian Dikirim';
+                $statusPO = 'Partial_Received';
             } else {
                 $statusPO = 'Belum Dikirim';
             }
@@ -895,6 +1028,9 @@ class PurchaseController extends Controller
             // ── 8. Simpan foto ────────────────────────────────────────────
             if ($request->foto_barang_base64) {
                 DB::table('tbl_po_receive_images')->insert(['receive_id' => $receiveId, 'jenis_foto' => 'barang', 'foto_base64' => $request->foto_barang_base64, 'created_at' => now()]);
+            }
+            if ($request->foto_nota_base64) {
+                DB::table('tbl_po_receive_images')->insert(['receive_id' => $receiveId, 'jenis_foto' => 'nota', 'foto_base64' => $request->foto_nota_base64, 'created_at' => now()]);
             }
             if ($request->foto_supir_base64) {
                 DB::table('tbl_po_receive_images')->insert(['receive_id' => $receiveId, 'jenis_foto' => 'supir', 'foto_base64' => $request->foto_supir_base64, 'created_at' => now()]);
@@ -1193,13 +1329,14 @@ class PurchaseController extends Controller
             ->join('tbl_bahan_scm', 'tbl_bahan_unit.bahan_id', '=', 'tbl_bahan_scm.id')
             ->where('tbl_bahan_unit.product_detail_id', $productDetailId)
             ->select(
+                'tbl_bahan_unit.base_price',
                 'tbl_units.nama_unit',
                 'tbl_bahan_scm.nama_bahan'
             )
             ->first();
 
         if ($mapping) {
-            $priceBeli = 1000; // Harga dummy sesuai kodingan awalmu
+            $priceBeli = $mapping->base_price ?? 0; // Harga dummy sesuai kodingan awalmu
             $subtotal = $qty * $priceBeli;
 
             // Gunakan updateOrInsert agar aman jika Ayam Besar & Kecil punya ID ESB yang sama
@@ -1456,69 +1593,67 @@ class PurchaseController extends Controller
         $userRole = Auth::user()->role;
         $isDcUser = $userRole !== 'superadmin';
 
-        $allowedOutlets = [];
         $namaDc = null;
+        $userWarehouseId = null;
 
-        // Jika yang login adalah DC, ambil nama DC dan daftar outlet_id yang diizinkan
+        // Jika yang login adalah DC, ambil nama DC dan ID Warehouse-nya
         if ($isDcUser) {
             $userWarehouseId = Auth::user()->warehouse_id;
 
-            // Ambil nama DC untuk ditampilkan di dashboard
-            // (Sesuaikan 'tbl_warehouse' dan 'nama_warehouse' dengan database kamu)
             $warehouse = DB::table('tbl_warehouse')->where('id', $userWarehouseId)->first();
             if ($warehouse) {
                 $namaDc = $warehouse->nama_warehouse;
             }
-
-            // Ambil mapping outlet_id milik DC ini
-            $allowedOutlets = DB::table('tbl_mapping_dc')
-                ->where('warehouse_id', $userWarehouseId)
-                ->pluck('outlet_id')
-                ->toArray();
         }
 
-        // 2. Buat Base Query PO untuk menghindari penulisan filter berulang
+        // 2. PERUBAHAN KUNCI: Base Query PO langsung tembak ke warehouse_id (bukan mapping outlet lagi)
         $basePoQuery = DB::table('tbl_po')
-            ->when($isDcUser, function ($query) use ($allowedOutlets) {
-                return $query->whereIn('outlet_id', $allowedOutlets);
+            ->when($isDcUser, function ($query) use ($userWarehouseId) {
+                return $query->where('warehouse_id', $userWarehouseId);
             });
 
-        // 3. Gunakan 'clone' agar base query bisa dipakai ulang untuk menghitung status
+        // 3. Hitung status
         $total_po = (clone $basePoQuery)->count();
         $menunggu = (clone $basePoQuery)->where('status', 'Waiting')->count();
         $disetujui = (clone $basePoQuery)->where('status', 'Approved')->count();
         $ditolak = (clone $basePoQuery)->where('status', 'Rejected')->count();
 
-        // 4. Filter data master yang dikirim ke view
-        $outlets = DB::table('tbl_outlets')
-            ->when($isDcUser, function ($query) use ($allowedOutlets) {
-                return $query->whereIn('id', $allowedOutlets);
-            })
-            ->get();
-
+        // 4. Data Master
+        $outlets = DB::table('tbl_outlets')->get();
         $bahans = DB::table('tbl_bahan_scm')->get();
 
-        // 5. Terapkan filter pada List PO beserta detail barangnya
+        // 5. PERUBAHAN KUNCI: Terapkan filter pada List PO berdasarkan warehouse_id
         $dataPO = DB::table('tbl_po')
             ->join('tbl_outlets', 'tbl_po.outlet_id', '=', 'tbl_outlets.id')
             ->select('tbl_po.*', 'tbl_outlets.nama_outlet')
-            ->when($isDcUser, function ($query) use ($allowedOutlets) {
-                return $query->whereIn('tbl_po.outlet_id', $allowedOutlets);
+            ->when($isDcUser, function ($query) use ($userWarehouseId) {
+                return $query->where('tbl_po.warehouse_id', $userWarehouseId);
             })
             ->get()
             ->map(function ($po) {
-                $po->items = DB::table('tbl_po_detail')
+                // Tarik dulu data items-nya
+                $items = DB::table('tbl_po_detail')
                     ->join('tbl_bahan_scm', 'tbl_po_detail.bahan_id', '=', 'tbl_bahan_scm.id')
                     ->leftJoin('tbl_units', 'tbl_po_detail.unit_id', '=', 'tbl_units.id')
                     ->where('tbl_po_detail.po_id', $po->id)
                     ->select(
                         'tbl_po_detail.*',
                         'tbl_bahan_scm.nama_bahan',
-                        'tbl_bahan_scm.sumber_barang', // ← tambah ini
+                        'tbl_bahan_scm.sumber_barang',
                         'tbl_units.nama_unit as satuan'
                     )
                     ->get();
 
+                // Suntik pilihan satuan ke item
+                foreach ($items as $item) {
+                    $item->pilihan_satuan = DB::table('tbl_bahan_unit as bu')
+                        ->join('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+                        ->where('bu.bahan_id', $item->bahan_id)
+                        ->select('u.id', 'u.nama_unit')
+                        ->get();
+                }
+
+                $po->items = $items;
                 return $po;
             });
 
@@ -1534,6 +1669,17 @@ class PurchaseController extends Controller
         ]);
     }
 
+    public function getSatuanBahan($bahan_id)
+    {
+        $satuan = DB::table('tbl_bahan_unit as bu')
+            ->join('tbl_units as u', 'bu.unit_id', '=', 'u.id')
+            ->where('bu.bahan_id', $bahan_id)
+            ->select('u.id', 'u.nama_unit')
+            ->get();
+
+        return response()->json($satuan);
+    }
+
     public function historyPO()
     {
         $histories = DB::table('tbl_po_history')
@@ -1546,8 +1692,10 @@ class PurchaseController extends Controller
 
     public function updateStatusPO(Request $request)
     {
+
         DB::beginTransaction();
         try {
+
             // Update status PO
             $affected = DB::table('tbl_po')
                 ->where('id', $request->id)
@@ -1565,12 +1713,10 @@ class PurchaseController extends Controller
             }
 
             DB::commit();
-
             if ($affected) {
                 return response()->json(['success' => true]);
             }
             return response()->json(['success' => false], 400);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
@@ -1579,6 +1725,38 @@ class PurchaseController extends Controller
             ], 500);
         }
     }
+
+    public function updatePO(Request $request, $id)
+    {
+        // 1. Validasi input agar data tetap aman
+        $request->validate([
+            'items' => 'required|array',
+            'items.*.qty' => 'required|numeric|min:0',
+            'items.*.unit_id' => 'required|exists:units,id', // pastikan tabel units sesuai
+        ]);
+
+        // 2. Loop data items yang dikirim dari modal
+        foreach ($request->items as $detailId => $data) {
+            // Update tabel detail PO
+            // Asumsi nama tabel adalah po_details
+            \DB::table('po_details')
+                ->where('id', $detailId)
+                ->update([
+                    'jumlah' => $data['qty'],
+                    'unit_id' => $data['unit_id'],
+                    'updated_at' => now(),
+                ]);
+        }
+
+        // 3. (Opsional) Berikan log/tanda bahwa PO ini sudah diedit 
+        // agar sistem tahu kalau data ini perlu disinkronisasi ulang ke ESB
+        \DB::table('purchase_orders')
+            ->where('id', $id)
+            ->update(['is_synced' => 0]); // Anggap 0 berarti belum disync ulang
+
+        return redirect()->back()->with('success', 'PO berhasil diperbarui!');
+    }
+
 
     // ── Ambil bahan SUPPLIER dari PO untuk dropdown di modal approve ──
     public function getPoSupplierItems($poId)
@@ -2456,10 +2634,11 @@ class PurchaseController extends Controller
         // 1. Mengambil semua outlet kecuali DC dan Head Office
         // Ditambahkan select() agar query lebih ringan hanya mengambil kolom yang dibutuhkan
         $outlets = DB::table('tbl_outlets')
-            ->select('id', 'nama_outlet')
+            ->selectRaw('MIN(id) as id, nama_outlet') // Ambil 1 ID perwakilan (ID terkecil)
             ->where('nama_outlet', 'NOT LIKE', 'DC%')
-            ->where('nama_outlet', 'NOT LIKE', 'HEAD OFFICE%') // Ditambah % antisipasi jika ada spasi/karakter tambahan
-            ->orderBy('nama_outlet', 'asc') // Opsional: Diurutkan abjad agar rapi di tabel
+            ->where('nama_outlet', 'NOT LIKE', 'HEAD OFFICE%')
+            ->groupBy('nama_outlet') // Gabungkan nama yang kembar agar tampil 1 saja
+            ->orderBy('nama_outlet', 'asc')
             ->get();
 
         // 2. Mengambil data warehouse untuk pilihan dropdown
@@ -2480,16 +2659,42 @@ class PurchaseController extends Controller
 
     public function simpanMapping(Request $request)
     {
-        // Simpan/Update data mapping
+        // Pastikan ada data mapping yang dikirim
+        if (!$request->has('mapping')) {
+            return back()->with('error', 'Tidak ada data yang diproses!');
+        }
+
         foreach ($request->mapping as $outletId => $warehouseId) {
-            if ($warehouseId) { // Hanya simpan jika warehouse dipilih
-                DB::table('tbl_mapping_dc')->updateOrInsert(
-                    ['outlet_id' => $outletId],
-                    ['warehouse_id' => $warehouseId, 'created_at' => now()]
-                );
+            if ($warehouseId) { // Hanya proses jika warehouse dipilih
+
+                // 1. Ambil nama outlet dari ID perwakilan yang dikirim oleh form
+                $namaOutlet = DB::table('tbl_outlets')
+                    ->where('id', $outletId)
+                    ->value('nama_outlet');
+
+                if ($namaOutlet) {
+                    // 2. Cari SEMUA ID outlet yang punya nama persis sama
+                    $semuaIdKembar = DB::table('tbl_outlets')
+                        ->where('nama_outlet', $namaOutlet)
+                        ->pluck('id');
+
+                    // 3. Looping dan update semua ID kembar tersebut ke warehouse yang sama
+                    foreach ($semuaIdKembar as $id) {
+                        DB::table('tbl_mapping_dc')->updateOrInsert(
+                            ['outlet_id' => $id],
+                            [
+                                'warehouse_id' => $warehouseId,
+                                'created_at' => now()
+                                // Catatan: updateOrInsert lebih aman pakai updated_at, 
+                                // namun jika tabel Anda wajib pakai created_at, bisa ditambahkan juga di sini.
+                            ]
+                        );
+                    }
+                }
             }
         }
-        return back()->with('success', 'Mapping berhasil disimpan!');
+
+        return back()->with('success', 'Mapping berhasil disimpan untuk semua outlet!');
     }
 
     public function indexMappingSupplier()
@@ -2498,16 +2703,16 @@ class PurchaseController extends Controller
         $outlets = DB::table('tbl_outlets as o')
             ->leftJoin('tbl_mapping_supplier as m', 'o.id', '=', 'm.outlet_id')
             ->leftJoin('tbl_suppliers as s', 'm.supplier_id', '=', 's.id')
-            ->select(
-                'o.id',
-                'o.nama_outlet',
-                'o.alamat',
-                DB::raw('GROUP_CONCAT(s.supplier_name SEPARATOR ", ") as daftar_supplier')
-            )
-            // --- TAMBAHKAN FILTER DI SINI ---
+            ->selectRaw('
+            MIN(o.id) as id, 
+            o.nama_outlet, 
+            MAX(o.alamat) as alamat, 
+            GROUP_CONCAT(DISTINCT s.supplier_name SEPARATOR ", ") as daftar_supplier
+        ')
             ->where('o.nama_outlet', 'NOT LIKE', '%DC%')
             ->where('o.nama_outlet', 'NOT LIKE', '%HEAD OFFICE%')
-            ->groupBy('o.id', 'o.nama_outlet', 'o.alamat')
+            ->groupBy('o.nama_outlet') // Group hanya berdasarkan nama outlet
+            ->orderBy('o.nama_outlet', 'asc')
             ->get();
 
         // 2. Ambil master supplier untuk isi dropdown di Modal Bulk
@@ -2519,41 +2724,69 @@ class PurchaseController extends Controller
 
     public function simpanMappingSupplier(Request $request)
     {
-        // Sekarang menerima ARRAY outlet_ids dan supplier_ids
-        $outletIds = $request->outlet_ids; // Array ID Outlet
-        $supplierIds = $request->supplier_ids; // Array ID Supplier yang dipilih di Select2
-        $mode = $request->mode; // Pastikan <input type="hidden" name="mode"> ada di modal
+        $outletIds = $request->outlet_ids; // Array ID Outlet (Perwakilan)
+        $supplierIds = $request->supplier_ids; // Array ID Supplier yang dipilih
+        $mode = $request->mode;
 
         try {
             DB::transaction(function () use ($outletIds, $supplierIds, $mode) {
+
+                // Pastikan array outletIds tidak kosong
+                if (empty($outletIds))
+                    return;
+
                 foreach ($outletIds as $oid) {
 
-                    // --- KUNCI PERBAIKAN DI SINI ---
-                    // Jika sedang MODE EDIT, kita harus "bersihkan" dulu data lama 
-                    // supaya kalau ada yang dihapus di modal, di DB juga hilang.
-                    if ($mode == 'edit') {
-                        DB::table('tbl_mapping_supplier')
-                            ->where('outlet_id', $oid)
-                            ->delete();
-                    }
+                    // 1. Cari NAMA outlet berdasarkan ID perwakilan yang dikirim form
+                    $namaOutlet = DB::table('tbl_outlets')->where('id', $oid)->value('nama_outlet');
 
-                    // Setelah bersih (atau jika mode bulk), kita masukkan supplier yang terpilih
-                    if (!empty($supplierIds)) {
-                        $dataInsert = [];
-                        foreach ($supplierIds as $sid) {
-                            $dataInsert[] = [
-                                'outlet_id' => $oid,
-                                'supplier_id' => $sid,
-                                'created_at' => now()
-                            ];
+                    if ($namaOutlet) {
+                        // 2. Tarik SEMUA ID yang punya nama persis sama
+                        $semuaIdKembar = DB::table('tbl_outlets')
+                            ->where('nama_outlet', $namaOutlet)
+                            ->pluck('id');
+
+                        // 3. Terapkan logika simpan/edit ke SEMUA ID KEMBAR tersebut
+                        foreach ($semuaIdKembar as $idKembar) {
+
+                            // Jika MODE EDIT: bersihkan dulu supplier lama untuk ID kembar ini
+                            if ($mode == 'edit') {
+                                DB::table('tbl_mapping_supplier')
+                                    ->where('outlet_id', $idKembar)
+                                    ->delete();
+                            }
+
+                            // Jika ada supplier yang di-submit, proses insert
+                            if (!empty($supplierIds)) {
+                                $dataInsert = [];
+                                foreach ($supplierIds as $sid) {
+                                    // Pengecekan eksistensi agar tidak terjadi duplikat 
+                                    // (Sangat berguna untuk Mode Bulk Add)
+                                    $exists = DB::table('tbl_mapping_supplier')
+                                        ->where('outlet_id', $idKembar)
+                                        ->where('supplier_id', $sid)
+                                        ->exists();
+
+                                    if (!$exists) {
+                                        $dataInsert[] = [
+                                            'outlet_id' => $idKembar,
+                                            'supplier_id' => $sid,
+                                            'created_at' => now()
+                                        ];
+                                    }
+                                }
+
+                                // Insert batch per outlet kembar
+                                if (!empty($dataInsert)) {
+                                    DB::table('tbl_mapping_supplier')->insert($dataInsert);
+                                }
+                            }
                         }
-                        // Gunakan insert untuk memasukkan semua yang dipilih
-                        DB::table('tbl_mapping_supplier')->insert($dataInsert);
                     }
                 }
             });
 
-            return response()->json(['status' => 'success', 'msg' => 'Data mapping berhasil diperbarui!']);
+            return response()->json(['status' => 'success', 'msg' => 'Data mapping berhasil diperbarui untuk semua outlet kembar!']);
         } catch (\Exception $e) {
             return response()->json(['status' => 'error', 'msg' => $e->getMessage()], 500);
         }
@@ -2561,12 +2794,25 @@ class PurchaseController extends Controller
 
     public function editMappingSupplier($outlet_id)
     {
-        // 1. Ambil data outlet-nya
+        // 1. Ambil data outlet perwakilan untuk ditampilkan namanya di modal
         $outlet = DB::table('tbl_outlets')->where('id', $outlet_id)->first();
 
-        // 2. Ambil ID supplier yang sudah terpilih untuk outlet ini
+        // Jika kebetulan ID tidak ditemukan, kembalikan response error yang aman
+        if (!$outlet) {
+            return response()->json(['error' => 'Outlet tidak ditemukan'], 404);
+        }
+
+        // 2. Tarik SEMUA ID yang punya nama persis sama dengan outlet ini
+        $semuaIdKembar = DB::table('tbl_outlets')
+            ->where('nama_outlet', $outlet->nama_outlet)
+            ->pluck('id');
+
+        // 3. Ambil ID supplier yang sudah terpilih untuk SEMUA outlet kembar tersebut
+        // Menggunakan whereIn() untuk multi-ID dan distinct() agar hasil array tidak dobel
         $selectedSupplierIds = DB::table('tbl_mapping_supplier')
-            ->where('outlet_id', $outlet_id)
+            ->whereIn('outlet_id', $semuaIdKembar)
+            ->select('supplier_id')
+            ->distinct()
             ->pluck('supplier_id')
             ->toArray();
 
@@ -2902,17 +3148,17 @@ class PurchaseController extends Controller
         // Validasi tetap bisa menggunakan tabel
         $request->validate([
             'bahan_unit_id' => 'required|exists:tbl_bahan_unit,id|unique:tbl_pricelist_scm,bahan_unit_id',
-            'harga_ho'      => 'required|numeric|min:0',
-            'harga_mitra'   => 'required|numeric|min:0',
+            'harga_ho' => 'required|numeric|min:0',
+            'harga_mitra' => 'required|numeric|min:0',
         ]);
 
         // Insert menggunakan Query Builder
         DB::table('tbl_pricelist_scm')->insert([
             'bahan_unit_id' => $request->bahan_unit_id,
-            'harga_ho'      => $request->harga_ho,
-            'harga_mitra'   => $request->harga_mitra,
-            'created_at'    => now(),
-            'updated_at'    => now(),
+            'harga_ho' => $request->harga_ho,
+            'harga_mitra' => $request->harga_mitra,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return response()->json(['status' => 'success', 'msg' => 'Pricelist berhasil ditambahkan!']);
@@ -2921,7 +3167,7 @@ class PurchaseController extends Controller
     public function updatePricelist(Request $request, $id)
     {
         $request->validate([
-            'harga_ho'    => 'required|numeric|min:0',
+            'harga_ho' => 'required|numeric|min:0',
             'harga_mitra' => 'required|numeric|min:0',
         ]);
 
@@ -2929,9 +3175,9 @@ class PurchaseController extends Controller
         DB::table('tbl_pricelist_scm')
             ->where('id', $id)
             ->update([
-                'harga_ho'    => $request->harga_ho,
+                'harga_ho' => $request->harga_ho,
                 'harga_mitra' => $request->harga_mitra,
-                'updated_at'  => now(),
+                'updated_at' => now(),
             ]);
 
         return response()->json(['status' => 'success', 'msg' => 'Pricelist berhasil diperbarui!']);
@@ -2956,7 +3202,8 @@ class PurchaseController extends Controller
                 $hargaHo = isset($row['harga_ho']) ? (float) $row['harga_ho'] : 0;
                 $hargaMitra = isset($row['harga_mitra']) ? (float) $row['harga_mitra'] : 0;
 
-                if (empty($namaProduk)) continue;
+                if (empty($namaProduk))
+                    continue;
 
                 // Cari ID berdasarkan Nama Bahan dan pastikan is_purchase_unit = 1
                 $bahanUnit = DB::table('tbl_bahan_unit as bu')
@@ -2996,7 +3243,7 @@ class PurchaseController extends Controller
             }
 
             DB::commit();
-            
+
             $msg = "Berhasil update/insert $berhasil produk.";
             if ($gagalDitemukan > 0) {
                 $msg .= " Namun ada $gagalDitemukan produk yang dilewati karena nama tidak sesuai dengan database SCM.";
@@ -3010,32 +3257,61 @@ class PurchaseController extends Controller
     }
 
 
-    public function indexPendingDelivery()
+    public function indexPendingDelivery(Request $request)
     {
-        // 1. Buat base query yang berlaku untuk SEMUA user (Backoffice & DC)
+        $userRole = Auth::user()->role;
+        $userWarehouseId = Auth::user()->warehouse_id;
+
+        // Tangkap pilihan rute dari dropdown UI Blade
+        $routeId = $request->input('route_id');
+
+        // -------------------------------------------------------------
+        // 1. Tarik Opsi Rute untuk Dropdown
+        // -------------------------------------------------------------
+        $routesQuery = DB::table('tbl_delivery_routes');
+
+        // Jika bukan superadmin, hanya tampilkan rute milik gudangnya (DC) saja
+        if ($userRole !== 'superadmin') {
+            $routesQuery->where('dc_id', $userWarehouseId);
+        }
+
+        // Susun berdasarkan hari agar rapi di dropdown
+        $routes = $routesQuery->orderBy('hari_kirim')->get();
+
+
+        // -------------------------------------------------------------
+        // 2. Base Query Daftar PO (Seperti bawaanmu)
+        // -------------------------------------------------------------
         $query = DB::table('tbl_po')
             ->join('tbl_outlets', 'tbl_po.outlet_id', '=', 'tbl_outlets.id')
             ->select('tbl_po.*', 'tbl_outlets.nama_outlet as outlet_name')
             ->where('tbl_po.status', 'Approved')
             ->whereNull('tbl_po.sj_id');
 
-        // 2. Cek apakah user yang login adalah Backoffice atau bukan.
-        // Asumsi: ada kolom 'role' di tabel users untuk membedakannya. 
-        $userRole = Auth::user()->role;
-
-        // 3. Jika BUKAN backoffice, maka tambahkan join dan filter mapping DC-nya
+        // 3. Filter Akses DC
         if ($userRole !== 'superadmin') {
-            $userWarehouseId = Auth::user()->warehouse_id;
-
             $query->join('tbl_mapping_dc', 'tbl_po.outlet_id', '=', 'tbl_mapping_dc.outlet_id')
                 ->where('tbl_mapping_dc.warehouse_id', $userWarehouseId);
         }
 
-        // 4. Eksekusi query
+        // -------------------------------------------------------------
+        // 4. FILTER RUTE (MAPPING AREA)
+        // -------------------------------------------------------------
+        if ($routeId) {
+            // Jika rute diplih, join ke tabel mapping rute untuk mencocokkan tokonya
+            $query->join('tbl_mapping_rute_outlet as map_rute', 'tbl_po.outlet_id', '=', 'map_rute.outlet_id')
+                ->where('map_rute.route_id', $routeId);
+        } else {
+            // Trik SCM Cerdas: Jika rute BELUM dipilih, paksa tabel menjadi KOSONG.
+            // Ini memaksa admin gudang untuk selalu berpatokan pada Rute Pengiriman.
+            $query->whereRaw('1 = 0');
+        }
+
+        // 5. Eksekusi query final
         $listPO = $query->get();
 
-        // 5. Kembalikan ke blade yang sama
-        return view('Purchasing.approvedPO', compact('listPO'));
+        // 6. Kembalikan ke blade dengan menyertakan data routes
+        return view('Purchasing.approvedPO', compact('listPO', 'routes'));
     }
 
     public function buatSJ(Request $request)
@@ -3047,7 +3323,32 @@ class PurchaseController extends Controller
                 ->with('error', 'Silahkan pilih minimal satu PO terlebih dahulu!');
         }
 
-        // Rekap barang GUDANG
+        // -------------------------------------------------------------------
+        // 1. REKAP PER PO (BARU) - Untuk Fitur "Eject / Hapus Muatan" di UI
+        // -------------------------------------------------------------------
+        $selectedPOs = DB::table('tbl_po')
+            ->join('tbl_outlets', 'tbl_po.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('tbl_po_detail', 'tbl_po.id', '=', 'tbl_po_detail.po_id')
+            ->leftJoin('tbl_bahan_scm', 'tbl_po_detail.bahan_id', '=', 'tbl_bahan_scm.id')
+            ->leftJoin('tbl_bahan_unit', function ($join) {
+                $join->on('tbl_po_detail.bahan_id', '=', 'tbl_bahan_unit.bahan_id')
+                    ->on('tbl_po_detail.unit_id', '=', 'tbl_bahan_unit.unit_id');
+            })
+            ->whereIn('tbl_po.id', $poIds)
+            ->select(
+                'tbl_po.id',
+                'tbl_po.no_po',
+                'tbl_outlets.nama_outlet as outlet_name',
+                // Hitung berat (Kg) HANYA untuk barang GUDANG. Barang SUPPLIER dianggap 0 beban truk.
+                DB::raw("COALESCE(SUM(CASE WHEN tbl_bahan_scm.sumber_barang = 'GUDANG' THEN (tbl_po_detail.jumlah * (tbl_bahan_unit.weight / 1000)) ELSE 0 END), 0) as total_berat")
+            )
+            ->groupBy('tbl_po.id', 'tbl_po.no_po', 'tbl_outlets.nama_outlet')
+            ->get();
+
+
+        // -------------------------------------------------------------------
+        // 2. REKAP BARANG GUDANG KESELURUHAN
+        // -------------------------------------------------------------------
         $rekapGudang = DB::table('tbl_po_detail')
             ->join('tbl_bahan_scm', 'tbl_po_detail.bahan_id', '=', 'tbl_bahan_scm.id')
             ->leftJoin('tbl_units', 'tbl_po_detail.unit_id', '=', 'tbl_units.id')
@@ -3072,7 +3373,10 @@ class PurchaseController extends Controller
             )
             ->get();
 
-        // Rekap barang SUPPLIER
+
+        // -------------------------------------------------------------------
+        // 3. REKAP BARANG SUPPLIER KESELURUHAN
+        // -------------------------------------------------------------------
         $rekapSupplier = DB::table('tbl_po_detail')
             ->join('tbl_bahan_scm', 'tbl_po_detail.bahan_id', '=', 'tbl_bahan_scm.id')
             ->leftJoin('tbl_units', 'tbl_po_detail.unit_id', '=', 'tbl_units.id')
@@ -3097,19 +3401,23 @@ class PurchaseController extends Controller
             )
             ->get();
 
+
+        // -------------------------------------------------------------------
+        // 4. DATA ARMADA & DRIVER
+        // -------------------------------------------------------------------
         $armadaDaftar = DB::table('tbl_armada')->get();
         $driverDaftar = DB::table('tbl_supir')->get();
 
-        // Untuk rekap blade lama (backward compat)
-        $rekapBarang = $rekapGudang;
+        $rekapBarang = $rekapGudang; // Untuk backward compat
 
         return view('Purchasing.recapListPO', compact(
+            'selectedPOs', // <-- Variabel baru dikirim ke Blade
             'rekapBarang',
             'rekapGudang',
             'rekapSupplier',
             'poIds',
             'armadaDaftar',
-            'driverDaftar',
+            'driverDaftar'
         ));
     }
 
@@ -3164,7 +3472,7 @@ class PurchaseController extends Controller
                     $po = DB::table('tbl_po')
                         ->join('tbl_outlets', 'tbl_po.outlet_id', '=', 'tbl_outlets.id')
                         ->where('tbl_po.id', $poId)
-                        ->select('tbl_po.*', 'tbl_outlets.nama_outlet')
+                        ->select('tbl_po.*', 'tbl_outlets.nama_outlet', 'tbl_outlets.alamat')
                         ->first();
 
                     $poAdaGudang = DB::table('tbl_po_detail')
@@ -3248,7 +3556,7 @@ class PurchaseController extends Controller
                         'outlet_po_id' => $poId,
                         'customer_id' => $customer->outlet_id ?? 0,
                         'warehouse_id' => $warehouseId, // Tetap warehouse_id karena kolomnya emang minta ID Warehouse
-                        'delivery_address' => $po->nama_outlet ?? null,
+                        'delivery_address' => $po->alamat ?? null,
                         'delivery_date' => now()->toDateString(),
                         'estimated_arrival' => now()->addDays(1)->toDateString(),
                         'driver_name' => $supir->nama_supir,

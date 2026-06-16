@@ -23,7 +23,7 @@ class IsSCM
         }
         
         // 2. Daftar role (Gunakan huruf kecil semua di sini)
-        $scmRoles = ['admindc', 'leader', 'spv'];
+        $scmRoles = ['admindc', 'purchasing', 'spv'];
     
         // 3. Ambil role user dan paksa jadi huruf kecil (strtolower) untuk dibandingin
         $userRole = strtolower(Auth::user()->role);
