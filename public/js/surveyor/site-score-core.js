@@ -378,6 +378,25 @@ function calculateCannibalizationPenalty() {
 
     if (isNaN(lat) || isNaN(lng) || masterOutlets.length === 0) return 0;
 
+    // Ambil konfigurasi dari input JSON
+    let maxRadius = 1500;
+    let criticalRadius = 800;
+    let superDense = 3000;
+    let narrowMarket = 1500;
+
+    const isCustom = document.getElementById('formulaCustom')?.checked;
+    if (isCustom) {
+        try {
+            const parsed = JSON.parse(document.getElementById('custom_weights_json').value);
+            if (parsed.cannibal) {
+                if (parsed.cannibal.max_radius > 0) maxRadius = parsed.cannibal.max_radius;
+                if (parsed.cannibal.critical_radius > 0) criticalRadius = parsed.cannibal.critical_radius;
+                if (parsed.cannibal.super_dense > 0) superDense = parsed.cannibal.super_dense;
+                if (parsed.cannibal.narrow_market > 0) narrowMarket = parsed.cannibal.narrow_market;
+            }
+        } catch (e) { }
+    }
+
     let closestDist = 9999999;
     masterOutlets.forEach(outlet => {
         const outLat = parseFloat(outlet.latitude);
@@ -387,16 +406,37 @@ function calculateCannibalizationPenalty() {
         if (dist < closestDist) closestDist = dist;
     });
 
-    if (closestDist <= 3000) {
-        let penalty = (closestDist <= 1500) ? 0.25 : 0.10;
-        const q1 = parseFloat(document.getElementById('rumah_q1')?.value || 0);
-        const q2 = parseFloat(document.getElementById('rumah_q2')?.value || 0);
-        if ((q1 + q2) > 2000) {
-            penalty = penalty / 2; // Density Mitigation
-        }
-        return penalty;
+    if (closestDist > maxRadius) return 0; // Aman
+
+    const q1 = parseFloat(document.getElementById('rumah_q1')?.value || 0);
+    const q2 = parseFloat(document.getElementById('rumah_q2')?.value || 0);
+    const q3 = parseFloat(document.getElementById('rumah_q3')?.value || 0);
+    const q4 = parseFloat(document.getElementById('rumah_q4')?.value || 0);
+
+    // --- ENHANCEMENT: VIRTUAL MARKET CAPACITY (RADAR PEMASARAN OJOL) ---
+    // Meskipun dua outlet berdekatan (Kanibal Fisik), jika ekosistem F&B online di area tersebut
+    // sangat raksasa, maka "Kue Pasar" cukup besar untuk dimakan berdua.
+    // Kita mengonversi skor Ojol (Hotzone) menjadi "Rumah Virtual" (1 point Ojol = ~30 Rumah Virtual).
+    const ojolScore = (window.tempRaksasaOjolScore || 0) + (window.tempMealDeliveryScore || 0) + (window.tempMealTakeawayScore || 0);
+    const virtualRumahOjol = ojolScore * 30;
+
+    const totalRumah = q1 + q2 + q3 + q4 + virtualRumahOjol;
+
+    let penalty = 0.25; // Default penalti maksimal
+    if (closestDist > criticalRadius) {
+        penalty = 0.10; // Rawan ringan
     }
-    return 0;
+
+    // Market Capacity Mitigation (Perlindungan Kapasitas Pasar)
+    if (totalRumah >= superDense) {
+        // Pasar sangat tebal (Fisik + Virtual Online), bisa menampung 2 outlet walau berdekatan
+        penalty = (closestDist <= criticalRadius) ? 0.05 : 0;
+    } else if (totalRumah >= narrowMarket) {
+        // Pasar sedang, penalti dikurangi setengahnya
+        penalty = penalty / 2;
+    }
+
+    return penalty;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -438,13 +478,13 @@ function hitungLiveScore() {
         }
     }
 
-    // 2. Ambil raw inputs dan terapkan multiplier sejak awal
-    const totalMotor = sumInputs('.motor-input') * multiplierTraffic;
-    const totalPejalan = sumInputs('.pejalan-input') * multiplierTraffic;
-    const q1 = getVal('rumah_q1') * multiplierRumah;
-    const q2 = getVal('rumah_q2') * multiplierRumah;
-    const q3 = getVal('rumah_q3') * multiplierRumah;
-    const q4 = getVal('rumah_q4') * multiplierRumah;
+    // 2. Ambil raw inputs (murni tanpa multiplier agar Skor Kelayakan valid)
+    const totalMotor = sumInputs('.motor-input');
+    const totalPejalan = sumInputs('.pejalan-input');
+    const q1 = getVal('rumah_q1');
+    const q2 = getVal('rumah_q2');
+    const q3 = getVal('rumah_q3');
+    const q4 = getVal('rumah_q4');
     const avgCheck = getVal('average_check') || 21000;
 
     const scoreMotor = hitungScore('traffic_motor', totalMotor);
@@ -509,9 +549,21 @@ function hitungLiveScore() {
     const internalCannibalPenalty = calculateCannibalizationPenalty();
     window.lastCannibalPenalty = internalCannibalPenalty;
 
-    const totalPenambah = scoreMotor + scorePejalan + scoreRumah + scoreFasilitas + (bonusHarga > 0 ? bonusHarga : 0) + bonusFisik;
+    let totalPenambah = scoreMotor + scorePejalan + scoreRumah + scoreFasilitas + (bonusHarga > 0 ? bonusHarga : 0) + bonusFisik;
     const totalPengurang = scoreKompetitor + (bonusHarga < 0 ? Math.abs(bonusHarga) : 0) + internalCannibalPenalty;
-    const finalScore = Math.min(1.0, Math.max(0, totalPenambah - totalPengurang));
+
+    // --- ENHANCEMENT: SINKRONISASI SKOR DENGAN OMSET MULTIPLIER ---
+    // Jika user secara legal mengaktifkan "Faktor Optimisme" > 1, kita suntikkan bonus ini 
+    // ke dalam Skor Kelayakan secara bersih (ditampilkan di luar blok Total Penambah).
+    const avgMultiplier = (multiplierTraffic + multiplierRumah) / 2;
+    let bonusOptimisme = 0;
+
+    if (avgMultiplier > 1) {
+        const nativeFinalScore = Math.max(0, totalPenambah - totalPengurang);
+        bonusOptimisme = nativeFinalScore * (avgMultiplier - 1);
+    }
+
+    const finalScore = Math.min(1.0, Math.max(0, totalPenambah - totalPengurang + bonusOptimisme));
     const finalPercent = finalScore * 100;
 
     // Tipe outlet & threshold
@@ -574,6 +626,16 @@ function hitungLiveScore() {
         }
     }
 
+    const bdBonusOptCont = document.getElementById('bdBonusOptimismeContainer');
+    if (bdBonusOptCont) {
+        if (bonusOptimisme > 0) {
+            bdBonusOptCont.style.display = 'flex';
+            document.getElementById('bdBonusOptimisme').innerText = '+' + (bonusOptimisme * 100).toFixed(2) + '%';
+        } else {
+            bdBonusOptCont.style.display = 'none';
+        }
+    }
+
     document.getElementById('totalMinusDisplay').innerText = (totalPengurang * 100).toFixed(2) + '%';
 
     // Breakdown Pengurang
@@ -605,14 +667,14 @@ function hitungLiveScore() {
     }
 
     // 1. Traffic (Expanded to Weekly total: Weekday x 5 + Weekend x 2)
-    // Terapkan multiplier ke individual inputs agar sejalan dengan totalMotor
-    const m_wd = (getVal('motor_weekday_pagi') + getVal('motor_weekday_siang') + getVal('motor_weekday_sore')) * multiplierTraffic;
-    const m_we = (getVal('motor_weekend_pagi') + getVal('motor_weekend_siang') + getVal('motor_weekend_sore')) * multiplierTraffic;
-    const totalMotorWeekly = (m_wd * 5) + (m_we * 2);
+    // Terapkan multiplier khusus untuk dongkrak perhitungan omset
+    const m_wd = (getVal('motor_weekday_pagi') + getVal('motor_weekday_siang') + getVal('motor_weekday_sore'));
+    const m_we = (getVal('motor_weekend_pagi') + getVal('motor_weekend_siang') + getVal('motor_weekend_sore'));
+    const totalMotorWeekly = ((m_wd * 5) + (m_we * 2)) * multiplierTraffic;
 
-    const p_wd = (getVal('pejalan_weekday_pagi') + getVal('pejalan_weekday_siang') + getVal('pejalan_weekday_sore')) * multiplierTraffic;
-    const p_we = (getVal('pejalan_weekend_pagi') + getVal('pejalan_weekend_siang') + getVal('pejalan_weekend_sore')) * multiplierTraffic;
-    const totalPejalanWeekly = (p_wd * 5) + (p_we * 2);
+    const p_wd = (getVal('pejalan_weekday_pagi') + getVal('pejalan_weekday_siang') + getVal('pejalan_weekday_sore'));
+    const p_we = (getVal('pejalan_weekend_pagi') + getVal('pejalan_weekend_siang') + getVal('pejalan_weekend_sore'));
+    const totalPejalanWeekly = ((p_wd * 5) + (p_we * 2)) * multiplierTraffic;
 
     // --- ENHANCEMENT 1: Diminishing Returns (Batas Jenuh Jalan Raya/Arteri) ---
     const totalMotorDaily = totalMotorWeekly / 7;
@@ -635,11 +697,11 @@ function hitungLiveScore() {
     const omsetMotorPerhari = (effectiveMotorDaily * currentRasio.motor * trafficFriction * avgCheck);
     const omsetPejalanPerhari = (totalPejalanWeekly * currentRasio.pejalan * avgCheck) / 7;
 
-    // 2. Rumah Penduduk (Harian = Perminggu / 7) - q1 dkk sudah dikali multiplier di atas
-    const omsetQ1 = (q1 * currentRasio.q1 * avgCheck) / 7;
-    const omsetQ2 = (q2 * currentRasio.q2 * avgCheck) / 7;
-    const omsetQ3 = (q3 * currentRasio.q3 * avgCheck) / 7;
-    const omsetQ4 = (q4 * currentRasio.q4 * avgCheck) / 7;
+    // 2. Rumah Penduduk (Harian = Perminggu / 7) - q1 dkk dikali multiplier khusus untuk dongkrak omset
+    const omsetQ1 = (q1 * multiplierRumah * currentRasio.q1 * avgCheck) / 7;
+    const omsetQ2 = (q2 * multiplierRumah * currentRasio.q2 * avgCheck) / 7;
+    const omsetQ3 = (q3 * multiplierRumah * currentRasio.q3 * avgCheck) / 7;
+    const omsetQ4 = (q4 * multiplierRumah * currentRasio.q4 * avgCheck) / 7;
 
     let subTotalOmset = omsetMotorPerhari + omsetPejalanPerhari + omsetQ1 + omsetQ2 + omsetQ3 + omsetQ4;
 
@@ -1025,7 +1087,7 @@ async function radarFasilitas() {
             return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
         };
 
-        window.radarData = { internal: [], pendidikan: [], market: [], bank: [], kesehatan: [], kompetitor: [] };
+        window.radarData = { internal: [], pendidikan: [], market: [], bank: [], kesehatan: [], kompetitor: [], ojol: [] };
         const addRadarData = (category, places) => {
             places.forEach(p => {
                 let dist = 0;
@@ -1169,6 +1231,113 @@ async function radarFasilitas() {
                     if (p.name.toLowerCase().includes('geprekin')) internalRes.push(p);
                 });
                 addRadarData('internal', internalRes);
+            }),
+
+            // Ekosistem Ojol (F&B Hotzone) - Restoran Raksasa (Huff Gravity Model & Sentiment Analysis)
+            searchPlaces({ location: loc, radius: 2000, type: 'restaurant' }).then(async res => {
+                try {
+                    res = await filterByRoutingDistance(loc, res, 2000 * 1.1);
+                    let raksasaList = [];
+                    res.forEach(p => {
+                        if (p.user_ratings_total && p.user_ratings_total >= 1000) {
+                            let dist = 2000;
+                            if (p.geometry && p.geometry.location) {
+                                const plat = typeof p.geometry.location.lat === 'function' ? p.geometry.location.lat() : p.geometry.location.lat;
+                                const plng = typeof p.geometry.location.lng === 'function' ? p.geometry.location.lng() : p.geometry.location.lng;
+                                dist = Math.round(haversineDist(lat, lng, plat, plng));
+                            }
+                            p._calcDist = dist;
+                            raksasaList.push(p);
+                        }
+                    });
+
+                    // Sort by distance and take top 5 to avoid API rate limit
+                    raksasaList.sort((a, b) => a._calcDist - b._calcDist);
+                    const top5 = raksasaList.slice(0, 5);
+
+                    let sentimentResults = [];
+                    for (const p of top5) {
+                        if (!p.place_id) {
+                            sentimentResults.push({ p, isHub: false });
+                            continue;
+                        }
+                        await new Promise(r => setTimeout(r, 600)); // Delay to bypass Places API rate limit
+                        const sRes = await new Promise((resolve) => {
+                            service.getDetails({ placeId: p.place_id, fields: ['reviews', 'delivery', 'takeout'] }, (place, status) => {
+                                let isHub = false;
+                                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                                    // 1. Sinyal Delivery (Validasi Resmi Google)
+                                    if (place.delivery === true || place.takeout === true) {
+                                        isHub = true;
+                                    }
+
+                                    // 2. Sinyal Nama Toko (Merchant Gofood/Grabfood)
+                                    const nameRegex = /gofood|grabfood|shopeefood/i;
+                                    if (p.name && nameRegex.test(p.name)) {
+                                        isHub = true;
+                                    }
+
+                                    // 3. Sinyal Ulasan (Teks)
+                                    if (!isHub && place.reviews) {
+                                        const regex = /gojek|gofood|grab|grabfood|shopee|shopeefood|maxim|driver|kurir|ojol|antri|nunggu/i;
+                                        for (let r of place.reviews) {
+                                            if (r.text && regex.test(r.text)) {
+                                                isHub = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
+                                    console.warn('OVER_QUERY_LIMIT on getDetails for ' + p.name);
+                                }
+                                resolve({ p, isHub });
+                            });
+                        });
+                        sentimentResults.push(sRes);
+                    }
+
+                    let raksasaScore = 0;
+                    const processedPlaceIds = top5.map(p => p.place_id);
+
+                    raksasaList.forEach(p => {
+                        const dist = p._calcDist;
+                        let score = 0;
+                        if (dist <= 250) score = 12.0;
+                        else if (dist <= 500) score = 8.0;
+                        else if (dist <= 1000) score = 4.0;
+                        else if (dist <= 1500) score = 1.5;
+                        else score = 0.5;
+
+                        if (p.user_ratings_total > 5000) score *= 1.5;
+
+                        let isHub = false;
+                        if (processedPlaceIds.includes(p.place_id)) {
+                            const sRes = sentimentResults.find(s => s.p.place_id === p.place_id);
+                            if (sRes && sRes.isHub) {
+                                isHub = true;
+                                score *= 1.5; // Bonus driver hub
+                            }
+                        }
+
+                        raksasaScore += score;
+                        window.radarData.ojol.push({ name: p.name, dist: dist, reviews: p.user_ratings_total, score: score.toFixed(1), isHub: isHub });
+                    });
+
+                    window.tempRaksasaOjolScore = raksasaScore;
+                } catch (err) {
+                    console.error(err);
+                    alert('Error Ojol: ' + err.message);
+                }
+            }),
+
+            // Sinyal Ekstensi Ojol (Meal Delivery & Takeaway)
+            searchPlaces({ location: loc, radius: 2000, type: 'meal_delivery' }).then(async res => {
+                res = await filterByRoutingDistance(loc, res, 2000 * 1.1);
+                window.tempMealDeliveryScore = calcDensityWeight(res) * 5; // Bobot tinggi untuk Ojol murni
+            }),
+            searchPlaces({ location: loc, radius: 2000, type: 'meal_takeaway' }).then(async res => {
+                res = await filterByRoutingDistance(loc, res, 2000 * 1.1);
+                window.tempMealTakeawayScore = calcDensityWeight(res) * 2; // Bobot sedang untuk takeaway
             }),
 
             // Demographic Proxy (Sistem Satelit Kuadran untuk bypass limit 60 Places API)
@@ -1644,8 +1813,8 @@ async function radarFasilitas() {
                     // --- 3. OTOMATISASI TARGET KONTRIBUSI OMSET (ORGANIK VS OJOL) ---
                     // Organik Ecosystem: Sekolah, Kampus, Market, Perkantoran
                     const organikScore = (sekolah * 1.5) + (kampus * 2) + market + (perkantoran * 1.2);
-                    // Ojol Ecosystem: Kesehatan + Perumahan/Apartemen (diambil dari radius 2.5km)
-                    const ojolScore = (kesehatan * 1.5) + (window.tempPerumahanDensity || 0) + (window.tempApartemenDensity || 0);
+                    // Ojol Ecosystem: Kesehatan + Perumahan/Apartemen + F&B Hotzone + Kategori Delivery/Takeaway
+                    const ojolScore = (kesehatan * 1.5) + (window.tempPerumahanDensity || 0) + (window.tempApartemenDensity || 0) + (window.tempRaksasaOjolScore || 0) + (window.tempMealDeliveryScore || 0) + (window.tempMealTakeawayScore || 0);
 
                     let rasioOrganik = 85; // Base default
                     if (organikScore > 0 || ojolScore > 0) {
@@ -2977,7 +3146,8 @@ function renderRadarReport() {
         { key: 'market', el: 'list_market', countEl: 'count_market', limit: 5 },
         { key: 'bank', el: 'list_bank', countEl: 'count_bank', limit: 5 },
         { key: 'kesehatan', el: 'list_kesehatan', countEl: 'count_kesehatan', limit: 3 },
-        { key: 'kompetitor', el: 'list_kompetitor', countEl: 'count_kompetitor', limit: 5 }
+        { key: 'kompetitor', el: 'list_kompetitor', countEl: 'count_kompetitor', limit: 5 },
+        { key: 'ojol', el: 'list_ojol', countEl: 'count_ojol', limit: 10 }
     ];
 
     categories.forEach(cat => {
@@ -2999,7 +3169,12 @@ function renderRadarReport() {
             uniqueData.slice(0, cat.limit).forEach(item => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center bg-transparent px-2 py-1 border-0';
-                li.innerHTML = `<span class="text-truncate" style="max-width: 75%;">${item.name}</span><span class="badge bg-light text-dark border">${item.dist} m</span>`;
+                if (item.reviews) {
+                    const hubBadge = item.isHub ? '<span class="badge bg-danger ms-1" title="Verified Driver Hub (Review Analysis)">🛵</span>' : '';
+                    li.innerHTML = `<span class="text-truncate" style="max-width: 60%;">${item.name} <small class="text-success fw-bold ms-1" title="Gravity Score">(+${item.score})</small>${hubBadge}</span><div class="text-end"><span class="badge bg-warning text-dark border me-1" title="Ulasan Google Maps"><i class="bi bi-star-fill text-warning"></i> ${item.reviews.toLocaleString('id-ID')}</span><span class="badge bg-light text-dark border">${item.dist} m</span></div>`;
+                } else {
+                    li.innerHTML = `<span class="text-truncate" style="max-width: 75%;">${item.name}</span><span class="badge bg-light text-dark border">${item.dist} m</span>`;
+                }
                 ul.appendChild(li);
             });
             if (uniqueData.length > cat.limit) {

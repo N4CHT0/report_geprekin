@@ -202,7 +202,8 @@
                                             {{ $po->no_po }}
                                         </td>
                                         <td class="text-center small">{{ $po->tgl_permintaan }}</td>
-                                        <td class="text-center text-dark text-start px-3">SCM-{{ $po->nama_outlet }}-LINK(NEW)</td>
+                                        <td class="text-center text-dark text-start px-3">
+                                            SCM-{{ $po->nama_outlet }}-LINK(NEW)</td>
                                         <td class="text-center">
                                             @php
                                                 $statusColors = [
@@ -244,6 +245,14 @@
 
                                                     <li>
                                                         <hr class="dropdown-divider my-1" style="border-color: #f1f5f9;">
+                                                    </li>
+                                                    <li>
+                                                        <button type="button" class="dropdown-item py-2 text-warning"
+                                                            data-bs-toggle="modal" data-bs-target="#editModal"
+                                                            data-id="{{ $po->id }}" data-no-po="{{ $po->no_po }}"
+                                                            data-items="{{ json_encode($po->items) }}">
+                                                            <i class="bi bi-pencil me-2"></i> Edit PO
+                                                        </button>
                                                     </li>
 
                                                     <li>
@@ -319,6 +328,33 @@
                             </div>
                         </div>
 
+                        <!-- MODAL EDIT -->
+                        <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                <form id="formEditPO" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                                        <div class="modal-header border-bottom px-4">
+                                            <h6 class="modal-title fw-bold text-dark" id="editLabel">Edit Purchase Order
+                                            </h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4 bg-light">
+                                            <div id="editModalContent"></div>
+                                        </div>
+                                        <div class="modal-footer px-4">
+                                            <button type="button" class="btn btn-light border"
+                                                data-bs-dismiss="modal">Batal</button>
+                                            <button type="submit" class="btn btn-warning text-white fw-semibold">Simpan
+                                                Perubahan</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -376,27 +412,27 @@
                         const badge = sumber === 'SUPPLIER'
                             ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-semibold px-2 py-1 rounded-pill" style="font-size:10px; --bs-border-opacity: .2;">Supplier</span>'
                             : '<span class="badge bg-primary-subtle text-primary-emphasis border border-primary fw-semibold px-2 py-1 rounded-pill" style="font-size:10px; --bs-border-opacity: .2;">DC</span>';
-                        
+
                         const detailId = item.id || item.detail_id || '';
 
                         // Render baris tabel, beri class 'satuan-dropdown' untuk diload via AJAX
                         itemRows += `
-                                <tr class="small text-secondary item-row" data-detail-id="${detailId}" style="border-bottom: 1px solid #f1f5f9;">
-                                    <td class="text-center text-muted align-middle">${index + 1}</td>
-                                    <td class="text-dark fw-bold align-middle" style="font-size:13px;">${item.nama_bahan}</td>
-                                    <td class="align-middle">
-                                        <input type="number" class="form-control form-control-sm text-center edit-qty mx-auto" 
-                                            value="${item.jumlah}" ${isEditable} min="0" step="0.01" style="max-width: 80px; border-radius: 6px;">
-                                    </td>
-                                    <td class="align-middle">
-                                        <select class="form-select form-select-sm edit-satuan satuan-dropdown" 
-                                            data-bahan-id="${item.bahan_id}" data-current-unit="${item.unit_id}" 
-                                            ${isEditable} style="border-radius: 6px; min-width: 120px;">
-                                            <option value="${item.unit_id}">${item.satuan || 'Loading...'}</option>
-                                        </select>
-                                    </td>
-                                    <td class="align-middle text-center">${badge}</td>
-                                </tr>`;
+                                            <tr class="small text-secondary item-row" data-detail-id="${detailId}" style="border-bottom: 1px solid #f1f5f9;">
+                                                <td class="text-center text-muted align-middle">${index + 1}</td>
+                                                <td class="text-dark fw-bold align-middle" style="font-size:13px;">${item.nama_bahan}</td>
+                                                <td class="align-middle">
+                                                    <input type="number" class="form-control form-control-sm text-center edit-qty mx-auto" 
+                                                        value="${item.jumlah}" ${isEditable} min="0" step="0.01" style="max-width: 80px; border-radius: 6px;">
+                                                </td>
+                                                <td class="align-middle">
+                                                    <select class="form-select form-select-sm edit-satuan satuan-dropdown" 
+                                                        data-bahan-id="${item.bahan_id}" data-current-unit="${item.unit_id}" 
+                                                        ${isEditable} style="border-radius: 6px; min-width: 120px;">
+                                                        <option value="${item.unit_id}">${item.satuan || 'Loading...'}</option>
+                                                    </select>
+                                                </td>
+                                                <td class="align-middle text-center">${badge}</td>
+                                            </tr>`;
                     });
                 } else {
                     itemRows = '<tr><td colspan="5" class="text-center text-muted small py-3">Tidak ada detail barang</td></tr>';
@@ -407,71 +443,71 @@
                 if (status === 'Rejected') infoBadgeClass = 'bg-danger-subtle text-danger-emphasis border border-danger';
 
                 $('#modalContent').html(`
-                        <div class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background-color: #ffffff;">
-                            <h6 class="fw-bold text-dark small text-uppercase mb-2.5" style="letter-spacing: 0.3px;">Informasi Pesanan</h6>
-                            <table class="table table-sm table-borderless mb-0 small text-secondary">
-                                <tr>
-                                    <th class="text-muted fw-normal pb-2" width="30%">No PO</th>
-                                    <td class="text-dark fw-bold pb-2">${noPo}</td>
-                                </tr>
-                                <tr>
-                                    <th class="text-muted fw-normal pb-2">Nama Outlet</th>
-                                    <td class="text-dark fw-semibold pb-2" style="color: #4f46e5 !important;">${namaOutlet}</td>
-                                </tr>
-                                <tr>
-                                    <th class="text-muted fw-normal pb-2">Tanggal Request</th>
-                                    <td class="text-dark pb-2">${tglReq}</td>
-                                </tr>
-                                <tr>
-                                    <th class="text-muted fw-normal">Status Logistik</th>
-                                    <td><span class="badge ${infoBadgeClass} fw-semibold px-2.5 py-1 rounded-pill" style="font-size:11px; --bs-border-opacity: .2;">${status}</span></td>
-                                </tr>
-                            </table>
-                        </div>
+                                    <div class="card p-3 border-0 shadow-sm rounded-4 mb-4" style="background-color: #ffffff;">
+                                        <h6 class="fw-bold text-dark small text-uppercase mb-2.5" style="letter-spacing: 0.3px;">Informasi Pesanan</h6>
+                                        <table class="table table-sm table-borderless mb-0 small text-secondary">
+                                            <tr>
+                                                <th class="text-muted fw-normal pb-2" width="30%">No PO</th>
+                                                <td class="text-dark fw-bold pb-2">${noPo}</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-muted fw-normal pb-2">Nama Outlet</th>
+                                                <td class="text-dark fw-semibold pb-2" style="color: #4f46e5 !important;">${namaOutlet}</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-muted fw-normal pb-2">Tanggal Request</th>
+                                                <td class="text-dark pb-2">${tglReq}</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-muted fw-normal">Status Logistik</th>
+                                                <td><span class="badge ${infoBadgeClass} fw-semibold px-2.5 py-1 rounded-pill" style="font-size:11px; --bs-border-opacity: .2;">${status}</span></td>
+                                            </tr>
+                                        </table>
+                                    </div>
 
-                        <div class="card p-3 border-0 shadow-sm rounded-4" style="background-color: #ffffff;">
-                            <div class="d-flex justify-content-between align-items-center mb-2.5">
-                                <h6 class="fw-bold text-dark small text-uppercase mb-0" style="letter-spacing: 0.3px;">Daftar Item Pesanan</h6>
-                                ${status === 'Waiting' ? `
-                                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle shadow-sm" 
-                                          style="cursor: pointer; padding: 6px 12px; font-size: 11px; letter-spacing: 0.3px;"
-                                          onclick="Swal.fire({
-                                              icon: 'info',
-                                              title: 'Petunjuk Validasi PO',
-                                              text: 'Sebelum menyetujui PO, harap pastikan Qty dan Satuan yang diajukan sudah sesuai dengan ketersediaan stok riil di gudang. Anda dapat mengubahnya langsung pada tabel di bawah ini.',
-                                              confirmButtonColor: '#4f46e5',
-                                              confirmButtonText: 'Mengerti'
-                                          })">
-                                        <i class="bi bi-info-circle-fill me-1"></i> Info Penyesuaian
-                                    </span>
-                                ` : ''}
-                            </div>
-                            <table class="table table-sm align-middle mb-0">
-                                <thead class="text-muted small text-uppercase" style="border-bottom: 2px solid #f1f5f9;">
-                                    <tr>
-                                        <th class="text-center pb-2" width="5%" style="font-weight:600;">No.</th>
-                                        <th class="pb-2" style="font-weight:600;">Nama Bahan</th>
-                                        <th class="text-center pb-2" width="20%" style="font-weight:600;">Qty</th>
-                                        <th class="text-start pb-2" width="25%" style="font-weight:600;">Satuan (Bisa diubah)</th>
-                                        <th class="text-center pb-2" width="15%" style="font-weight:600;">Asal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${itemRows}
-                                </tbody>
-                            </table>
-                        </div>
-                    `);
+                                    <div class="card p-3 border-0 shadow-sm rounded-4" style="background-color: #ffffff;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2.5">
+                                            <h6 class="fw-bold text-dark small text-uppercase mb-0" style="letter-spacing: 0.3px;">Daftar Item Pesanan</h6>
+                                            ${status === 'Waiting' ? `
+                                                <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle shadow-sm" 
+                                                      style="cursor: pointer; padding: 6px 12px; font-size: 11px; letter-spacing: 0.3px;"
+                                                      onclick="Swal.fire({
+                                                          icon: 'info',
+                                                          title: 'Petunjuk Validasi PO',
+                                                          text: 'Sebelum menyetujui PO, harap pastikan Qty dan Satuan yang diajukan sudah sesuai dengan ketersediaan stok riil di gudang. Anda dapat mengubahnya langsung pada tabel di bawah ini.',
+                                                          confirmButtonColor: '#4f46e5',
+                                                          confirmButtonText: 'Mengerti'
+                                                      })">
+                                                    <i class="bi bi-info-circle-fill me-1"></i> Info Penyesuaian
+                                                </span>
+                                            ` : ''}
+                                        </div>
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead class="text-muted small text-uppercase" style="border-bottom: 2px solid #f1f5f9;">
+                                                <tr>
+                                                    <th class="text-center pb-2" width="5%" style="font-weight:600;">No.</th>
+                                                    <th class="pb-2" style="font-weight:600;">Nama Bahan</th>
+                                                    <th class="text-center pb-2" width="20%" style="font-weight:600;">Qty</th>
+                                                    <th class="text-start pb-2" width="25%" style="font-weight:600;">Satuan (Bisa diubah)</th>
+                                                    <th class="text-center pb-2" width="15%" style="font-weight:600;">Asal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${itemRows}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                `);
 
                 // --- LOAD DROPDOWN SATUAN VIA AJAX ---
-                $('.satuan-dropdown').each(function() {
+                $('.satuan-dropdown').each(function () {
                     let selectElement = $(this);
                     let bahanId = selectElement.data('bahan-id');
                     let currentUnitId = selectElement.data('current-unit');
 
-                    $.get('/get-satuan-bahan/' + bahanId, function(res) {
+                    $.get('/get-satuan-bahan/' + bahanId, function (res) {
                         let options = '';
-                        res.forEach(function(satuan) {
+                        res.forEach(function (satuan) {
                             let isSelected = (satuan.id == currentUnitId) ? 'selected' : '';
                             options += `<option value="${satuan.id}" ${isSelected}>${satuan.nama_unit}</option>`;
                         });
@@ -489,17 +525,17 @@
                             let html = '';
                             res.items.forEach(function (item) {
                                 html += `
-                                    <div class="d-flex align-items-center gap-2 mb-2.5">
-                                        <span class="badge bg-light text-dark border fw-medium" style="min-width:160px; font-size:12px; text-align:left; display:inline-block; padding: 8px 12px; border-radius: 8px;">
-                                            <i class="bi bi-box-seam me-1 text-muted"></i> ${item.nama_bahan}
-                                        </span>
-                                        <select class="form-select form-select-sm supplier-select" data-detail-id="${item.detail_id}" required style="border-radius: 8px; padding-top: 6px; padding-bottom: 6px;">
-                                            <option value="">-- Pilih Supplier Penyuplai --</option>`;
+                                                <div class="d-flex align-items-center gap-2 mb-2.5">
+                                                    <span class="badge bg-light text-dark border fw-medium" style="min-width:160px; font-size:12px; text-align:left; display:inline-block; padding: 8px 12px; border-radius: 8px;">
+                                                        <i class="bi bi-box-seam me-1 text-muted"></i> ${item.nama_bahan}
+                                                    </span>
+                                                    <select class="form-select form-select-sm supplier-select" data-detail-id="${item.detail_id}" required style="border-radius: 8px; padding-top: 6px; padding-bottom: 6px;">
+                                                        <option value="">-- Pilih Supplier Penyuplai --</option>`;
                                 res.suppliers.forEach(function (sup) {
                                     html += `<option value="${sup.id}">${sup.supplier_name}</option>`;
                                 });
                                 html += `</select>
-                                    </div>`;
+                                                </div>`;
                             });
                             $('#supplier-inputs').html(html);
                         }
@@ -549,7 +585,7 @@
 
                 // PERUBAHAN: Tangkap data Qty dan Satuan yang sudah diedit
                 let modifiedItems = [];
-                $('#modalContent .item-row').each(function() {
+                $('#modalContent .item-row').each(function () {
                     modifiedItems.push({
                         detail_id: $(this).data('detail-id'),
                         qty: $(this).find('.edit-qty').val(),
@@ -672,6 +708,39 @@
                 }
             });
         }
+
+        // Handle Edit Modal
+        const editModal = document.getElementById('editModal');
+        editModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const poId = button.getAttribute('data-id');
+            const noPo = button.getAttribute('data-no-po');
+            const items = JSON.parse(button.getAttribute('data-items'));
+
+            document.getElementById('formEditPO').action = `/purchasing/po-update/${poId}`;
+            document.getElementById('editLabel').textContent = 'Edit PO: ' + noPo;
+
+            let html = `
+            <table class="table table-white bg-white shadow-sm rounded-3">
+                <thead><tr><th>Bahan</th><th>Qty</th><th>Satuan</th></tr></thead>
+                <tbody>`;
+
+            items.forEach((item) => {
+                html += `
+                <tr>
+                    <td>${item.nama_bahan}</td>
+                    <td><input type="number" name="items[${item.detail_id}][qty]" class="form-control" value="${item.jumlah}" step="0.01"></td>
+                    <td>
+                        <select name="items[${item.detail_id}][unit_id]" class="form-select">
+                            <option value="${item.unit_id}">${item.satuan}</option>
+                        </select>
+                    </td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            $('#editModalContent').html(html);
+        });
     </script>
 @endpush
 

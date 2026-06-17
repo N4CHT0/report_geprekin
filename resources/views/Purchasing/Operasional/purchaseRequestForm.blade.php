@@ -867,10 +867,12 @@
                                                             <th class="text-danger py-2.5">Nama Bahan</th>
                                                             <th class="text-danger py-2.5">Supplier</th>
                                                             <th class="text-center text-danger py-2.5">Qty PO</th>
+                                                            <th class="text-center text-danger py-2.5">Pack</th>
+                                                            <th class="text-center text-danger py-2.5">Kg</th>
                                                             <th class="text-center text-danger py-2.5">Ayam Besar</th>
                                                             <th class="text-center text-danger py-2.5">Ayam Kecil</th>
                                                             <th class="text-center text-primary py-2.5">Total Pcs</th>
-                                                            <th class="text-center text-danger py-2.5">Pack</th>
+                                                            
                                                             <th class="text-center text-danger py-2.5">Gramase</th>
                                                         </tr>
                                                     </thead>
@@ -882,15 +884,19 @@
 
                                     <hr class="my-4" style="border-color: var(--border);">
 
-                                    <div class="row justify-content-center">
+                                    <div class="row justify-content-center g-4">
+                                        {{-- AREA KAMERA FOTO BARANG --}}
                                         <div class="col-md-6 text-center">
                                             <label class="fw-bold mb-2 text-dark small text-uppercase"
-                                                style="letter-spacing:0.5px;"><i
-                                                    class="bi bi-camera me-2 text-muted"></i>Dokumentasi Bukti Fisik
-                                                Barang</label>
+                                                style="letter-spacing:0.5px;">
+                                                <i class="bi bi-box-seam me-2 text-muted"></i>Dokumentasi Bukti Fisik
+                                                Barang
+                                            </label>
+
                                             <div class="camera-area border rounded-4 bg-light mb-3 d-flex align-items-center justify-content-center overflow-hidden shadow-sm"
                                                 style="height: 220px; position: relative; background-color: #ffffff !important;">
-                                                <div id="camera_placeholder" class="text-muted">
+
+                                                <div id="camera_placeholder_barang" class="text-muted">
                                                     <i class="bi bi-image fs-1 d-block mb-2 text-light-grid"
                                                         style="color: #cbd5e1;"></i>
                                                     <small class="fw-medium text-secondary">Modul Kamera Belum
@@ -903,10 +909,11 @@
                                                 <img id="img_barang" src="" class="img-fluid w-100 h-100"
                                                     style="display:none; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 2;">
                                             </div>
+
                                             <div class="d-flex justify-content-center gap-2">
                                                 <button type="button"
                                                     class="btn btn-outline-primary shadow-sm px-3 border-0 bg-light border-1 text-secondary"
-                                                    onclick="startCamera('barang'); document.getElementById('camera_placeholder').style.display='none';">
+                                                    onclick="startCamera('barang'); document.getElementById('camera_placeholder_barang').style.display='none';">
                                                     <i class="bi bi-webcam me-1.5 text-primary"></i> Hubungkan Kamera
                                                 </button>
                                                 <button type="button" id="btn_snap_barang"
@@ -918,7 +925,48 @@
                                             </div>
                                             <input type="hidden" name="foto_barang_base64" id="input_foto_barang">
                                         </div>
+
+                                        {{-- AREA KAMERA FOTO NOTA / SURAT JALAN --}}
+                                        <div class="col-md-6 text-center">
+                                            <label class="fw-bold mb-2 text-dark small text-uppercase"
+                                                style="letter-spacing:0.5px;">
+                                                <i class="bi bi-receipt me-2 text-muted"></i>Dokumentasi Nota/Surat
+                                                Jalan
+                                            </label>
+
+                                            <div class="camera-area border rounded-4 bg-light mb-3 d-flex align-items-center justify-content-center overflow-hidden shadow-sm"
+                                                style="height: 220px; position: relative; background-color: #ffffff !important;">
+
+                                                <div id="camera_placeholder_nota" class="text-muted">
+                                                    <i class="bi bi-file-earmark-text fs-1 d-block mb-2 text-light-grid"
+                                                        style="color: #cbd5e1;"></i>
+                                                    <small class="fw-medium text-secondary">Modul Kamera Belum
+                                                        Diaktifkan</small>
+                                                </div>
+
+                                                <video id="video_nota" width="100%" height="100%" autoplay playsinline
+                                                    style="display:none; object-fit: cover; position: absolute; top: 0; left: 0;"></video>
+                                                <canvas id="canvas_nota" style="display:none;"></canvas>
+                                                <img id="img_nota" src="" class="img-fluid w-100 h-100"
+                                                    style="display:none; object-fit: cover; position: absolute; top: 0; left: 0; z-index: 2;">
+                                            </div>
+
+                                            <div class="d-flex justify-content-center gap-2">
+                                                <button type="button"
+                                                    class="btn btn-outline-primary shadow-sm px-3 border-0 bg-light border-1 text-secondary"
+                                                    onclick="startCamera('nota'); document.getElementById('camera_placeholder_nota').style.display='none';">
+                                                    <i class="bi bi-webcam me-1.5 text-primary"></i> Hubungkan Kamera
+                                                </button>
+                                                <button type="button" id="btn_snap_nota"
+                                                    class="btn btn-danger shadow-sm px-3" onclick="takeSnapshot('nota')"
+                                                    style="display:none; background-color: var(--danger); border-color:var(--danger);">
+                                                    <i class="bi bi-camera-fill me-1.5"></i> Ambil Foto Nota
+                                                </button>
+                                            </div>
+                                            <input type="hidden" name="foto_nota_base64" id="input_foto_nota">
+                                        </div>
                                     </div>
+
                                 </div>
 
                                 <div class="modal-footer bg-light px-4">
@@ -1125,7 +1173,15 @@
                         <input type="hidden" name="items[${index}][konversi]"  value="${konv}">
                     </td>
                     <td>${supplierCol}</td>
-                    <td class="text-center fw-bold">${sisa} Ekor</td>
+                    <td class="text-center fw-bold">${sisa} Pack</td>
+                    <td>
+                        <input type="number" name="items[${index}][qty_pack]"
+                               class="form-control text-center" value="0" min="0">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${index}][qty_kg]"
+                               class="form-control text-center" value="0" min="0">
+                    </td>
                     <td>
                         <input type="number" name="items[${index}][qty_besar]"
                                class="form-control qty-besar text-center" value="0" min="0">
@@ -1137,10 +1193,6 @@
                     <td>
                         <input type="number" name="items[${index}][qty_terima]"
                                class="form-control qty-ayam-total text-center bg-light" readonly>
-                    </td>
-                    <td>
-                        <input type="number" name="items[${index}][qty_pack]"
-                               class="form-control text-center" value="0" min="0">
                     </td>
                     <td>
                         <input type="text"  class="form-control total-display text-end bg-light" readonly>

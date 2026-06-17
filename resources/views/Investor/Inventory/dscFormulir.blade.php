@@ -2313,6 +2313,909 @@
             }
         }
 
+        /* ==========================================================
+           PATCH MOBILE AUTO SUMMARY DSC
+           Mobile card tetap 1 bahan per layar, tetapi angka otomatis
+           ikut berubah saat user edit Ending, Purchase, Mutasi, Waste,
+           dan tetap menampilkan data hasil filter/load.
+           ========================================================== */
+        @media (max-width: 767.98px) {
+            #cards .summary {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 8px !important;
+                margin-top: 10px !important;
+            }
+
+            #cards .summary .kv,
+            #cards .summary .kv:nth-child(3) {
+                grid-column: auto !important;
+                display: grid !important;
+                grid-template-columns: 1fr !important;
+                gap: 3px !important;
+                min-height: 54px !important;
+                padding: 8px 9px !important;
+                border: 1px solid #e5e7eb !important;
+                border-radius: 13px !important;
+                background: #f9fafb !important;
+            }
+
+            #cards .summary .kv span {
+                color: #6b7280 !important;
+                font-size: .68rem !important;
+                font-weight: 950 !important;
+                letter-spacing: .2px !important;
+                text-transform: uppercase !important;
+            }
+
+            #cards .summary .kv b {
+                font-size: .9rem !important;
+                font-weight: 950 !important;
+                text-align: right !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            #cards .summary .kv-actual.neg {
+                border-color: #fecaca !important;
+                background: #fff5f5 !important;
+            }
+
+            #cards .summary .kv-actual.neg span,
+            #cards .summary .kv-actual.neg b {
+                color: #b91c1c !important;
+            }
+        }
+
+        @media (max-width: 350px) {
+            #cards .summary {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+
+        /* ==========================================================
+           HISTORY FRIENDLY + WIB PATCH
+           UI only: modal history lebih sederhana dan semua jam tampil WIB.
+        ========================================================== */
+        .dsc-history-modal .modal-dialog {
+            max-width: min(1180px, calc(100vw - 24px));
+        }
+        .dsc-history-modal .modal-header {
+            padding: 14px 18px !important;
+        }
+        .dsc-history-title {
+            font-size: 1rem !important;
+        }
+        .dsc-history-subtitle {
+            font-size: .8rem !important;
+            margin-top: 4px !important;
+        }
+        .history-filter-card {
+            padding: 12px !important;
+            border-radius: 14px !important;
+        }
+        .history-filter-grid {
+            grid-template-columns: 1.2fr .7fr .85fr .85fr auto !important;
+            gap: 10px !important;
+        }
+        .history-search-row {
+            margin-top: 10px !important;
+            grid-template-columns: 1fr auto !important;
+            gap: 10px !important;
+        }
+        .history-layout {
+            grid-template-columns: minmax(0, 1fr) 300px !important;
+            gap: 12px !important;
+        }
+        #tblHistoryDSC {
+            min-width: 760px !important;
+        }
+        #tblHistoryDSC thead th {
+            padding: 10px 12px !important;
+            font-size: .76rem !important;
+        }
+        #tblHistoryDSC tbody td {
+            padding: 10px 12px !important;
+            font-size: .84rem !important;
+        }
+        .history-time {
+            font-size: .82rem !important;
+            line-height: 1.25 !important;
+        }
+        .history-user-main,
+        .history-change-title {
+            font-size: .88rem !important;
+        }
+        .history-user-sub,
+        .history-change-meta {
+            font-size: .72rem !important;
+        }
+        .history-diff {
+            margin-top: 6px !important;
+            gap: 6px !important;
+        }
+        .history-old-value,
+        .history-new-value {
+            max-width: 120px !important;
+            padding: 4px 7px !important;
+            font-size: .78rem !important;
+        }
+        .history-detail-panel {
+            padding: 12px !important;
+            border-radius: 14px !important;
+        }
+        .history-footbar {
+            padding: 10px 2px 14px !important;
+        }
+        @media (max-width: 991.98px) {
+            .history-layout {
+                grid-template-columns: 1fr !important;
+            }
+            .history-detail-panel {
+                max-height: none !important;
+            }
+        }
+        @media (max-width: 575.98px) {
+            .dsc-history-modal .modal-body {
+                padding: 10px !important;
+            }
+            .history-filter-grid,
+            .history-search-row {
+                grid-template-columns: 1fr !important;
+            }
+            .history-table-scroll {
+                max-height: 58vh !important;
+            }
+            #tblHistoryDSC {
+                min-width: 680px !important;
+            }
+            .history-detail-panel {
+                display: none;
+            }
+            .history-detail-panel.has-detail {
+                display: block;
+            }
+        }
+
+
+
+        /* PATCH SPV ADJUSTMENT VISIBILITY
+           Kolom Adjustment hanya tampil untuk role SPV.
+           Role lain tetap memakai nilai adjustment existing untuk rumus, tapi kolomnya disembunyikan dari UI.
+        */
+        .spv-only {
+            display: none !important;
+        }
+        body.can-spv-adjust #tblDSC th.spv-only,
+        body.can-spv-adjust #tblDSC td.spv-only {
+            display: table-cell !important;
+        }
+        body.can-spv-adjust .spv-only-card {
+            display: block !important;
+        }
+
+        /* PATCH SPV ADJUSTMENT FINAL LOCK */
+        .spv-adjust-input {
+            border-color: #f59e0b !important;
+            background: #fff7ed !important;
+        }
+        .spv-adjust-input:disabled {
+            background: #f3f4f6 !important;
+            border-color: var(--border) !important;
+        }
+
+        .spv-correctable:not(:disabled) {
+            border-color: #f59e0b !important;
+            background: #fff7ed !important;
+        }
+
+        .spv-adjust-note {
+            font-size: .78rem;
+            font-weight: 900;
+            color: #92400e;
+        }
+
+
+        /* PATCH: tampilkan tombol Koreksi Final di footer */
+        #btnSaveSpvAdjustmentFoot,
+        #btnSaveSpvAdjustmentMob {
+            font-weight: 950;
+        }
+
+        @media (max-width: 767.98px) {
+            .wh-footer .right {
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            }
+        }
+
+
+        /* PATCH MOBILE FOOTER KOREKSI FINAL */
+        @media (max-width: 767.98px) {
+            .wh-footer .right {
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                gap: 5px !important;
+            }
+
+            .wh-footer .right .btn {
+                min-width: 0 !important;
+                padding-left: 4px !important;
+                padding-right: 4px !important;
+                font-size: .72rem !important;
+                line-height: 1.05 !important;
+            }
+
+            .wh-footer .right .btn span {
+                display: inline-block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 100%;
+            }
+        }
+
+    
+
+        /* ==========================================================
+           PATCH FOOTER ACTIONS FREEZE - DESKTOP + MOBILE
+           Tujuan: tombol Next, Koreksi Final, Simpan Draft, dan Final
+           tetap terlihat saat scroll. UI only: tidak mengubah ID, route,
+           endpoint, payload, rumus, autosave, Simpan Draft, maupun Final.
+           ========================================================== */
+        .wh-footer {
+            position: sticky !important;
+            bottom: 10px !important;
+            z-index: 999 !important;
+            margin: 12px !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 14px !important;
+            background: rgba(255, 255, 255, .97) !important;
+            backdrop-filter: blur(10px) !important;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, .10) !important;
+        }
+
+        .wh-footer .right {
+            min-width: 0 !important;
+        }
+
+        .wh-footer .right .btn {
+            white-space: nowrap !important;
+        }
+
+        @media (min-width: 768px) {
+            .maincard {
+                overflow: visible !important;
+            }
+
+            .dt-wrap {
+                max-height: calc(100vh - 260px);
+                overflow: auto !important;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+            }
+
+            .wh-footer {
+                left: 0 !important;
+                right: 0 !important;
+                transform: none !important;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .wh-footer {
+                position: fixed !important;
+                left: 50% !important;
+                right: auto !important;
+                bottom: 10px !important;
+                transform: translateX(-50%) !important;
+                width: calc(100% - 20px) !important;
+                max-width: 410px !important;
+                z-index: 9999 !important;
+                margin: 0 !important;
+                padding: 9px !important;
+                border-radius: 18px !important;
+                background: rgba(255, 255, 255, .97) !important;
+                box-shadow: 0 12px 28px rgba(15, 23, 42, .16) !important;
+            }
+
+            .wh-footer .left {
+                display: none !important;
+            }
+
+            .wh-footer .right {
+                width: 100% !important;
+                display: grid !important;
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                gap: 6px !important;
+            }
+
+            .wh-footer .right .btn {
+                width: 100% !important;
+                min-width: 0 !important;
+                min-height: 44px !important;
+                height: 44px !important;
+                padding: 6px 4px !important;
+                border-radius: 14px !important;
+                font-size: .72rem !important;
+                line-height: 1.05 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 2px !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .wh-footer .right .btn i {
+                font-size: 1rem !important;
+                margin: 0 !important;
+            }
+
+            .wh-footer .right .btn span {
+                display: inline-block !important;
+                max-width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            main.container.wrap,
+            main {
+                padding-bottom: 132px !important;
+            }
+        }
+
+        @media (max-width: 350px) {
+            .wh-footer .right {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            main.container.wrap,
+            main {
+                padding-bottom: 190px !important;
+            }
+        }
+
+
+        /* ==========================================================
+           PATCH MOBILE OPENING NOTICE - CLEAN + NO FOOTER OVERLAY
+           UI only: popup Update Terbaru DSC dibuat full mobile friendly.
+           Tidak mengubah endpoint, payload, rumus, autosave, draft, atau final.
+           ========================================================== */
+        body.dsc-opening-notice-active .wh-footer {
+            display: none !important;
+        }
+
+        body.dsc-opening-notice-active {
+            overflow: hidden !important;
+        }
+
+        .dsc-start-popup {
+            border-radius: 18px !important;
+            overflow: hidden !important;
+        }
+
+        .dsc-start-title {
+            font-size: 1.28rem !important;
+            line-height: 1.15 !important;
+            font-weight: 900 !important;
+            color: #334155 !important;
+            padding: 0 4px !important;
+        }
+
+        .dsc-start-html {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .dsc-start-box {
+            text-align: left;
+            line-height: 1.45;
+            font-size: .92rem;
+            color: #374151;
+        }
+
+        .dsc-start-box .intro {
+            font-weight: 900;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+
+        .dsc-start-box ol {
+            padding-left: 18px;
+            margin: 0 0 12px 0;
+        }
+
+        .dsc-start-box li {
+            margin-bottom: 6px;
+        }
+
+        .dsc-start-net {
+            padding: 10px 12px;
+            border-radius: 13px;
+            font-weight: 900;
+        }
+
+        @media (max-width: 575.98px) {
+            .swal2-container.dsc-start-container {
+                padding: 10px !important;
+                align-items: center !important;
+            }
+
+            .swal2-popup.dsc-start-popup {
+                width: calc(100vw - 20px) !important;
+                max-width: 390px !important;
+                max-height: calc(100dvh - 20px) !important;
+                padding: 16px 14px 14px !important;
+                border-radius: 18px !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-icon {
+                width: 54px !important;
+                height: 54px !important;
+                margin: 4px auto 10px !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-icon-content {
+                font-size: 2.05rem !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-title {
+                margin: 0 0 10px !important;
+                padding: 0 !important;
+                font-size: 1.18rem !important;
+                line-height: 1.15 !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-html-container {
+                margin: 0 !important;
+                padding: 0 2px !important;
+                max-height: calc(100dvh - 190px) !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            .dsc-start-box {
+                font-size: .84rem !important;
+                line-height: 1.38 !important;
+            }
+
+            .dsc-start-box .intro {
+                font-size: .86rem !important;
+                margin-bottom: 7px !important;
+            }
+
+            .dsc-start-box ol {
+                padding-left: 18px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .dsc-start-box li {
+                margin-bottom: 5px !important;
+            }
+
+            .dsc-start-net {
+                padding: 9px 10px !important;
+                border-radius: 12px !important;
+                font-size: .82rem !important;
+                line-height: 1.35 !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-actions {
+                width: 100% !important;
+                margin: 12px 0 0 !important;
+            }
+
+            .swal2-popup.dsc-start-popup .swal2-confirm {
+                width: 100% !important;
+                min-height: 46px !important;
+                border-radius: 14px !important;
+                font-size: .92rem !important;
+                font-weight: 950 !important;
+            }
+        }
+
+
+
+        /* ==========================================================
+           FIX REQUEST: FOOTER TIDAK MENUTUP FORM + TOMBOL PER SHIFT
+           - Desktop dan mobile diberi ruang bawah supaya footer tidak overlay input.
+           - Tombol footer disembunyikan sesuai status:
+             Shift 1 = Draft saja, Shift 2 = Draft + Final,
+             Data sudah Final = Koreksi saja (jika role/meta mengizinkan).
+           - UI only, tidak mengubah route, endpoint, payload, rumus, autosave,
+             Simpan Draft, Final, atau Koreksi Final.
+           ========================================================== */
+        .dsc-action-hidden {
+            display: none !important;
+        }
+
+        .dt-wrap {
+            padding-bottom: 118px !important;
+            scroll-padding-bottom: 140px !important;
+        }
+
+        #cards,
+        .card-list {
+            padding-bottom: 132px !important;
+            scroll-padding-bottom: 150px !important;
+        }
+
+        #cards .bcard:last-child {
+            margin-bottom: 132px !important;
+        }
+
+        .wh-footer {
+            pointer-events: auto !important;
+        }
+
+        .wh-footer .right {
+            align-items: stretch !important;
+        }
+
+        @media (min-width: 768px) {
+            .maincard {
+                padding-bottom: 4px !important;
+            }
+
+            .wh-footer {
+                position: sticky !important;
+                bottom: 12px !important;
+            }
+
+            .wh-footer .right {
+                display: flex !important;
+                justify-content: flex-end !important;
+                flex-wrap: wrap !important;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            main.container.wrap,
+            main {
+                padding-bottom: calc(172px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .wh-footer {
+                bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+            }
+
+            .wh-footer .right {
+                display: grid !important;
+                grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)) !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+
+            .wh-footer .right .btn:not(.dsc-action-hidden) {
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+        }
+
+        @media (max-width: 350px) {
+            main.container.wrap,
+            main {
+                padding-bottom: calc(214px + env(safe-area-inset-bottom)) !important;
+            }
+
+            #cards,
+            .card-list,
+            #cards .bcard:last-child {
+                padding-bottom: 180px !important;
+                margin-bottom: 180px !important;
+            }
+        }
+
+
+
+        /* ==========================================================
+           FINAL FORCE FIX MOBILE FOOTER BUTTON VISIBILITY
+           Masalah sebelumnya: .dsc-action-hidden kalah specificity oleh
+           rule lama .wh-footer .right .btn { display:flex !important; }.
+           Rule ini harus berada PALING BAWAH style agar tombol yang hidden
+           benar-benar hilang di mobile dan desktop.
+           ========================================================== */
+        .wh-footer .right > .btn.dsc-action-hidden,
+        .wh-footer .right > button.dsc-action-hidden,
+        .wh-footer .right > .btn.d-none,
+        .wh-footer .right > button.d-none,
+        .wh-footer .right .btn.dsc-action-hidden,
+        .wh-footer .right button.dsc-action-hidden,
+        .wh-footer .right .btn.d-none,
+        .wh-footer .right button.d-none {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+
+        body.dsc-shift-1:not(.dsc-final-lock) #btnSaveFinalFoot,
+        body.dsc-shift-1:not(.dsc-final-lock) #btnSaveFinalMob,
+        body.dsc-shift-1:not(.dsc-final-lock) #btnSaveSpvAdjustmentFoot,
+        body.dsc-shift-1:not(.dsc-final-lock) #btnSaveSpvAdjustmentMob {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+
+        body.dsc-final-lock #btnSaveDraftFoot,
+        body.dsc-final-lock #btnSaveDraftM,
+        body.dsc-final-lock #btnSaveFinalFoot,
+        body.dsc-final-lock #btnSaveFinalMob {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .wh-footer .right:has(.btn:not(.dsc-action-hidden):not(.d-none):nth-child(1)) {
+                grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)) !important;
+            }
+        }
+
+
+
+        /* ==========================================================
+           V4 FIX MOBILE FOOTER BUTTON RESPONSIVE
+           Tombol bawah mobile dibuat adaptif sesuai jumlah tombol yang tampil:
+           - 1 tombol: full width
+           - 2 tombol: 2 kolom sama rata
+           - 3 tombol: 3 kolom jika layar cukup, otomatis 2+1 di layar kecil
+           - Koreksi/Draft/Final tetap mengikuti logic visibility JS.
+           ========================================================== */
+        @media (max-width: 767.98px) {
+            .wh-footer {
+                width: min(100% - 16px, 430px) !important;
+                max-width: 430px !important;
+                padding: 8px !important;
+                border-radius: 18px !important;
+            }
+
+            .wh-footer .right {
+                width: 100% !important;
+                display: grid !important;
+                gap: 7px !important;
+                align-items: stretch !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-1 {
+                grid-template-columns: 1fr !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3,
+            .wh-footer .right.dsc-actions-count-4 {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+
+            .wh-footer .right > .btn:not(.dsc-action-hidden):not(.d-none) {
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 48px !important;
+                min-height: 48px !important;
+                padding: 6px 4px !important;
+                border-radius: 15px !important;
+                font-size: clamp(.68rem, 2.8vw, .82rem) !important;
+                line-height: 1.05 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 3px !important;
+                overflow: hidden !important;
+                white-space: nowrap !important;
+            }
+
+            .wh-footer .right > .btn:not(.dsc-action-hidden):not(.d-none) i {
+                font-size: 1.02rem !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+            }
+
+            .wh-footer .right > .btn:not(.dsc-action-hidden):not(.d-none) span {
+                display: block !important;
+                max-width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            main.container.wrap,
+            main {
+                padding-bottom: calc(154px + env(safe-area-inset-bottom)) !important;
+            }
+
+            #cards,
+            .card-list {
+                padding-bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .wh-footer {
+                width: calc(100% - 12px) !important;
+                padding: 7px !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3,
+            .wh-footer .right.dsc-actions-count-4 {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3 > .btn:not(.dsc-action-hidden):not(.d-none):last-child {
+                grid-column: 1 / -1 !important;
+            }
+
+            .wh-footer .right > .btn:not(.dsc-action-hidden):not(.d-none) {
+                height: 46px !important;
+                min-height: 46px !important;
+                font-size: .72rem !important;
+            }
+
+            main.container.wrap,
+            main {
+                padding-bottom: calc(204px + env(safe-area-inset-bottom)) !important;
+            }
+
+            #cards,
+            .card-list,
+            #cards .bcard:last-child {
+                padding-bottom: calc(184px + env(safe-area-inset-bottom)) !important;
+                margin-bottom: calc(184px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
+
+
+        /* ==========================================================
+           V5 HARD FIX MOBILE FOOTER RESPONSIVE
+           Tujuan: tombol Draft / Final / Koreksi tidak loncat posisi.
+           Mobile footer memakai flex, bukan grid lama, supaya tombol yang
+           disembunyikan tidak meninggalkan kolom kosong.
+           ========================================================== */
+        @media (max-width: 767.98px) {
+            .wh-footer {
+                width: min(calc(100vw - 16px), 430px) !important;
+                max-width: 430px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+                padding: 8px !important;
+                border-radius: 18px !important;
+                overflow: hidden !important;
+            }
+
+            .wh-footer .left {
+                display: none !important;
+            }
+
+            .wh-footer .right {
+                width: 100% !important;
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                gap: 8px !important;
+                align-items: stretch !important;
+                justify-content: center !important;
+            }
+
+            .wh-footer .right > .btn,
+            .wh-footer .right > button {
+                min-width: 0 !important;
+                width: auto !important;
+                max-width: none !important;
+                flex: 1 1 0 !important;
+                height: 50px !important;
+                min-height: 50px !important;
+                padding: 6px 4px !important;
+                border-radius: 15px !important;
+                font-size: clamp(.70rem, 2.9vw, .84rem) !important;
+                line-height: 1.05 !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 3px !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            .wh-footer .right > .btn i,
+            .wh-footer .right > button i {
+                font-size: 1.05rem !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+            }
+
+            .wh-footer .right > .btn span,
+            .wh-footer .right > button span {
+                display: block !important;
+                max-width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-0 {
+                display: none !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-1 > .btn:not(.dsc-action-hidden):not(.d-none),
+            .wh-footer .right.dsc-actions-count-1 > button:not(.dsc-action-hidden):not(.d-none) {
+                flex: 0 1 100% !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-2 > .btn:not(.dsc-action-hidden):not(.d-none),
+            .wh-footer .right.dsc-actions-count-2 > button:not(.dsc-action-hidden):not(.d-none) {
+                flex: 1 1 0 !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3 {
+                flex-wrap: nowrap !important;
+            }
+
+            main.container.wrap,
+            main {
+                padding-bottom: calc(165px + env(safe-area-inset-bottom)) !important;
+            }
+
+            #cards,
+            .card-list,
+            #cards .bcard:last-child {
+                padding-bottom: calc(145px + env(safe-area-inset-bottom)) !important;
+                margin-bottom: calc(40px + env(safe-area-inset-bottom)) !important;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .wh-footer .right {
+                gap: 6px !important;
+            }
+
+            .wh-footer .right > .btn,
+            .wh-footer .right > button {
+                height: 48px !important;
+                min-height: 48px !important;
+                font-size: .68rem !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3 {
+                flex-wrap: wrap !important;
+            }
+
+            .wh-footer .right.dsc-actions-count-3 > .btn:not(.dsc-action-hidden):not(.d-none),
+            .wh-footer .right.dsc-actions-count-3 > button:not(.dsc-action-hidden):not(.d-none) {
+                flex: 1 1 calc(50% - 6px) !important;
+            }
+        }
+
+        /* Hidden paling kuat: jangan biarkan rule lama display:flex membuat kolom kosong. */
+        .wh-footer .right > .btn.dsc-action-hidden,
+        .wh-footer .right > button.dsc-action-hidden,
+        .wh-footer .right > .btn.d-none,
+        .wh-footer .right > button.d-none,
+        .wh-footer .right > .btn[hidden],
+        .wh-footer .right > button[hidden] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            flex: 0 0 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: 0 !important;
+            overflow: hidden !important;
+        }
+
     </style>
 </head>
 
@@ -2353,10 +3256,7 @@
                     <button class="btn btn-primary" id="btnLoadNav" type="button">
                         <i class="bi bi-cloud-download me-1"></i>Load
                     </button>
-
-                    <button class="btn btn-history" id="btnHistoryNav" type="button">
-                        <i class="bi bi-clock-history me-1"></i>History
-                    </button>
+                    {{-- History sementara dimatikan untuk menurunkan CPU/I/O --}}
 
                     <form action="{{ route('auth.investor.logout') }}" method="POST" class="d-inline">
                         @csrf
@@ -2386,8 +3286,13 @@
                         Actual Tepung: <span class="mono" id="actualTepungLabel">0.00</span>
                     </span>
                     <span class="badge-wh" id="statusBadge"><span class="dot"></span> Belum load</span>
-                    <span class="badge-wh" id="lastSavedBadge"><i class="bi bi-cloud-check"></i> Belum tersimpan</span>
+                    <span class="badge-wh" id="lastSavedBadge"><i class="bi bi-hdd"></i> Autosave OFF - lokal</span>
                     <span class="badge-wh" id="shiftAlert" style="display:none"></span>
+                </div>
+
+                <div class="w-100 mt-2 alert alert-warning py-2 px-3 mb-0 small fw-bold" id="autosaveOffNotice">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Autosave server sementara dimatikan untuk menurunkan beban CPU/I/O. Input tetap tersimpan lokal di HP/browser ini. Klik <b>Simpan Draft</b> untuk kirim ke server, lalu <b>Final</b> jika data sudah benar.
                 </div>
             </div>
 
@@ -2406,12 +3311,12 @@
                                 <label class="form-label">Outlet <span class="text-danger">*</span></label>
                                 <select id="outlet_id" class="form-select" required>
                                     <option value="">-- Pilih Outlet --</option>
-                                    @foreach ($outlets as $o)
-                                        <option value="{{ $o->id }}"
-                                            {{ (string) $outletId === (string) $o->id ? 'selected' : '' }}>
-                                            {{ $o->nama_outlet }}
-                                        </option>
-                                    @endforeach
+                                    @php($selectedOutletForSelect = collect($outlets ?? [])->firstWhere('id', (int) ($outletId ?? 0)))
+                                    @if(!empty($selectedOutletForSelect))
+                                        <option value="{{ $selectedOutletForSelect->id }}" selected>{{ $selectedOutletForSelect->nama_outlet }}</option>
+                                    @elseif(!empty($outletId))
+                                        <option value="{{ $outletId }}" selected>Outlet terpilih</option>
+                                    @endif
                                 </select>
                                 <div class="help-mini">Pilih outlet sesuai lokasi kerja.</div>
                             </div>
@@ -2480,6 +3385,8 @@
                         </div>
 
                         <!-- QUICK ACTIONS -->
+                        @php($hideSaveSection = true)
+                        @if(!$hideSaveSection)
                         <div class="box">
                             <div class="box-head">
                                 <h6>3) Simpan</h6>
@@ -2511,6 +3418,7 @@
 
                             <div class="help-mini mt-2">Shift 1 simpan draft. Shift 2 bisa final.</div>
                         </div>
+                        @endif
                     </div>
 
                 </div>
@@ -2542,8 +3450,9 @@
                                     In</th>
                                 <th style="width:140px;" title="MUTASI IN = perpindahan stok masuk.">Mutasi In</th>
                                 <th style="width:140px;" title="MUTASI OUT = perpindahan stok keluar.">Mutasi Out</th>
+                                <th class="spv-only" style="width:140px;" title="Koreksi Final = koreksi setelah final.">Adjustment</th>
 
-                                <th style="width:130px;" title="Total Stok = Open + Purchase + MutIn - MutOut">Total</th>
+                                <th style="width:130px;" title="Total Stok = Open + Purchase + MutIn - MutOut + Adjustment">Total</th>
 
                                 <th style="width:140px;" title="ENDING = stok akhir fisik.">Ending</th>
                                 <th style="width:140px;" title="Terpakai = Total - Ending">Actual Used</th>
@@ -2560,7 +3469,7 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td colspan="15" class="text-center text-muted p-4">Klik <b>Load</b> dulu.</td>
+                                <td colspan="16" class="text-center text-muted p-4">Klik <b>Load</b> dulu.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -2574,8 +3483,9 @@
                         <button class="btn btn-outline-secondary" id="btnNextZeroFoot" type="button">
                             <i class="bi bi-arrow-right-circle me-1"></i>Next
                         </button>
-                        <button class="btn btn-history" id="btnHistoryFoot" type="button">
-                            <i class="bi bi-clock-history me-1"></i>History
+                        {{-- History sementara dimatikan untuk menurunkan CPU/I/O --}}
+                        <button class="btn btn-warning d-none" id="btnSaveSpvAdjustmentFoot" type="button">
+                            <i class="bi bi-sliders me-1"></i>Koreksi Final
                         </button>
                         <button class="btn btn-outline-primary" id="btnSaveDraftFoot" type="button">
                             <i class="bi bi-pencil-square me-1"></i>Simpan Draft
@@ -2618,7 +3528,8 @@
                     </div>
                     <div class="right">
                         <button class="btn btn-outline-secondary" id="btnNextZeroMob" type="button"><i class="bi bi-arrow-right-circle"></i><span>Next</span></button>
-                        <button class="btn btn-history" id="btnHistoryMob" type="button"><i class="bi bi-clock-history"></i><span>History</span></button>
+                        {{-- History sementara dimatikan untuk menurunkan CPU/I/O --}}
+                        <button class="btn btn-warning d-none" id="btnSaveSpvAdjustmentMob" type="button"><i class="bi bi-sliders"></i><span>Koreksi</span></button>
                         <button class="btn btn-outline-primary" id="btnSaveDraftM" type="button"><i class="bi bi-pencil-square"></i><span>Draft</span></button>
                         <!-- Final: UNIQUE ID -->
                         <button class="btn btn-accent" id="btnSaveFinalMob" type="button"><i class="bi bi-check-circle"></i><span>Final</span></button>
@@ -2628,119 +3539,7 @@
 
         </section>
 
-
-        <!-- MODAL HISTORY DSC - clean audit style -->
-        <div class="modal fade dsc-history-modal" id="historyModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <div>
-                            <h5 class="dsc-history-title">
-                                <span class="title-icon"><i class="bi bi-clock-history"></i></span>
-                                History Perubahan DSC
-                            </h5>
-                            <div class="dsc-history-subtitle" id="historySummary">
-                                Pilih outlet/tanggal lalu klik Refresh.
-                            </div>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="history-filter-card">
-                            <div class="history-filter-grid">
-                                <div>
-                                    <div class="history-filter-label">Filter Bahan</div>
-                                    <select id="historyBahan" class="form-select">
-                                        <option value="">Semua bahan</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div class="history-filter-label">Shift</div>
-                                    <select id="historyShift" class="form-select">
-                                        <option value="">Semua shift</option>
-                                        <option value="1">Shift 1</option>
-                                        <option value="2">Shift 2</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div class="history-filter-label">Dari Tanggal</div>
-                                    <input type="date" id="historyDateFrom" class="form-control">
-                                </div>
-                                <div>
-                                    <div class="history-filter-label">Sampai Tanggal</div>
-                                    <input type="date" id="historyDateTo" class="form-control">
-                                </div>
-                                <div class="history-refresh-wrap">
-                                    <button type="button" class="btn history-action-btn w-100" id="btnHistoryRefresh">
-                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="history-search-row">
-                                <div class="history-search-wrap">
-                                    <i class="bi bi-search"></i>
-                                    <input type="search" id="historySearch" class="form-control"
-                                        placeholder="Cari petugas, bahan, kolom, nilai, IP, device...">
-                                </div>
-                                <button type="button" class="btn btn-outline-secondary" id="btnHistoryReset">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Filter
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="history-layout">
-                            <div class="history-table-shell">
-                                <div class="history-table-scroll">
-                                    <table class="table table-bordered align-middle" id="tblHistoryDSC">
-                                        <thead>
-                                            <tr>
-                                                <th style="width:58px">No</th>
-                                                <th style="width:150px">Jam</th>
-                                                <th style="width:190px">Petugas / User</th>
-                                                <th>Perubahan</th>
-                                                <th style="width:100px">Status</th>
-                                                <th style="width:100px">Detail</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="historyBody">
-                                            <tr>
-                                                <td colspan="6" class="history-empty">Belum ada data history.</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <aside class="history-detail-panel" id="historyDetailPanel">
-                                <div class="history-detail-title">Detail audit</div>
-                                <div class="history-detail-sub">Klik salah satu baris history untuk melihat IP, device, sumber data, dan user agent.</div>
-                                <div class="history-detail-empty">
-                                    <i class="bi bi-cursor-fill d-block mb-2"></i>
-                                    Belum ada baris dipilih.
-                                </div>
-                            </aside>
-                        </div>
-
-                        <div class="history-footbar">
-                            <div id="historyInfo">Menampilkan 0 data</div>
-                            <div class="d-flex gap-2 align-items-center flex-wrap">
-                                <select id="historyPerPage" class="form-select" style="width:150px">
-                                    <option value="10">10 per halaman</option>
-                                    <option value="25">25 per halaman</option>
-                                    <option value="50">50 per halaman</option>
-                                    <option value="100">100 per halaman</option>
-                                </select>
-                                <div class="history-pagination" id="historyPagination"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-white">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- MODAL HISTORY DSC dimatikan sementara untuk menurunkan CPU/I/O. --}}
 
     </main>
 
@@ -2759,6 +3558,7 @@
         const URL_LOAD = `{{ route('load') }}`; // /load
         const URL_SAVE = `{{ route('saveSo') }}`; // /save-so  (Final -> tbl_stock)
         const URL_SAVE_DRAFT = `{{ route('dsc.save-draft') }}`; // /save-draft (draft)
+        const URL_SAVE_SPV_ADJUSTMENT = `{{ url('/master/dsc/formulir/spv-adjustment') }}`; // PATCH: SPV adjustment after final
         const URL_HISTORY = `{{ route('dsc.history') }}`; // JSON history DSC
 
         // ========= BUTTON GROUPS (UNIQUE IDs) =========
@@ -2767,7 +3567,8 @@
             draft: '#btnSaveDraftDesk, #btnSaveDraftFoot, #btnSaveDraftM',
             final: '#btnSaveFinalDesk, #btnSaveFinalFoot, #btnSaveFinalMob',
             next0: '#btnNextZeroDesk, #btnNextZeroFoot, #btnNextZeroMob',
-            history: '#btnHistoryNav, #btnHistoryFoot, #btnHistoryMob'
+            history: '#btnHistoryNav, #btnHistoryFoot, #btnHistoryMob',
+            spvAdjust: '#btnSaveSpvAdjustmentFoot, #btnSaveSpvAdjustmentMob'
         };
 
         // ========= STATE =========
@@ -2777,18 +3578,39 @@
         let kasirClosed = false;
         let actualTepungMeta = 0;
         let gateMeta = {}; // meta untuk shift gate
+        let canSpvAdjust = false; // PATCH: SPV/TM Manager/Superadmin boleh koreksi field tertentu saat FINAL/LOCK
+        const CURRENT_USER_ROLE = `{{ strtolower(auth()->user()->role ?? '') }}`;
+        const CAN_FINAL_CORRECTION_ROLE =
+            CURRENT_USER_ROLE.includes('spv') ||
+            CURRENT_USER_ROLE === 'superadmin' ||
+            CURRENT_USER_ROLE === 'tm_manager' ||
+            CURRENT_USER_ROLE === 'tm manager' ||
+            CURRENT_USER_ROLE === 'tm-manager' ||
+            CURRENT_USER_ROLE.includes('tm_manager') ||
+            CURRENT_USER_ROLE.includes('tm manager') ||
+            CURRENT_USER_ROLE.includes('tm-manager');
+
+        // Backward compatible: nama variable lama tetap dipakai oleh patch existing.
+        const IS_SPV_USER = CAN_FINAL_CORRECTION_ROLE;
         let mobileIndex = 0; // mobile: tampilkan 1 bahan aktif agar tidak scroll panjang
         let lastEditedBahanId = null; // bahan terakhir yang user ubah, supaya History tidak salah bahan
 
         // ========= AUTO SAVE SILENT =========
-        // Mode baru: setiap user isi/edit form, sistem otomatis simpan ke DRAFT.
-        // Tidak mengubah logic Simpan Draft manual dan Final.
+        // Mode aman nasional: server autosave sementara dimatikan untuk mengurangi I/O.
+        // Local draft tetap aktif. Simpan ke server hanya lewat tombol Simpan Draft / Final.
+        // Tidak mengubah logic rumus, payload, Simpan Draft manual, dan Final.
         let autoSaveTimer = null;
         let autoSaveRunning = false;
         let autoSaveQueued = false;
+        let localDraftSaveTimer = null;
 
-        const AUTO_SAVE_ENABLED = true;
-        const AUTO_SAVE_DELAY = 8000; // 8 detik: lebih aman untuk banyak outlet, tetap otomatis simpan draft
+        // OPTIMASI I/O:
+        // Server autosave dimatikan agar tidak POST draft setiap user mengetik.
+        // Data tetap aman di browser lewat localStorage yang disimpan debounce.
+        // Kirim ke server hanya saat user klik Simpan Draft / Simpan Final.
+        const AUTO_SAVE_ENABLED = false;
+        const AUTO_SAVE_DELAY = 30000;
+        const LOCAL_DRAFT_SAVE_DELAY = 1500;
 
         // touched tracker (yang user pernah ubah)
         const touched = {}; // { bahan_id: true }
@@ -2803,7 +3625,7 @@
 
         function setSavingUi(isSaving, message = 'Sistem sedang proses penyimpanan, harap tunggu...') {
             manualSaveRunning = !!isSaving;
-            $(BTN.load + ', ' + BTN.draft + ', ' + BTN.final + ', ' + BTN.next0).prop('disabled', !!isSaving);
+            $(BTN.load + ', ' + BTN.draft + ', ' + BTN.final + ', ' + BTN.next0 + ', ' + BTN.spvAdjust).prop('disabled', !!isSaving);
 
             if (isSaving) {
                 setStatus('loading', message);
@@ -2924,6 +3746,43 @@
             return !!(outlet && tgl && shift && pic);
         }
 
+        // PATCH SAFE SELECT2 GROUP OUTLET:
+        // Select2 AJAX bisa memilih value "group_xxx". Untuk endpoint save yang masih
+        // validasi integer, ambil ID outlet pertama dari data Select2 kalau tersedia.
+        // Kalau ID tidak tersedia, value asli tetap dikirim karena controller sudah punya
+        // fallback normalisasi group_xxx. Ini tidak mengubah rumus/payload baris stok.
+        function selectedOutletIdForServer() {
+            const raw = ($('#outlet_id').val() || '').toString().trim();
+            if (/^\d+$/.test(raw)) return raw;
+
+            try {
+                const selected = $('#outlet_id').select2('data');
+                const item = selected && selected.length ? selected[0] : null;
+                const ids = item ? (item.ids || item.merged_ids || item.alias_ids || null) : null;
+
+                if (Array.isArray(ids) && ids.length) {
+                    const id = parseInt(ids[0], 10);
+                    if (id > 0) return String(id);
+                }
+
+                if (typeof ids === 'string') {
+                    const m = ids.match(/\d+/);
+                    if (m) return m[0];
+                }
+            } catch (e) {}
+
+            const opt = $('#outlet_id option:selected').get(0);
+            const optIds = opt && opt.dataset ? (opt.dataset.ids || '') : '';
+            const optMatch = optIds.match(/\d+/);
+            if (optMatch) return optMatch[0];
+
+            const label = ($('#outlet_id option:selected').text() || '').toString();
+            const m = label.match(/ID:\s*([0-9]+)/i) || label.match(/\b([0-9]{1,10})\b/);
+            if (m && m[1]) return m[1];
+
+            return raw;
+        }
+
         // ========= SHIFT BADGE + GATE =========
         function setShiftBadge(type, text) {
             const $b = $('#shiftAlert');
@@ -2950,7 +3809,7 @@
             const okS1 = hasDraftS1 || hasFinalS1 || hasS1;
         
             if (isShift1()) {
-                setShiftBadge('warn', 'Shift 1: hanya boleh Simpan Draft (Tombol Simpan Disabled)');
+                setShiftBadge('warn', 'Shift 1: hanya tampil tombol Simpan Draft.');
                 return;
             }
         
@@ -2968,25 +3827,172 @@
             setShiftBadge('ok', 'Shift 1 sudah siap');
         }
 
+        function setFooterActionVisible(selector, visible) {
+            const $btn = $(selector);
+            if (!$btn.length) return;
+
+            $btn.each(function () {
+                const el = this;
+
+                if (visible) {
+                    $(el)
+                        .removeClass('d-none dsc-action-hidden')
+                        .prop('hidden', false);
+
+                    // Pakai !important supaya menang dari CSS lama .wh-footer .right .btn { display:flex !important; }.
+                    el.style.setProperty('display', 'flex', 'important');
+                    el.style.setProperty('visibility', 'visible', 'important');
+                    el.style.setProperty('opacity', '1', 'important');
+                    el.style.setProperty('pointer-events', 'auto', 'important');
+                    el.style.removeProperty('width');
+                    el.style.removeProperty('max-width');
+                    el.style.removeProperty('min-width');
+                    el.style.removeProperty('padding');
+                    el.style.removeProperty('margin');
+                    el.style.removeProperty('border');
+                    el.style.removeProperty('flex');
+                } else {
+                    $(el)
+                        .addClass('d-none dsc-action-hidden')
+                        .prop('hidden', true)
+                        .prop('disabled', true);
+
+                    // Hide fisik, bukan cuma visibility, agar tidak ada kolom kosong di mobile.
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                    el.style.setProperty('opacity', '0', 'important');
+                    el.style.setProperty('pointer-events', 'none', 'important');
+                    el.style.setProperty('flex', '0 0 0', 'important');
+                    el.style.setProperty('width', '0', 'important');
+                    el.style.setProperty('max-width', '0', 'important');
+                    el.style.setProperty('min-width', '0', 'important');
+                    el.style.setProperty('padding', '0', 'important');
+                    el.style.setProperty('margin', '0', 'important');
+                    el.style.setProperty('border', '0', 'important');
+                }
+            });
+        }
+
+        function canFinalByShiftGate() {
+            if (!isShift2()) return false;
+
+            const hasDraftS1 = !!gateMeta.has_draft_s1;
+            const hasFinalS1 = !!gateMeta.has_final_s1;
+            const hasS1 = !!gateMeta.has_shift_1;
+
+            return hasDraftS1 || hasFinalS1 || hasS1;
+        }
+
+        function refreshFooterActionVisibility() {
+            const ok = validateHeader();
+            const ready = ok && loaded;
+            const isFinalLocked = !!kasirClosed;
+            const shiftValue = String($('#shift').val() || '');
+
+            $('body')
+                .toggleClass('dsc-shift-1', shiftValue === '1')
+                .toggleClass('dsc-shift-2', shiftValue === '2')
+                .toggleClass('dsc-ready', !!ready)
+                .toggleClass('dsc-final-lock', !!isFinalLocked);
+
+            // Default aman: semua action footer disembunyikan dulu.
+            // Ini mencegah tombol Final/Koreksi sisa dari outlet/tanggal/shift sebelumnya
+            // tetap kelihatan ketika user baru pindah ke Shift 1 atau belum Load ulang.
+            let showDraft = false;
+            let showFinal = false;
+            let showSpvCorrection = false;
+
+            if (ready) {
+                if (isFinalLocked) {
+                    // Data tanggal/shift ini sudah final: hanya Koreksi Final yang boleh muncul,
+                    // dan hanya untuk role yang memang diizinkan oleh backend/meta.
+                    showSpvCorrection = canSpvAdjust && CAN_FINAL_CORRECTION_ROLE;
+                } else if (shiftValue === '1') {
+                    // Shift 1 baru input: hanya Draft. Final dan Koreksi wajib hilang.
+                    showDraft = true;
+                    showFinal = false;
+                    showSpvCorrection = false;
+                } else if (shiftValue === '2') {
+                    // Shift 2: Draft selalu boleh, Final hanya kalau Shift 1 sudah ada/siap.
+                    showDraft = true;
+                    showFinal = canFinalByShiftGate();
+                    showSpvCorrection = false;
+                }
+            }
+
+            // Sesuai request:
+            // - Shift 1: hanya Draft.
+            // - Shift 2: Draft dan Final jika gate Shift 1 sudah siap.
+            // - Tanggal/data sudah Final: hanya Koreksi Final.
+            // Tombol Next disembunyikan dari footer agar menu bawah tidak menutupi form.
+            setFooterActionVisible(BTN.next0, false);
+            setFooterActionVisible(BTN.draft, showDraft);
+            setFooterActionVisible(BTN.final, showFinal);
+            setFooterActionVisible(BTN.spvAdjust, showSpvCorrection);
+
+            // Double safety khusus Shift 1: walaupun ada rule lama atau response final dari state lama,
+            // Final/Koreksi tetap hilang sampai user benar-benar load data final untuk shift tersebut.
+            if (shiftValue === '1' && !isFinalLocked) {
+                setFooterActionVisible(BTN.final, false);
+                setFooterActionVisible(BTN.spvAdjust, false);
+            }
+
+            refreshFooterActionLayout();
+        }
+
+        function refreshFooterActionLayout() {
+            $('.wh-footer .right').each(function () {
+                const $right = $(this);
+                const count = $right.children('.btn').filter(function () {
+                    const $btn = $(this);
+                    return !$btn.hasClass('dsc-action-hidden') &&
+                        !$btn.hasClass('d-none') &&
+                        !$btn.prop('hidden') &&
+                        $btn.css('display') !== 'none';
+                }).length;
+
+                $right.removeClass('dsc-actions-count-0 dsc-actions-count-1 dsc-actions-count-2 dsc-actions-count-3 dsc-actions-count-4');
+                $right.addClass('dsc-actions-count-' + Math.min(count, 4));
+            });
+        }
+
+        function resetLoadedStateBecauseHeaderChanged() {
+            // Saat Outlet/Tanggal/Shift/Petugas berubah, data yang sedang tampil tidak boleh
+            // dianggap sebagai status aktif lagi. Tanpa reset ini, kalau sebelumnya membuka
+            // data FINAL lalu pindah ke Shift 1, tombol Koreksi bisa masih terlihat di mobile.
+            loaded = false;
+            kasirClosed = false;
+            canSpvAdjust = false;
+            gateMeta = {};
+            updateShiftGate(gateMeta);
+            setStatus('', 'Belum load');
+            $('#infoText').text('Data awal berubah. Klik Load untuk mengambil data shift ini.');
+            $(BTN.spvAdjust).addClass('d-none dsc-action-hidden').hide().prop('disabled', true);
+            $(BTN.final).addClass('dsc-action-hidden').hide().prop('disabled', true);
+            $(BTN.draft).addClass('dsc-action-hidden').hide().prop('disabled', true);
+            refreshButtons();
+        }
+
         function refreshButtons() {
             const ok = validateHeader();
         
-            $(BTN.load).prop('disabled', !ok || kasirClosed);
-            $(BTN.draft).prop('disabled', !ok || kasirClosed || !loaded);
-        
-            let canFinal = ok && loaded && !kasirClosed && isShift2();
-        
-            if (isShift2()) {
-                const hasDraftS1 = !!gateMeta.has_draft_s1;
-                const hasFinalS1 = !!gateMeta.has_final_s1;
-                const hasS1 = !!gateMeta.has_shift_1;
+            // PATCH LOCK UX:
+            // Data Awal tetap bisa dipakai untuk cek outlet/tanggal/shift lain,
+            // jadi tombol Load tidak boleh ikut disabled saat data sudah Final/LOCK.
+            $(BTN.load).prop('disabled', !ok);
 
-                if (!hasDraftS1 && !hasFinalS1 && !hasS1) {
-                    canFinal = false;
-                }
-            }
-        
+            const canDraft = ok && loaded && !kasirClosed && (isShift1() || isShift2());
+            const canFinal = ok && loaded && !kasirClosed && isShift2() && canFinalByShiftGate();
+
+            $(BTN.draft).prop('disabled', !canDraft);
             $(BTN.final).prop('disabled', !canFinal);
+
+            // PATCH SPV ADJUSTMENT:
+            // Tombol khusus hanya aktif jika data sudah FINAL/LOCK dan role SPV/TM Manager/Superadmin.
+            const canSaveSpvAdjustment = ok && loaded && kasirClosed && canSpvAdjust && CAN_FINAL_CORRECTION_ROLE;
+            $(BTN.spvAdjust).prop('disabled', !canSaveSpvAdjustment);
+
+            refreshFooterActionVisibility();
         }
 
         // ========= LOGIC (match BE) =========
@@ -3074,18 +4080,19 @@
 
           <td class="mono num-read text-end">${fmt(x.open)}</td>
 
-          <td><input class="form-control input-mini pin" type="number" step="0.01" value="${x.pin}"></td>
-          <td><input class="form-control input-mini mi" type="number" step="0.01" value="${x.mi}"></td>
-          <td><input class="form-control input-mini mo" type="number" step="0.01" value="${x.mo}"></td>
+          <td><input class="form-control input-mini pin spv-correctable" type="number" step="0.01" value="${x.pin}"></td>
+          <td><input class="form-control input-mini mi spv-correctable" type="number" step="0.01" value="${x.mi}"></td>
+          <td><input class="form-control input-mini mo spv-correctable" type="number" step="0.01" value="${x.mo}"></td>
+          <td class="spv-only"><input class="form-control input-mini adj spv-adjust-input spv-correctable" type="number" step="0.01" value="${x.adj || 0}" title="Koreksi Final"></td>
 
           <td class="mono num-read text-end total">${fmt(c.total)}</td>
 
-          <td><input class="form-control input-mini ending" type="number" step="0.01" value="${x.ending}"></td>
+          <td><input class="form-control input-mini ending spv-correctable" type="number" step="0.01" value="${x.ending}"></td>
 
           <td class="mono text-end actual ${negClass}">${fmt(c.actualUsed)}</td>
 
-          <td><input class="form-control input-mini wprod" type="number" step="0.01" value="${x.wProd}"></td>
-          <td><input class="form-control input-mini wbahan" type="number" step="0.01" value="${x.wBahan}"></td>
+          <td><input class="form-control input-mini wprod spv-correctable" type="number" step="0.01" value="${x.wProd}"></td>
+          <td><input class="form-control input-mini wbahan spv-correctable" type="number" step="0.01" value="${x.wBahan}"></td>
 
           <td class="mono num-read text-end wt">${fmt(c.wasteTepung)}</td>
 
@@ -3115,56 +4122,96 @@
           </div>
 
           <div class="summary">
-            <div class="kv"><span>Stok Awal</span><b>${fmt(x.open)}</b></div>
-            <div class="kv"><span>Total Stok</span><b>${fmt(c.total)}</b></div>
-            <div class="kv ${negClass}"><span>Terpakai</span><b>${fmt(c.actualUsed)}</b></div>
-            <div class="kv"><span>WASTE TEPUNG</span><b>${fmt(c.wasteTepung)}</b></div>
-            <div class="kv"><span>ACTUAL TEPUNG</span><b>${fmt(actualTepung)}</b></div>
+            <div class="kv"><span>Stok Awal</span><b class="sum-open">${fmt(x.open)}</b></div>
+            <div class="kv"><span>Purchase In</span><b class="sum-pin">${fmt(x.pin)}</b></div>
+            <div class="kv"><span>Mutasi In</span><b class="sum-mi">${fmt(x.mi)}</b></div>
+            <div class="kv"><span>Mutasi Out</span><b class="sum-mo">${fmt(x.mo)}</b></div>
+            <div class="kv"><span>Adjustment</span><b class="sum-adj">${fmt(x.adj || 0)}</b></div>
+            <div class="kv"><span>Total Stok</span><b class="sum-total">${fmt(c.total)}</b></div>
+            <div class="kv"><span>Stok Akhir</span><b class="sum-ending">${fmt(x.ending)}</b></div>
+            <div class="kv ${negClass} kv-actual"><span>Actual Used</span><b class="sum-actual">${fmt(c.actualUsed)}</b></div>
+            <div class="kv"><span>Waste Produk</span><b class="sum-wprod">${fmt(x.wProd)}</b></div>
+            <div class="kv"><span>Waste Bahan</span><b class="sum-wbahan">${fmt(x.wBahan)}</b></div>
+            <div class="kv"><span>Waste Tepung</span><b class="sum-wt">${fmt(c.wasteTepung)}</b></div>
+            <div class="kv"><span>Actual Tepung</span><b class="sum-at">${fmt(actualTepung)}</b></div>
           </div>
 
           <div class="grid3">
             <div>
               <label class="form-label small mb-1">Barang Masuk</label>
-              <input class="form-control pin" type="number" step="0.01" value="${x.pin}">
+              <input class="form-control pin spv-correctable" type="number" step="0.01" value="${x.pin}">
             </div>
             <div>
               <label class="form-label small mb-1">Mutasi IN</label>
-              <input class="form-control mi" type="number" step="0.01" value="${x.mi}">
+              <input class="form-control mi spv-correctable" type="number" step="0.01" value="${x.mi}">
             </div>
             <div>
               <label class="form-label small mb-1">Mutasi OUT</label>
-              <input class="form-control mo" type="number" step="0.01" value="${x.mo}">
+              <input class="form-control mo spv-correctable" type="number" step="0.01" value="${x.mo}">
             </div>
+          </div>
+
+          <div class="mt-2 spv-only spv-only-card">
+            <label class="form-label small mb-1">Adjustment <span class="spv-adjust-note">SPV</span></label>
+            <input class="form-control adj spv-adjust-input spv-correctable" type="number" step="0.01" value="${x.adj || 0}">
           </div>
 
           <div class="mt-2">
             <label class="form-label small mb-1">Stok Akhir <span class="text-danger">*</span></label>
-            <input class="form-control ending" type="number" step="0.01" value="${x.ending}">
+            <input class="form-control ending spv-correctable" type="number" step="0.01" value="${x.ending}">
           </div>
 
           <div class="grid2">
             <div>
               <label class="form-label small mb-1">Waste Produk</label>
-              <input class="form-control wprod" type="number" step="0.01" value="${x.wProd}">
+              <input class="form-control wprod spv-correctable" type="number" step="0.01" value="${x.wProd}">
             </div>
             <div>
               <label class="form-label small mb-1">Waste Bahan</label>
-              <input class="form-control wbahan" type="number" step="0.01" value="${x.wBahan}">
+              <input class="form-control wbahan spv-correctable" type="number" step="0.01" value="${x.wBahan}">
             </div>
           </div>
 
           <div class="mt-2">
-            <label class="form-label small mb-1">Catatan</label>
+            <label class="form-label small mb-1">Keterangan</label>
             <input class="form-control ket" type="text" value="${esc(x.ket)}" placeholder="opsional...">
           </div>
         </div>
       `;
         }
 
+        function refreshMobileCard(id) {
+            const x = ensure(id);
+            const $card = $('#cards .bcard[data-id="' + id + '"]');
+            if (!$card.length) return;
+
+            const c = calc(x);
+            const isTep = isTepungName(x.nama);
+            const actualTepung = isTep ? (c.actualUsed - c.wasteTepung) : 0;
+
+            $card.find('.sum-open').text(fmt(x.open));
+            $card.find('.sum-pin').text(fmt(x.pin));
+            $card.find('.sum-mi').text(fmt(x.mi));
+            $card.find('.sum-mo').text(fmt(x.mo));
+            $card.find('.sum-adj').text(fmt(x.adj || 0));
+            $card.find('.sum-total').text(fmt(c.total));
+            $card.find('.sum-ending').text(fmt(x.ending));
+            $card.find('.sum-actual').text(fmt(c.actualUsed));
+            $card.find('.sum-wprod').text(fmt(x.wProd));
+            $card.find('.sum-wbahan').text(fmt(x.wBahan));
+            $card.find('.sum-wt').text(fmt(c.wasteTepung));
+            $card.find('.sum-at').text(fmt(actualTepung));
+            $card.find('.kv-actual').toggleClass('neg', c.actualUsed < 0);
+        }
+
+        function refreshAllMobileCards() {
+            items.forEach(it => refreshMobileCard(it.id));
+        }
+
         function renderAll() {
             const $tb = $('#tblDSC tbody').empty();
             if (!items.length) {
-                $tb.html(`<tr><td colspan="15" class="text-center text-muted p-4">Tidak ada bahan.</td></tr>`);
+                $tb.html(`<tr><td colspan="16" class="text-center text-muted p-4">Tidak ada bahan.</td></tr>`);
             } else {
                 let html = '';
                 items.forEach((it, i) => html += rowHtml(i, it));
@@ -3368,6 +4415,7 @@
                 x.pin = toNum($tr.find('input.pin').val());
                 x.mi = toNum($tr.find('input.mi').val());
                 x.mo = toNum($tr.find('input.mo').val());
+                x.adj = toNum($tr.find('input.adj').val());
                 x.ending = toNum($tr.find('input.ending').val());
                 x.wProd = toNum($tr.find('input.wprod').val());
                 x.wBahan = toNum($tr.find('input.wbahan').val());
@@ -3387,10 +4435,12 @@
                     $card.find('input.pin').val(x.pin);
                     $card.find('input.mi').val(x.mi);
                     $card.find('input.mo').val(x.mo);
+                    $card.find('input.adj').val(x.adj);
                     $card.find('input.ending').val(x.ending);
                     $card.find('input.wprod').val(x.wProd);
                     $card.find('input.wbahan').val(x.wBahan);
                     $card.find('input.ket').val(x.ket);
+                    refreshMobileCard(id);
                 }
 
                 syncActualTepungLabel();
@@ -3409,6 +4459,7 @@
                 x.pin = toNum($card.find('input.pin').val());
                 x.mi = toNum($card.find('input.mi').val());
                 x.mo = toNum($card.find('input.mo').val());
+                x.adj = toNum($card.find('input.adj').val());
                 x.ending = toNum($card.find('input.ending').val());
                 x.wProd = toNum($card.find('input.wprod').val());
                 x.wBahan = toNum($card.find('input.wbahan').val());
@@ -3419,6 +4470,7 @@
                     $tr.find('input.pin').val(x.pin);
                     $tr.find('input.mi').val(x.mi);
                     $tr.find('input.mo').val(x.mo);
+                    $tr.find('input.adj').val(x.adj);
                     $tr.find('input.ending').val(x.ending);
                     $tr.find('input.wprod').val(x.wProd);
                     $tr.find('input.wbahan').val(x.wBahan);
@@ -3432,6 +4484,7 @@
                     $tr.find('td.at').text(isTep ? fmt(c.actualUsed - c.wasteTepung) : '0.00');
                 }
 
+                refreshMobileCard(id);
                 syncActualTepungLabel();
                 validateEndingEmptyForTouchedOnly();
                 refreshMobilePager();
@@ -3440,39 +4493,114 @@
         }
 
         // ========= LOCK UI =========
-        function lockUI(isLock, meta = null) {
+        let finalLockPopupShownKey = null;
+
+        function lockUI(isLock, meta = null, options = {}) {
             kasirClosed = !!isLock;
 
-            const $targets = $(
-                '#outlet_id, #tanggal, #shift, #nama_petugas, #uang_plus_shift,' +
+            /*
+             * PATCH LOCK UX:
+             * Saat data sudah Final/LOCK, yang dikunci hanya area Input Bahan.
+             * Data Awal tetap aktif supaya user bisa cek outlet/tanggal/shift lain lalu klik Load.
+             *
+             * Tetap aktif:
+             * - Outlet
+             * - Tanggal
+             * - Shift
+             * - Petugas
+             * - Uang Plus
+             * - Tombol Load
+             *
+             * Disabled saat Final:
+             * - Cari Bahan
+             * - Input table/card bahan
+             * - Next
+             * - Simpan Draft
+             * - Simpan Final
+             */
+            const $inputBahanTargets = $(
                 '#searchAny,' +
                 '#tblDSC input, #cards input,' +
-                '#btnReset,' +
-                BTN.load + ',' + BTN.draft + ',' + BTN.final + ',' + BTN.next0
+                BTN.draft + ',' + BTN.final + ',' + BTN.next0
             );
-            $targets.prop('disabled', kasirClosed);
+
+            $inputBahanTargets.prop('disabled', kasirClosed);
+
+            // Jika FINAL/LOCK dan role SPV, hanya field Adjustment yang tetap bisa diedit.
+            if (kasirClosed && canSpvAdjust && CAN_FINAL_CORRECTION_ROLE) {
+                $('#tblDSC input.spv-correctable, #cards input.spv-correctable').prop('disabled', false);
+                $(BTN.spvAdjust).removeClass('d-none').prop('disabled', false);
+                $('#infoText').text('Data sudah final. SPV/TM Manager/Superadmin bisa koreksi Purchase/Mutasi/Adjustment/Ending/Waste/Uang Plus.');
+            } else {
+                $(BTN.spvAdjust).addClass('d-none').prop('disabled', true);
+            }
+
+            // Paksa Data Awal tetap aktif walaupun data final.
+            $('#outlet_id, #tanggal, #shift, #nama_petugas, #uang_plus_shift').prop('disabled', false);
+
+            // PATCH MOBILE:
+            // Preview/Next bahan dan dropdown pilih bahan harus tetap aktif walaupun data final,
+            // supaya user tetap bisa cek bahan lain di HP.
+            $('#mobJump, #btnMobPrev, #btnMobNext').prop('disabled', false);
+
+            $(BTN.load).prop('disabled', !validateHeader());
 
             if (kasirClosed) {
                 setStatus('bad', 'Final (LOCK)');
-                $('#infoText').text(`Kasir sudah ditutup${meta?.closed_at ? ' • ' + meta.closed_at : ''}`);
+                $('#infoText').text(`Anda sudah simpan final pada tanggal ini${meta?.closed_at ? ' • ' + meta.closed_at : ''}`);
+
+                const popupKey = [
+                    $('#outlet_id').val() || '',
+                    $('#tanggal').val() || '',
+                    meta?.closed_at || 'closed'
+                ].join('|');
+
+                if (options.showPopup && finalLockPopupShownKey !== popupKey) {
+                    finalLockPopupShownKey = popupKey;
+
+                    return Swal.fire({
+                        icon: 'info',
+                        title: 'Data Sudah Simpan Final',
+                        html: `Data pada tanggal ini sudah disimpan final.<br><b>Tabel Input Bahan dikunci. SPV/TM Manager/Superadmin bisa koreksi field tertentu termasuk Uang Plus. Navigasi bahan tetap aktif.</b>${meta?.closed_at ? '<br><small>Waktu final: ' + esc(meta.closed_at) + '</small>' : ''}`,
+                        confirmButtonText: 'Oke',
+                        confirmButtonColor: '#0f172a'
+                    }).then(function () {
+                        refreshButtons();
+                    });
+                }
             }
 
             refreshButtons();
+            return Promise.resolve();
         }
 
         // ========= API: LOAD =========
-        async function loadData() {
+        let loadRequestRunning = false;
+
+        async function loadData(showNotif = false) {
+            if (loadRequestRunning) {
+                $('#infoText').text('Load sedang berjalan, tunggu sampai selesai.');
+                return;
+            }
+
             if (!validateHeader()) {
                 await swWarn('Lengkapi data', 'Outlet / Tanggal / Shift / Petugas wajib diisi sebelum Load.');
                 return;
             }
 
+            loadRequestRunning = true;
+            // Selama Load berjalan, jangan tampilkan action sisa dari shift sebelumnya.
+            loaded = false;
+            kasirClosed = false;
+            canSpvAdjust = false;
+            refreshFooterActionVisibility();
+            $(BTN.load).prop('disabled', true);
             $('#infoText').text('Loading data...');
             setStatus('loading', 'Loading...');
 
             try {
                 const qs = new URLSearchParams({
-                    outlet_id: $('#outlet_id').val(),
+                    outlet_id: selectedOutletIdForServer(),
                     tanggal: $('#tanggal').val(),
                     shift: $('#shift').val(),
                     pic: ($('#nama_petugas').val() || '').trim(),
@@ -3501,8 +4629,10 @@
                 lastEditedBahanId = null;
 
                 items = json.data?.items || [];
+                const cleanedCarryOverCount = items.filter(it => Number(it.carryover_cleaned || 0) === 1).length;
                 actualTepungMeta = Number(json.data?.meta?.actual_tepung || 0);
                 gateMeta = json.data?.meta || {};
+                canSpvAdjust = IS_SPV_USER && !!Number(gateMeta.can_spv_adjust || 0);
 
                 items.forEach(it => ensure(it.id, it));
                 normalizeUangPlusShiftState();
@@ -3510,45 +4640,148 @@
 
                 renderAll();
                 bindInputs();
+                // FIX: Jangan munculkan popup localStorage otomatis setelah Load.
+                // Popup ini menimpa data server dan mengganggu proses upsert.
+                // Backup lokal tetap ada, tapi tidak dipulihkan otomatis.
+                // restoreLocalDraftAfterLoad();
 
-                $('#infoText').text(`Loaded: ${items.length} bahan`);
-                setStatus('ok', 'Siap input');
+                if (cleanedCarryOverCount > 0) {
+                    $('#infoText').text(`Loaded: ${items.length} bahan. ${cleanedCarryOverCount} baris purchase/mutasi Shift 1 otomatis tidak dibawa ke Shift 2.`);
+                    setStatus('ok', 'Shift 2 bersih');
+                } else {
+                    $('#infoText').text(`Loaded: ${items.length} bahan`);
+                    setStatus('ok', 'Siap input');
+                }
 
                 // lock kasir
                 const kasir = json.data?.lock || {
                     is_closed: false
                 };
-                lockUI(!!kasir.is_closed, kasir);
 
                 updateShiftGate(gateMeta);
                 validateEndingEmptyForTouchedOnly();
+
+                /*
+                 * PATCH POPUP ORDER:
+                 * 1. Kalau user klik tombol Load manual, tampilkan dulu: Data berhasil di load.
+                 * 2. Setelah itu, kalau data sudah Final/LOCK, tampilkan popup final.
+                 * 3. Disabled hanya tabel/card Input Bahan, bukan Data Awal.
+                 */
+                if (showNotif) {
+                    await Swal.fire({
+                        icon: 'success',
+                        title: 'Data Berhasil Di Load',
+                        text: 'Data berhasil di load.',
+                        timer: 1200,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                }
+
+                await lockUI(!!kasir.is_closed, kasir, { showPopup: true });
             } catch (e) {
                 console.error(e);
                 setStatus('bad', 'Gagal');
                 $('#infoText').text('Gagal load.');
                 await swError('Gagal Load', e.message);
             } finally {
+                loadRequestRunning = false;
                 refreshButtons();
             }
         }
 
         // ========= PAYLOAD BUILDER =========
+
+        /*
+         |--------------------------------------------------------------------------
+         | FIX MOBILE NEXT/PREVIOUS + OFFLINE SAFE
+         |--------------------------------------------------------------------------
+         | Di HP, user sering isi satu field lalu langsung tap Next/Previous/pindah Shift.
+         | Pada beberapa browser mobile, event input/change/blur belum sempat mem-push
+         | nilai terakhir ke object st sebelum card disembunyikan atau payload dibuat.
+         |
+         | Helper ini memaksa nilai DOM terakhir disalin dulu ke state st + touched,
+         | sehingga Ayam Kecil tidak hilang setelah user pindah dari Ayam Besar,
+         | pindah Shift, offline, atau langsung klik Simpan Draft.
+         |--------------------------------------------------------------------------
+         */
+        function syncBahanFromDom(bahanId) {
+            const id = Number(bahanId || 0);
+            if (!id) return false;
+
+            const x = ensure(id);
+            let $scope = $('#cards .bcard[data-id="' + id + '"]');
+
+            if (!$scope.length) {
+                $scope = $('#tblDSC tbody tr[data-id="' + id + '"]');
+            }
+
+            if (!$scope.length) return false;
+
+            markTouched(id);
+
+            x.pin = toNum($scope.find('input.pin').val());
+            x.mi = toNum($scope.find('input.mi').val());
+            x.mo = toNum($scope.find('input.mo').val());
+            x.adj = toNum($scope.find('input.adj').val());
+            x.ending = toNum($scope.find('input.ending').val());
+            x.wProd = toNum($scope.find('input.wprod').val());
+            x.wBahan = toNum($scope.find('input.wbahan').val());
+            x.ket = ($scope.find('input.ket').val() || '');
+
+            return true;
+        }
+
+        function syncActiveBahanFromDom() {
+            const $activeInput = $('#cards .bcard.active-card input:focus, #tblDSC tbody input:focus').first();
+
+            if ($activeInput.length) {
+                const $row = $activeInput.closest('.bcard, tr');
+                const id = Number($row.data('id'));
+                if (id) {
+                    syncBahanFromDom(id);
+                    return id;
+                }
+            }
+
+            const $activeCard = $('#cards .bcard.active-card').first();
+            if ($activeCard.length) {
+                const id = Number($activeCard.data('id'));
+                if (id) {
+                    syncBahanFromDom(id);
+                    return id;
+                }
+            }
+
+            return null;
+        }
+
+        function syncAllTouchedFromDom() {
+            syncActiveBahanFromDom();
+            items.forEach(it => {
+                const id = Number(it.id);
+                if (touched[id]) {
+                    syncBahanFromDom(id);
+                }
+            });
+        }
+
         function buildPayloadDraft() {
+            syncAllTouchedFromDom();
+
             const payload = {
-                outlet_id: $('#outlet_id').val(),
+                outlet_id: selectedOutletIdForServer(),
                 tanggal: $('#tanggal').val(),
                 shift: $('#shift').val(),
                 nama_petugas: ($('#nama_petugas').val() || '').trim(),
                 rows: []
             };
 
-            let selectedItems = items.filter(it => isTouched(it.id));
-
-            // Kalau Uang Plus Shift diubah, kirim semua baris agar uang_plus lama per bahan
-            // ikut direset menjadi 0 dan tidak dobel di report.
-            if (uangPlusDirty) {
-                selectedItems = [...items];
-            }
+            // FIX UPSERT:
+            // Simpan Draft manual wajib kirim semua baris, bukan hanya touched.
+            // Kalau hanya touched, beberapa input mobile/restore/localStorage bisa dianggap
+            // tidak berubah sehingga rows kosong / tidak lengkap dan upsert tidak menyimpan.
+            let selectedItems = [...items];
 
             const uangPlusShift = getUangPlusShift();
 
@@ -3573,8 +4806,194 @@
             return payload;
         }
 
+
+
+        // ========= OFFLINE SAFE LOCAL DRAFT =========
+        // Patch anti data hilang untuk HP/jaringan jelek:
+        // - setiap input disimpan dulu ke localStorage HP
+        // - server autosave sementara OFF; Simpan Draft manual tetap pakai tbl_stock_draft seperti logic lama
+        // - kalau session habis / sinyal putus, data tetap bisa direstore setelah login/load ulang
+        const DSC_LOCAL_DRAFT_VERSION = 2;
+        const DSC_LOCAL_DRAFT_PREFIX = 'dsc_offline_stock_draft_v2';
+
+        function localDraftKey() {
+            return [
+                DSC_LOCAL_DRAFT_PREFIX,
+                $('#outlet_id').val() || 'outlet',
+                $('#tanggal').val() || 'tanggal',
+                $('#shift').val() || 'shift'
+            ].join(':');
+        }
+
+        function collectFullLocalDraft(reason = 'input') {
+            syncAllTouchedFromDom();
+
+            const rows = items.map((it, i) => {
+                const x = ensure(it.id, it);
+                return {
+                    bahan_id: Number(it.id),
+                    nama_bahan: x.nama || it.nama_bahan || '',
+                    satuan: x.sat || it.satuan || '',
+                    opening_stock: Number(x.open || 0),
+                    purchase_in: Number(x.pin || 0),
+                    mutasi_in: Number(x.mi || 0),
+                    mutasi_out: Number(x.mo || 0),
+                    adjustment_qty: Number(x.adj || 0),
+                    ending_stock: Number(x.ending || 0),
+                    waste_product: Number(x.wProd || 0),
+                    waste_bahan: Number(x.wBahan || 0),
+                    waste_tepung: Number((x.wProd || 0) + (x.wBahan || 0)),
+                    uang_plus: i === 0 ? getUangPlusShift() : Number(x.uang || 0),
+                    keterangan: x.ket || '',
+                    touched: !!touched[Number(it.id)]
+                };
+            });
+
+            return {
+                version: DSC_LOCAL_DRAFT_VERSION,
+                reason,
+                saved_at: new Date().toISOString(),
+                saved_at_label: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+                outlet_id: selectedOutletIdForServer(),
+                tanggal: $('#tanggal').val(),
+                shift: $('#shift').val(),
+                nama_petugas: ($('#nama_petugas').val() || '').trim(),
+                uang_plus_shift: getUangPlusShift(),
+                touched_ids: Object.keys(touched).map(Number),
+                rows
+            };
+        }
+
+        function scheduleLocalDraftSave(reason = 'input', immediate = false) {
+            clearTimeout(localDraftSaveTimer);
+
+            if (immediate) {
+                saveLocalDraftNow(reason);
+                return;
+            }
+
+            localDraftSaveTimer = setTimeout(function () {
+                saveLocalDraftNow(reason);
+            }, LOCAL_DRAFT_SAVE_DELAY);
+        }
+
+        function saveLocalDraftNow(reason = 'input') {
+            // Jangan terlalu ketat validateHeader di local draft.
+            // Kalau user sedang offline / baru pindah shift, simpan dulu di HP selama data utama ada.
+            if (!loaded || !items.length) return;
+            if (!($('#outlet_id').val() && $('#tanggal').val() && $('#shift').val())) return;
+
+            syncAllTouchedFromDom();
+
+            try {
+                localStorage.setItem(localDraftKey(), JSON.stringify(collectFullLocalDraft(reason)));
+
+                if (!navigator.onLine) {
+                    setStatus('bad', 'Offline - aman di HP');
+                    updateLastSavedBadge('pending');
+                    $('#infoText').text('Offline: draft tetap tersimpan lokal di HP/browser ini. Saat internet normal, klik Simpan Draft untuk kirim ke server.');
+                }
+            } catch (e) {
+                console.warn('Local draft gagal disimpan', e);
+                $('#infoText').text('Penyimpanan lokal HP penuh/tidak tersedia. Segera klik Simpan Draft saat koneksi normal.');
+            }
+        }
+
+        function clearLocalDraft() {
+            try { localStorage.removeItem(localDraftKey()); } catch (e) {}
+        }
+
+        function applyLocalDraft(localDraft) {
+            if (!localDraft || !Array.isArray(localDraft.rows)) return false;
+
+            const byId = {};
+            localDraft.rows.forEach(r => {
+                const id = Number(r.bahan_id || 0);
+                if (id) byId[id] = r;
+            });
+
+            items.forEach(it => {
+                const id = Number(it.id);
+                const r = byId[id];
+                if (!r) return;
+
+                const x = ensure(id, it);
+                x.open = Number(r.opening_stock ?? x.open ?? 0);
+                x.pin = Number(r.purchase_in ?? x.pin ?? 0);
+                x.mi = Number(r.mutasi_in ?? x.mi ?? 0);
+                x.mo = Number(r.mutasi_out ?? x.mo ?? 0);
+                x.adj = Number(r.adjustment_qty ?? x.adj ?? 0);
+                x.ending = Number(r.ending_stock ?? x.ending ?? 0);
+                x.wProd = Number(r.waste_product ?? x.wProd ?? 0);
+                x.wBahan = Number(r.waste_bahan ?? x.wBahan ?? 0);
+                x.uang = Number(r.uang_plus ?? x.uang ?? 0);
+                x.ket = (r.keterangan ?? x.ket ?? '').toString();
+
+                if (r.touched || (localDraft.touched_ids || []).map(Number).includes(id)) {
+                    touched[id] = true;
+                    lastEditedBahanId = id;
+                }
+            });
+
+            if (typeof localDraft.uang_plus_shift !== 'undefined') {
+                $('#uang_plus_shift').val(Number(localDraft.uang_plus_shift || 0));
+                uangPlusDirty = true;
+            }
+
+            renderAll();
+            bindInputs();
+            refreshAllMobileCards();
+            syncActualTepungLabel();
+            validateEndingEmptyForTouchedOnly();
+            refreshButtons();
+            setStatus('ok', 'Draft lokal dipulihkan');
+            $('#infoText').text('Draft dari HP berhasil dipulihkan. Klik Simpan Draft saat koneksi normal.');
+            return true;
+        }
+
+        async function restoreLocalDraftAfterLoad() {
+            let raw = null;
+            try { raw = localStorage.getItem(localDraftKey()); } catch (e) { raw = null; }
+            if (!raw) return;
+
+            let localDraft = null;
+            try { localDraft = JSON.parse(raw); } catch (e) { return; }
+            if (!localDraft || !Array.isArray(localDraft.rows) || !localDraft.rows.length) return;
+
+            const touchedCount = (localDraft.touched_ids || []).length || localDraft.rows.filter(r => r.touched).length;
+            const savedAt = localDraft.saved_at_label || '-';
+
+            const ans = await Swal.fire({
+                icon: 'warning',
+                title: 'Ada draft belum tersinkron di HP ini',
+                html: `Ditemukan backup lokal <b>${touchedCount || localDraft.rows.length} bahan</b><br>Terakhir: <b>${esc(savedAt)}</b><br><br>Pulihkan supaya input tidak hilang?`,
+                showCancelButton: true,
+                showDenyButton: true,
+                confirmButtonText: 'Pulihkan',
+                denyButtonText: 'Hapus backup',
+                cancelButtonText: 'Nanti',
+                reverseButtons: true,
+                confirmButtonColor: '#0f172a'
+            });
+
+            if (ans.isConfirmed) {
+                clearTimeout(localDraftSaveTimer);
+                applyLocalDraft(localDraft);
+                clearLocalDraft();
+                isDirty = false;
+            } else if (ans.isDenied) {
+                clearTimeout(localDraftSaveTimer);
+                clearLocalDraft();
+                updateLastSavedBadge('pending');
+                $('#infoText').text('Backup lokal HP dihapus.');
+            }
+        }
+
+        function markLocalSynced() {
+            clearLocalDraft();
+        }
         function buildPayloadFinal() {
-            const outletId = $('#outlet_id').val();
+            const outletId = selectedOutletIdForServer();
             const tanggal = $('#tanggal').val();
             const picRaw = ($('#nama_petugas').val() || '').trim();
 
@@ -3613,7 +5032,7 @@
             if (!$b.length) return;
 
             if (mode === 'pending') {
-                $b.html('<i class="bi bi-hourglass-split"></i> Menunggu autosave...');
+                $b.html('<i class="bi bi-hdd"></i> Draft lokal tersimpan');
                 return;
             }
 
@@ -3638,13 +5057,19 @@
 
         // ========= AUTO SAVE DRAFT SILENT =========
         function scheduleAutoSave() {
-            if (!AUTO_SAVE_ENABLED) return;
             if (kasirClosed || !loaded) return;
             if (!validateHeader()) return;
 
-            clearTimeout(autoSaveTimer);
+            // Simpan lokal dengan debounce supaya localStorage tidak ditulis setiap keypress.
+            scheduleLocalDraftSave('typing', false);
             updateLastSavedBadge('pending');
 
+            if (!AUTO_SAVE_ENABLED) {
+                $('#infoText').text('Autosave server OFF. Draft aman tersimpan lokal di HP/browser ini. Klik Simpan Draft untuk kirim ke server.');
+                return;
+            }
+
+            clearTimeout(autoSaveTimer);
             autoSaveTimer = setTimeout(function () {
                 autoSaveDraftSilent();
             }, AUTO_SAVE_DELAY);
@@ -3686,18 +5111,24 @@
                 const { json, raw } = await readJsonOrText(res);
 
                 if (!res.ok || !json || !json.ok) {
-                    throw new Error(pickErrorMessage(res, json, raw));
+                    const err = new Error(pickErrorMessage(res, json, raw));
+                    err.res = res;
+                    err.json = json;
+                    err.raw = raw;
+                    throw err;
                 }
 
                 lastAutoSaveHash = payloadHash;
+                markLocalSynced();
                 setStatus('ok', 'Auto saved');
                 updateLastSavedBadge('ok');
-                $('#infoText').text('Perubahan otomatis tersimpan sebagai draft.');
+                $('#infoText').text('Perubahan tersimpan sebagai draft server.');
             } catch (e) {
                 console.error(e);
-                setStatus('bad', 'Auto save gagal');
+                saveLocalDraftNow('autosave_failed');
+                setStatus('bad', navigator.onLine ? 'Backup di HP' : 'Offline - aman di HP');
                 updateLastSavedBadge('error', e.message);
-                $('#infoText').text('Auto save gagal. Harap tunggu sampai koneksi/token normal, lalu klik Simpan Draft manual.');
+                $('#infoText').text('Server belum tersimpan, tapi draft aman lokal di HP/browser ini. Login ulang/online lalu Load untuk pulihkan.');
             } finally {
                 autoSaveRunning = false;
 
@@ -3719,6 +5150,8 @@
             if (kasirClosed) return swWarn('Sudah Final', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
             if (!loaded) return swWarn('Belum load', 'Klik Load dulu.');
             if (!validateHeader()) return swWarn('Data belum lengkap', 'Lengkapi Outlet/Tanggal/Shift/Nama Petugas.');
+
+            saveLocalDraftNow('manual_draft_before_send');
 
             const payload = buildPayloadDraft();
             if (!payload.rows.length) {
@@ -3742,6 +5175,8 @@
 
                 Swal.close();
                 lastAutoSaveHash = JSON.stringify(buildPayloadDraft());
+                clearTimeout(localDraftSaveTimer);
+                markLocalSynced();
                 updateLastSavedBadge('ok');
 
                 // kalau shift 1, tawarkan lanjut ke shift 2
@@ -3792,6 +5227,8 @@
 
         // ========= Final =========
         async function saveFinal() {
+            syncAllTouchedFromDom();
+
             if (manualSaveRunning) return swWarn('Harap tunggu', 'Sistem masih proses penyimpanan. Jangan klik berulang.');
             if (autoSaveRunning) return swWarn('Harap tunggu', 'Autosave masih berjalan. Tunggu sampai status selesai, lalu klik lagi.');
             if (kasirClosed) return swWarn('Sudah Final', 'Kasir sudah ditutup. Tidak bisa simpan/edit.');
@@ -3814,7 +5251,9 @@
                 }
             }
 
-            const outletId = $('#outlet_id').val();
+            saveLocalDraftNow('final_before_send');
+
+            const outletId = selectedOutletIdForServer();
             const tanggal = $('#tanggal').val();
             const picEnc = encodeURIComponent(($('#nama_petugas').val() || '').trim());
 
@@ -3841,7 +5280,24 @@
                     throw err;
                 }
 
+                clearTimeout(localDraftSaveTimer);
+                markLocalSynced();
                 Swal.close();
+
+                const lockMeta = json.data?.lock || {
+                    is_closed: true,
+                    closed_shift: 2
+                };
+
+                lockUI(true, lockMeta, { showPopup: false });
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Final Berhasil',
+                    html: 'Data Shift 1 dan Shift 2 sudah menjadi final.<br><b>Tanggal ini sudah dikunci dan tidak bisa diedit.</b>',
+                    confirmButtonText: 'Oke',
+                    confirmButtonColor: '#0f172a'
+                });
 
                 // ✅ MODAL: mau lanjut isi omset/setor?
                 const ans = await Swal.fire({
@@ -3858,7 +5314,7 @@
                     window.location.href =
                         `${URL_OMSET_FORM}?tanggal=${tanggal}&outlet_id=${outletId}&shift=2&pic=${picEnc}`;
                 } else {
-                    window.location.reload();
+                    await loadData();
                 }
             } catch (e) {
                 Swal.close();
@@ -3868,6 +5324,128 @@
                 setSavingUi(false);
             }
         }
+
+
+        // ========= SPV ADJUSTMENT AFTER FINAL =========
+        function buildPayloadSpvAdjustment() {
+            // FIX KOREKSI FINAL BALIK LAGI:
+            // Pastikan nilai terakhir dari input DOM masuk ke object st sebelum payload dibuat.
+            // Tanpa ini, edit terakhir di HP/desktop bisa belum tersalin saat tombol Koreksi diklik.
+            syncAllTouchedFromDom();
+
+            return {
+                // Pakai context yang sudah di-Load agar koreksi tidak nyasar shift/outlet lain.
+                outlet_id: (typeof loadedOutletIdForSave !== 'undefined' && loadedOutletIdForSave) ? loadedOutletIdForSave : selectedOutletIdForServer(),
+                tanggal: (typeof loadedTanggalForSave !== 'undefined' && loadedTanggalForSave) ? loadedTanggalForSave : $('#tanggal').val(),
+                shift: (typeof loadedShiftForSave !== 'undefined' && loadedShiftForSave) ? loadedShiftForSave : $('#shift').val(),
+                nama_petugas: ($('#nama_petugas').val() || '').trim(),
+
+                /*
+                 * SPV correction:
+                 * Field dikirim eksplisit sesuai kolomnya, jadi BE tahu harus update ke kolom mana:
+                 * - purchase_in
+                 * - mutasi_in
+                 * - mutasi_out
+                 * - adjustment_qty
+                 * - ending_stock
+                 * - waste_product
+                 * - waste_bahan
+                 */
+                /*
+                 * PATCH UANG PLUS KOREKSI FINAL:
+                 * Uang Plus adalah nilai per shift, bukan per bahan.
+                 * Supaya tidak dobel, sama seperti draft/final:
+                 * - baris bahan pertama membawa nilai uang_plus shift
+                 * - baris lainnya dikirim 0 untuk mereset sisa nilai lama
+                 */
+                rows: items.map((it, i) => {
+                    const x = ensure(it.id);
+                    const uangPlusShift = getUangPlusShift();
+
+                    return {
+                        bahan_id: it.id,
+                        purchase_in: Number(x.pin || 0),
+                        mutasi_in: Number(x.mi || 0),
+                        mutasi_out: Number(x.mo || 0),
+                        adjustment_qty: Number(x.adj || 0),
+                        ending_stock: Number(x.ending || 0),
+                        waste_product: Number(x.wProd || 0),
+                        waste_bahan: Number(x.wBahan || 0),
+                        uang_plus: i === 0 ? uangPlusShift : 0
+                    };
+                })
+            };
+        }
+
+
+        async function saveSpvAdjustment() {
+            if (!CAN_FINAL_CORRECTION_ROLE || !canSpvAdjust) {
+                return swWarn('Akses ditolak', 'Hanya SPV, TM Manager, atau Superadmin yang boleh simpan koreksi setelah final.');
+            }
+            if (!loaded) return swWarn('Belum load', 'Klik Load dulu.');
+            if (!kasirClosed) return swWarn('Belum Final', 'Koreksi hanya untuk data yang sudah Final/LOCK.');
+            if (!validateHeader()) return swWarn('Data belum lengkap', 'Lengkapi Outlet/Tanggal/Shift/Nama Petugas.');
+            if (typeof validateLoadedContextForSave === 'function') {
+                const loadedCtxSpv = validateLoadedContextForSave();
+                if (!loadedCtxSpv.ok) return swWarn('Load ulang dulu', loadedCtxSpv.message);
+            }
+
+            const confirm = await Swal.fire({
+                icon: 'question',
+                title: 'Simpan Koreksi Final?',
+                html: 'Status tetap <b>FINAL/LOCK</b>.<br>Yang disimpan hanya kolom koreksi SPV yang diizinkan.',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Simpan',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#0f172a',
+                reverseButtons: true
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                setSavingUi(true, 'Menyimpan koreksi SPV...');
+                swLoading('Menyimpan koreksi SPV...');
+
+                const res = await fetch(URL_SAVE_SPV_ADJUSTMENT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...apiHeaders()
+                    },
+                    body: JSON.stringify(buildPayloadSpvAdjustment())
+                });
+
+                const { json, raw } = await readJsonOrText(res);
+                if (!res.ok || !json || !json.ok) {
+                    const err = new Error(pickErrorMessage(res, json, raw));
+                    err.res = res;
+                    err.json = json;
+                    err.raw = raw;
+                    throw err;
+                }
+
+                Swal.close();
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Koreksi Final Tersimpan',
+                    html: 'Koreksi berhasil disimpan.<br><b>Status data tetap FINAL/LOCK.</b>',
+                    timer: 1500,
+                    timerProgressBar: true,
+                    showConfirmButton: false
+                });
+
+                await loadData(false);
+            } catch (e) {
+                Swal.close();
+                console.error(e);
+                await handleSaveError('Koreksi Final gagal', e.res || null, e.json || null, e.raw || null, e);
+            } finally {
+                setSavingUi(false);
+            }
+        }
+
 
         // ========= NEXT ZERO (isi ending 0 untuk baris berikutnya yang belum disentuh) =========
         function nextZero() {
@@ -3942,447 +5520,57 @@
             });
         }
 
-
-
-        // ========= HISTORY DSC MODAL - CLEAN, CLICKABLE, SEARCH + SCROLL + PAGINATION =========
-        let historyRawRows = [];
-        let historyFilteredRows = [];
-        let historyPage = 1;
-        let historySelectedIndex = null;
-
-        function historySafeText(value) {
-            if (value === null || typeof value === 'undefined' || value === '') return '-';
-            return String(value);
-        }
-
-        function historyFormatTime(value) {
-            const raw = historySafeText(value);
-            if (raw === '-') return '-';
-
-            // Support beberapa format dari controller:
-            // - created_at: 2026-05-29 16:20:46
-            // - jam: 29/05/2026 16:20:46
-            // - timestamp ISO: 2026-05-29T16:20:46.000000Z
-            return raw
-                .replace('T', ' ')
-                .replace('.000000Z', '')
-                .replace('Z', '')
-                .slice(0, 19);
-        }
-
-        function historyRowTime(row) {
-            return historyFormatTime(
-                row.jam ||
-                row.created_at ||
-                row.createdAt ||
-                row.created ||
-                row.updated_at ||
-                row.updatedAt ||
-                ''
-            );
-        }
-
-        function historyStatusKind(row) {
-            const src = String(row.source || row.table_name || '').toLowerCase();
-            const act = String(row.action || '').toLowerCase();
-            if (src.includes('draft') || act.includes('draft')) return 'draft';
-            if (src.includes('tbl_stock') || act.includes('final')) return 'final';
-            return 'other';
-        }
-
-        function historyStatusBadge(row) {
-            const kind = historyStatusKind(row);
-            if (kind === 'draft') return '<span class="history-status-badge draft">DRAFT</span>';
-            if (kind === 'final') return '<span class="history-status-badge final">Final</span>';
-            return '<span class="history-status-badge other">LOG</span>';
-        }
-
-        function historyIsSignificant(row) {
-            const oldVal = parseFloat(String(row.old_value ?? '').replace(',', '.'));
-            const newVal = parseFloat(String(row.new_value ?? '').replace(',', '.'));
-            if (Number.isNaN(oldVal) || Number.isNaN(newVal)) return false;
-            const diff = Math.abs(newVal - oldVal);
-            const base = Math.max(Math.abs(oldVal), 1);
-            return diff >= 50 || (diff / base) >= 0.3;
-        }
-
-        function historySignificantBadge(row) {
-            return historyIsSignificant(row)
-                ? '<span class="history-status-badge other" title="Selisih besar">Perubahan signifikan</span>'
-                : '';
-        }
-
-        function historyFieldLabel(field) {
-            const map = {
-                opening_stock: 'Opening Stock',
-                purchase_in: 'Purchase In',
-                mutasi_in: 'Mutasi In',
-                mutasi_out: 'Mutasi Out',
-                adjustment_qty: 'Adjustment',
-                used_qty: 'Used Qty',
-                waste_product: 'Waste Produk',
-                waste_bahan: 'Waste Bahan',
-                waste_tepung: 'Waste Tepung',
-                ending_stock: 'Ending Stock / AB',
-                actual_tepung: 'Actual Tepung',
-                uang_plus: 'Uang Plus',
-                keterangan: 'Catatan',
-                nama_petugas: 'Petugas',
-                pic: 'Petugas',
-                'Purchase In': 'Purchase In',
-                'Petugas': 'Petugas',
-                'Catatan': 'Catatan'
-            };
-            const key = String(field || '').trim();
-            return map[key] || key || '-';
-        }
-
-        function getHistoryBahanIdFromRow() {
-            // Prioritas: bahan terakhir yang benar-benar diubah user.
-            // Ini mencegah modal History tetap nyangkut di filter bahan lama
-            // seperti AYAM BESAR padahal yang baru diedit AYAM CUT 14.
-            if (lastEditedBahanId) return lastEditedBahanId;
-
-            const focusedRowId = $('#tblDSC tbody tr:has(:focus)').data('id');
-            if (focusedRowId) return focusedRowId;
-
-            const activeCardId = $('#cards .bcard.active-card').data('id');
-            if (activeCardId) return activeCardId;
-
-            return '';
-        }
-
-        function fillHistoryBahanOptions() {
-            const $sel = $('#historyBahan');
-            if (!$sel.length) return;
-
-            const current = String($sel.val() || '');
-            $sel.empty().append('<option value="">Semua bahan</option>');
-
-            const seen = {};
-            items.forEach(function(it) {
-                const id = String(it.id || it.bahan_id || '');
-                if (!id || seen[id]) return;
-                seen[id] = true;
-                const nama = it.nama_bahan || it.nama || ('Bahan #' + id);
-                $sel.append(`<option value="${esc(id)}">${esc(nama)}</option>`);
-            });
-
-            if (current && $sel.find(`option[value="${current}"]`).length) {
-                $sel.val(current);
-            }
-        }
-
-        async function openHistoryModal(e) {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            const outletId = $('#outlet_id').val();
-            const tanggal = $('#tanggal').val();
-
-            if (!outletId || !tanggal) {
-                return swWarn('Filter belum lengkap', 'Pilih outlet dan tanggal dulu, lalu klik History lagi.');
-            }
-
-            if (!document.getElementById('historyModal')) {
-                return swError('Modal history tidak ditemukan', 'Elemen #historyModal belum ada di file blade.');
-            }
-
-            fillHistoryBahanOptions();
-            $('#historyDateFrom').val($('#historyDateFrom').val() || tanggal);
-            $('#historyDateTo').val($('#historyDateTo').val() || tanggal);
-
-            const activeBahan = getHistoryBahanIdFromRow();
-            if (activeBahan && $('#historyBahan').find(`option[value="${activeBahan}"]`).length) {
-                $('#historyBahan').val(activeBahan);
-            }
-
-            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('historyModal'));
-            modal.show();
-
-            await loadHistoryData();
-        }
-
-        async function loadHistoryData() {
-            const outletId = $('#outlet_id').val();
-            const tanggal = $('#tanggal').val();
-            const shift = $('#historyShift').val() || $('#shift').val() || '';
-            const bahanId = $('#historyBahan').val() || '';
-            const dateFrom = $('#historyDateFrom').val() || tanggal || '';
-            const dateTo = $('#historyDateTo').val() || tanggal || '';
-
-            if (!outletId || !tanggal) return;
-
-            $('#historySummary').text('Memuat history...');
-            $('#historyBody').html('<tr><td colspan="6" class="history-empty">Memuat data history...</td></tr>');
-            $('#historyPagination').html('');
-            $('#historyDetailPanel').html(historyEmptyDetailHtml());
-
-            try {
-                const qs = new URLSearchParams();
-                qs.set('outlet_id', outletId);
-                qs.set('tanggal', tanggal);
-                if (shift) qs.set('shift', shift);
-                if (bahanId) qs.set('bahan_id', bahanId);
-                if (dateFrom) qs.set('date_from', dateFrom);
-                if (dateTo) qs.set('date_to', dateTo);
-
-                const res = await fetch(URL_HISTORY + '?' + qs.toString(), {
-                    method: 'GET',
-                    headers: apiHeaders()
-                });
-
-                const { json, raw } = await readJsonOrText(res);
-                if (!res.ok || !json || !(json.ok || json.success)) {
-                    throw new Error(pickErrorMessage(res, json, raw));
-                }
-
-                let rows = [];
-                if (Array.isArray(json.data)) rows = json.data;
-                else if (Array.isArray(json.data?.rows)) rows = json.data.rows;
-                else if (Array.isArray(json.history)) rows = json.history;
-
-                historyRawRows = rows;
-                historyPage = 1;
-                historySelectedIndex = null;
-                applyHistorySearch();
-            } catch (err) {
-                console.error(err);
-                $('#historySummary').text('Gagal memuat history');
-                $('#historyBody').html(`<tr><td colspan="6" class="text-danger py-4 px-3">Gagal memuat history: ${esc(err.message)}</td></tr>`);
-                $('#historyInfo').text('Gagal memuat data');
-            }
-        }
-
-        function historyParseDevice(userAgent) {
-            const ua = String(userAgent || '').trim();
-            if (!ua) return { label: '-', icon: 'bi-question-circle', detail: '-' };
-
-            let os = 'Unknown OS';
-            if (/android/i.test(ua)) os = 'Android';
-            else if (/iphone|ipad|ipod/i.test(ua)) os = 'iPhone/iPad';
-            else if (/windows/i.test(ua)) os = 'Windows';
-            else if (/mac os|macintosh/i.test(ua)) os = 'Mac';
-            else if (/linux/i.test(ua)) os = 'Linux';
-
-            let browser = 'Browser';
-            if (/edg/i.test(ua)) browser = 'Edge';
-            else if (/opr|opera/i.test(ua)) browser = 'Opera';
-            else if (/firefox/i.test(ua)) browser = 'Firefox';
-            else if (/crios/i.test(ua)) browser = 'Chrome iOS';
-            else if (/chrome/i.test(ua)) browser = 'Chrome';
-            else if (/safari/i.test(ua)) browser = 'Safari';
-
-            let icon = 'bi-laptop';
-            if (/android|iphone|ipad|ipod|mobile/i.test(ua)) icon = 'bi-phone';
-            if (/tablet|ipad/i.test(ua)) icon = 'bi-tablet';
-
-            return { label: `${os} • ${browser}`, icon, detail: ua };
-        }
-
-        function historyEmptyDetailHtml() {
-            return `
-                <div class="history-detail-title">Detail audit</div>
-                <div class="history-detail-sub">Klik salah satu baris history untuk melihat IP, device, sumber data, dan user agent.</div>
-                <div class="history-detail-empty">
-                    <i class="bi bi-cursor-fill d-block mb-2"></i>
-                    Belum ada baris dipilih.
-                </div>`;
-        }
-
-        function historyDetailHtml(row) {
-            const device = historyParseDevice(row.user_agent || row.device || '');
-            const petugas = row.pic || row.nama_petugas || '-';
-            const user = row.user_name || row.user || '-';
-            const bahan = row.nama_bahan || row.bahan || (row.bahan_id ? `Bahan #${row.bahan_id}` : '-');
-            const source = row.table_name || row.source || '-';
-            const action = row.action || '-';
-            const ip = row.ip_address || '-';
-
-            return `
-                <div class="history-detail-title">Detail audit</div>
-                <div class="history-detail-sub">${esc(historyRowTime(row))}</div>
-                <div class="history-kv"><span>Petugas</span><span>${esc(petugas)}</span></div>
-                <div class="history-kv"><span>User Login</span><span>${esc(user)}</span></div>
-                <div class="history-kv"><span>Bahan</span><span>${esc(bahan)}</span></div>
-                <div class="history-kv"><span>Shift</span><span>${row.shift ? 'Shift ' + esc(row.shift) : '-'}</span></div>
-                <div class="history-kv"><span>Kolom</span><span>${esc(historyFieldLabel(row.field_name))}</span></div>
-                <div class="history-kv"><span>Sebelum</span><span class="history-mono">${esc(historySafeText(row.old_value))}</span></div>
-                <div class="history-kv"><span>Sesudah</span><span class="history-mono">${esc(historySafeText(row.new_value))}</span></div>
-                <div class="history-kv"><span>Status</span><span>${historyStatusBadge(row)}</span></div>
-                <div class="history-kv"><span>Sumber</span><span>${esc(source)}</span></div>
-                <div class="history-kv"><span>Action</span><span>${esc(action)}</span></div>
-                <div class="history-kv"><span>IP Address</span><span class="history-mono">${esc(ip)}</span></div>
-                <div class="history-kv"><span>Device</span><span><span class="history-device-pill"><i class="bi ${esc(device.icon)}"></i>${esc(device.label)}</span></span></div>
-                <div class="history-kv"><span>User Agent</span><span class="history-mono">${esc(device.detail)}</span></div>`;
-        }
-
-        function applyHistorySearch() {
-            const q = ($('#historySearch').val() || '').trim().toLowerCase();
-
-            if (!q) {
-                historyFilteredRows = historyRawRows.slice();
-            } else {
-                historyFilteredRows = historyRawRows.filter(function(row) {
-                    const haystack = [
-                        row.jam, row.created_at, row.updated_at, row.pic, row.user_name, row.nama_petugas, row.shift,
-                        row.bahan_id, row.nama_bahan, row.bahan, row.field_name,
-                        historyFieldLabel(row.field_name), row.old_value, row.new_value,
-                        row.action, row.table_name, row.source, row.ip_address, row.user_agent, row.device
-                    ].map(historySafeText).join(' ').toLowerCase();
-                    return haystack.includes(q);
-                });
-            }
-
-            historyPage = 1;
-            historySelectedIndex = null;
-            $('#historyDetailPanel').html(historyEmptyDetailHtml());
-            renderHistoryPage();
-        }
-
-        function renderHistoryPage() {
-            const perPage = Math.max(1, Number($('#historyPerPage').val() || 10));
-            const total = historyFilteredRows.length;
-            const totalPage = Math.max(1, Math.ceil(total / perPage));
-            historyPage = Math.min(Math.max(1, historyPage), totalPage);
-
-            const start = (historyPage - 1) * perPage;
-            const pageRows = historyFilteredRows.slice(start, start + perPage);
-
-            const fromDate = $('#historyDateFrom').val() || $('#tanggal').val() || '-';
-            const toDate = $('#historyDateTo').val() || fromDate;
-            const dateText = toDate && toDate !== fromDate ? `${fromDate} s/d ${toDate}` : fromDate;
-            $('#historySummary').text(`Total ${total} perubahan • Outlet ${$('#outlet_id').val() || '-'} • ${dateText}`);
-            $('#historyInfo').text(total ? `Menampilkan ${start + 1} sampai ${Math.min(start + perPage, total)} dari ${total} data` : 'Menampilkan 0 data');
-
-            if (!pageRows.length) {
-                $('#historyBody').html('<tr><td colspan="6" class="history-empty">Belum ada history untuk filter ini.</td></tr>');
-                renderHistoryPagination(totalPage);
-                return;
-            }
-
-            const html = pageRows.map(function(row, idx) {
-                const no = start + idx + 1;
-                const globalIndex = start + idx;
-                const petugas = row.pic || row.nama_petugas || '-';
-                const user = row.user_name || row.user || '';
-                const bahan = row.nama_bahan || row.bahan || (row.bahan_id ? `Bahan #${row.bahan_id}` : '-');
-                const field = historyFieldLabel(row.field_name);
-                const shift = row.shift ? `Shift ${row.shift}` : '-';
-                const source = row.table_name || row.source || '-';
-
-                const userHtml = `
-                    <div class="history-user-main">${esc(petugas || user || '-')}</div>
-                    ${user && user !== petugas ? `<div class="history-user-sub" title="${esc(user)}">${esc(user)}</div>` : ''}`;
-
-                const changeHtml = `
-                    <div class="history-change-title">
-                        <span>${esc(field)}</span>
-                        ${historySignificantBadge(row)}
-                    </div>
-                    <div class="history-change-meta">${esc(bahan)} • ${esc(shift)} • ${esc(source)}</div>
-                    <div class="history-diff">
-                        <span class="history-old-value" title="${esc(historySafeText(row.old_value))}">${esc(historySafeText(row.old_value))}</span>
-                        <span class="history-arrow">→</span>
-                        <span class="history-new-value" title="${esc(historySafeText(row.new_value))}">${esc(historySafeText(row.new_value))}</span>
-                    </div>`;
-
-                return `
-                    <tr class="history-clickable ${historySelectedIndex === globalIndex ? 'history-active' : ''}" data-history-index="${globalIndex}">
-                        <td class="text-center text-muted">${no}</td>
-                        <td><div class="history-time">${esc(historyRowTime(row))}</div></td>
-                        <td>${userHtml}</td>
-                        <td>${changeHtml}</td>
-                        <td>${historyStatusBadge(row)}</td>
-                        <td><button type="button" class="btn btn-sm history-detail-btn" data-history-index="${globalIndex}">Detail</button></td>
-                    </tr>`;
-            }).join('');
-
-            $('#historyBody').html(html);
-            renderHistoryPagination(totalPage);
-        }
-
-        function selectHistoryRow(index) {
-            index = Number(index);
-            if (Number.isNaN(index) || !historyFilteredRows[index]) return;
-            historySelectedIndex = index;
-            $('#historyDetailPanel').html(historyDetailHtml(historyFilteredRows[index]));
-            $('#tblHistoryDSC tbody tr').removeClass('history-active');
-            $(`#tblHistoryDSC tbody tr[data-history-index="${index}"]`).addClass('history-active');
-        }
-
-        function renderHistoryPagination(totalPage) {
-            const $p = $('#historyPagination');
-            if (!$p.length) return;
-            if (totalPage <= 1) {
-                $p.html('');
-                return;
-            }
-
-            const btn = (page, label, disabled = false, active = false) => {
-                return `<button type="button" class="btn btn-sm ${active ? 'btn-primary active' : 'btn-outline-secondary'}" data-history-page="${page}" ${disabled ? 'disabled' : ''}>${label}</button>`;
-            };
-
-            let html = '';
-            html += btn(1, '&laquo;', historyPage <= 1);
-            html += btn(historyPage - 1, '&lsaquo;', historyPage <= 1);
-
-            const from = Math.max(1, historyPage - 2);
-            const to = Math.min(totalPage, historyPage + 2);
-            for (let p = from; p <= to; p++) html += btn(p, p, false, p === historyPage);
-
-            html += btn(historyPage + 1, '&rsaquo;', historyPage >= totalPage);
-            html += btn(totalPage, '&raquo;', historyPage >= totalPage);
-            $p.html(html);
-        }
-
-        function changeHistoryPage(page) {
-            page = Number(page || 1);
-            if (!page || page < 1) return;
-            historyPage = page;
-            historySelectedIndex = null;
-            $('#historyDetailPanel').html(historyEmptyDetailHtml());
-            renderHistoryPage();
-        }
-
+        // ========= HISTORY DSC MODAL DIMATIKAN SEMENTARA =========
         function bindHistoryButtonClick() {
-            $(document).off('click.dschistory', BTN.history).on('click.dschistory', BTN.history, openHistoryModal);
+            $(document).off('click.dschistory', BTN.history);
+            $(BTN.history).addClass('d-none').prop('disabled', true);
         }
-
 
         function dscShowOpeningNotice() {
             if (typeof Swal === 'undefined') return;
 
             const isOnline = navigator.onLine;
             const networkText = isOnline
-                ? 'Status browser: online. Pastikan sinyal tetap stabil sampai muncul status tersimpan.'
-                : 'Status browser: offline. Jangan lanjut input dulu sebelum koneksi kembali normal.';
+                ? 'Status browser online. Pastikan sinyal tetap stabil sampai muncul status tersimpan.'
+                : 'Status browser offline. Jangan lanjut input dulu sebelum koneksi kembali normal.';
 
             Swal.fire({
                 icon: isOnline ? 'info' : 'warning',
                 title: 'Update Terbaru DSC',
                 html: `
-                    <div style="text-align:left;line-height:1.5;font-size:.92rem">
-                        <div style="font-weight:800;margin-bottom:8px;color:#0f172a">Sebelum mulai input, perhatikan aturan terbaru berikut:</div>
-                        <ol style="padding-left:18px;margin:0 0 10px 0">
-                            <li><b>Pastikan jaringan internet stabil.</b> DSC memakai autosave, tetapi data dianggap aman setelah muncul status <b>Tersimpan</b>.</li>
-                            <li><b>Jangan membuka DSC outlet/tanggal/shift yang sama di 2 tab atau 2 device</b>, karena bisa saling menimpa data terakhir.</li>
-                            <li><b>Ending Stock adalah hasil hitung fisik/manual.</b> Angka ending akan menjadi dasar opening shift berikutnya atau tanggal berikutnya.</li>
-                            <li><b>Role Crew</b> hanya boleh mengisi kolom yang masih kosong/0. Jika nominal sudah lebih dari 0, perubahan hanya bisa dilakukan oleh <b>SPV</b> atau <b>TM Manager</b>.</li>
-                            <li>Semua perubahan tersimpan di <b>History</b> lengkap dengan jam, petugas, IP, dan device.</li>
+                    <div class="dsc-start-box">
+                        <div class="intro">Sebelum mulai input, perhatikan aturan terbaru:</div>
+                        <ol>
+                            <li><b>Internet wajib stabil.</b> Draft disimpan lokal saat mengetik. Klik <b>Simpan Draft</b> untuk kirim ke server.</li>
+                            <li><b>Jangan buka outlet/tanggal/shift yang sama di 2 tab atau 2 device</b>, karena data terakhir bisa saling menimpa.</li>
+                            <li><b>Ending Stock hasil hitung fisik/manual.</b> Angka ending menjadi opening shift/tanggal berikutnya.</li>
+                            <li><b>Crew</b> hanya mengisi kolom kosong/0. Jika sudah ada nominal, perubahan oleh <b>SPV</b> atau <b>TM Manager</b>.</li>
+                            <li>History audit sementara disembunyikan agar halaman input lebih ringan.</li>
                         </ol>
-                        <div style="padding:10px 12px;border:1px solid ${isOnline ? '#bbf7d0' : '#fecaca'};border-radius:12px;background:${isOnline ? '#ecfdf5' : '#fef2f2'};color:${isOnline ? '#065f46' : '#991b1b'};font-weight:800">
+                        <div class="dsc-start-net" style="border:1px solid ${isOnline ? '#bbf7d0' : '#fecaca'};background:${isOnline ? '#ecfdf5' : '#fef2f2'};color:${isOnline ? '#065f46' : '#991b1b'}">
                             ${networkText}
                         </div>
                     </div>
                 `,
-                confirmButtonText: 'Saya Mengerti',
+                confirmButtonText: 'Lanjutkan',
                 confirmButtonColor: '#0f172a',
                 allowOutsideClick: false,
                 allowEscapeKey: false,
-                width: 620
+                width: 520,
+                customClass: {
+                    container: 'dsc-start-container',
+                    popup: 'dsc-start-popup',
+                    title: 'dsc-start-title',
+                    htmlContainer: 'dsc-start-html'
+                },
+                didOpen: () => {
+                    document.body.classList.add('dsc-opening-notice-active');
+                    $('.wh-footer').attr('aria-hidden', 'true');
+                },
+                willClose: () => {
+                    document.body.classList.remove('dsc-opening-notice-active');
+                    $('.wh-footer').removeAttr('aria-hidden');
+                }
             });
         }
 
@@ -4392,7 +5580,7 @@
                 Swal.fire({
                     icon: 'warning',
                     title: 'Koneksi Internet Terputus',
-                    text: 'Jangan lanjut input dulu. Tunggu koneksi normal agar autosave tidak gagal.',
+                    text: 'Jaringan tidak stabil. Input tetap aman lokal, tetapi kirim ke server hanya saat klik Simpan Draft / Final.',
                     confirmButtonText: 'Oke',
                     confirmButtonColor: '#0f172a'
                 });
@@ -4403,7 +5591,7 @@
                 Swal.fire({
                     icon: 'success',
                     title: 'Koneksi Kembali Normal',
-                    text: 'Silakan cek status tersimpan atau klik Simpan Draft untuk memastikan data aman.',
+                    text: 'Silakan klik Simpan Draft untuk mengirim data lokal ke server.',
                     timer: 2200,
                     timerProgressBar: true,
                     showConfirmButton: false
@@ -4413,13 +5601,56 @@
 
         // ========= DOC READY =========
         $(document).ready(function() {
+            if (IS_SPV_USER) {
+                $('body').addClass('can-spv-adjust');
+            } else {
+                $('body').removeClass('can-spv-adjust');
+            }
+
+            // PATCH ROLE VISIBILITY:
+            // Tombol Koreksi Final hanya boleh terlihat untuk SPV, TM Manager, dan Superadmin.
+            if (!CAN_FINAL_CORRECTION_ROLE) {
+                $(BTN.spvAdjust).addClass('d-none').prop('disabled', true);
+            }
             dscBindNetworkAlert();
             setTimeout(dscShowOpeningNotice, 450);
 
-            // select2
+            // select2 outlet AJAX: tidak render ribuan option di HTML.
             $('#outlet_id').select2({
                 width: '100%',
-                placeholder: '-- Pilih Outlet --'
+                placeholder: 'Ketik minimal 2 huruf outlet...',
+                allowClear: true,
+                minimumInputLength: 2,
+                ajax: {
+                    url: `{{ route('outlets') }}`,
+                    dataType: 'json',
+                    delay: 350,
+                    data: params => ({ q: params.term || '', page: params.page || 1, limit: 25 }),
+                    processResults: (data, params) => {
+                        params.page = params.page || 1;
+                        const rows = data.results || data.items || [];
+                        return {
+                            results: rows.map(item => ({
+                                ...item,
+                                id: item.id,
+                                ids: item.ids || item.merged_ids || item.alias_ids || [],
+                                text: (item.text || item.nama_outlet || item.label || '').toString()
+                                    .replace(/\s*\[ID:\s*[^\]]*\]\s*/gi, '')
+                                    .replace(/\s+/g, ' ')
+                                    .trim()
+                            })),
+                            pagination: { more: !!(data.pagination && data.pagination.more) }
+                        };
+                    },
+                    cache: true
+                }
+            }).on('select2:select', function (e) {
+                const data = e.params && e.params.data ? e.params.data : {};
+                const ids = data.ids || data.merged_ids || data.alias_ids || [];
+                if (Array.isArray(ids) && ids.length) {
+                    const option = this.options[this.selectedIndex];
+                    if (option) option.dataset.ids = ids.join(',');
+                }
             });
             $('#shift').select2({
                 width: '100%',
@@ -4427,9 +5658,21 @@
             });
 
             // header changes
+            $('#outlet_id,#tanggal,#shift,#nama_petugas').on('focusin', function () {
+                $(this).data('prev-value', $(this).val());
+            });
+
             $('#outlet_id,#tanggal,#shift,#nama_petugas').on('change input', function() {
-                updateShiftGate(gateMeta);
-                refreshButtons();
+                // FIX MOBILE/OFFLINE:
+                // Sebelum header berubah, paksa input bahan aktif masuk local draft.
+                // Ini menjaga input terakhir kalau user isi Ayam Kecil lalu langsung pindah Shift.
+                if (loaded && items.length) {
+                    syncActiveBahanFromDom();
+                    saveLocalDraftNow('header_change_before_reload');
+                    updateLastSavedBadge('pending');
+                }
+
+                resetLoadedStateBecauseHeaderChanged();
             });
 
             $('#uang_plus_shift').on('input change', function() {
@@ -4442,13 +5685,18 @@
             });
 
             // load (nav + cta)
-            $(document).on('click', BTN.load, loadData);
+            $(document).on('click', BTN.load, function() {
+                loadData(true);
+            });
 
             // draft (desk + foot + mobile)
             $(document).on('click', BTN.draft, saveDraft);
 
             // final (desk + foot + mobile)
             $(document).on('click', BTN.final, saveFinal);
+
+            // PATCH SPV: simpan adjustment meskipun status tetap final
+            $(document).on('click', BTN.spvAdjust, saveSpvAdjustment);
 
             // next 0
             $(document).on('click', BTN.next0, nextZero);
@@ -4468,51 +5716,66 @@
 
             // mobile pager
             $('#btnMobPrev').on('click', function() {
+                // FIX: simpan nilai input aktif sebelum card disembunyikan.
+                syncActiveBahanFromDom();
+                saveLocalDraftNow('mobile_prev');
+                scheduleAutoSave();
+
                 setMobileIndex(mobileIndex - 1);
                 $('#cards .bcard.active-card input.ending').focus();
             });
             $('#btnMobNext').on('click', function() {
+                // FIX: simpan nilai input aktif sebelum card disembunyikan.
+                syncActiveBahanFromDom();
+                saveLocalDraftNow('mobile_next');
                 scheduleAutoSave();
+
                 setMobileIndex(mobileIndex + 1);
                 $('#cards .bcard.active-card input.ending').focus();
             });
 
             $('#mobJump').on('change', function() {
+                // FIX: simpan nilai input aktif sebelum lompat bahan.
+                syncActiveBahanFromDom();
+                saveLocalDraftNow('mobile_jump');
                 scheduleAutoSave();
+
                 jumpMobileToBahanId($(this).val());
             });
 
-            // search
-            $('#searchAny').on('input', applySearch);
+            // search debounce: jangan filter DOM setiap keypress langsung.
+            let searchAnyTimer = null;
+            $('#searchAny').on('input', function () {
+                clearTimeout(searchAnyTimer);
+                searchAnyTimer = setTimeout(applySearch, 300);
+            });
 
 
-            // history modal
+            // history modal dimatikan sementara untuk menurunkan CPU/I/O
             bindHistoryButtonClick();
-            $('#btnHistoryRefresh').on('click', loadHistoryData);
-            $('#historyBahan,#historyShift,#historyDateFrom,#historyDateTo').on('change', loadHistoryData);
-            $('#historySearch').on('input', applyHistorySearch);
-            $('#historyPerPage').on('change', function() {
-                historyPage = 1;
-                renderHistoryPage();
+
+
+            // Status jaringan khusus outlet dengan sinyal jelek.
+            window.addEventListener('offline', function () {
+                if (loaded) saveLocalDraftNow('offline_event');
+                setStatus('bad', 'Offline - aman di HP');
+                updateLastSavedBadge('pending');
+                $('#infoText').text('Internet putus. Input tetap disimpan di HP ini dan akan bisa dipulihkan.');
             });
-            $('#historyPagination').on('click', '[data-history-page]', function() {
-                changeHistoryPage($(this).data('history-page'));
-            });
-            $('#historyBody').on('click', 'tr.history-clickable, .history-detail-btn', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                selectHistoryRow($(this).data('history-index') || $(this).closest('tr').data('history-index'));
-            });
-            $('#btnHistoryReset').on('click', function() {
-                $('#historySearch').val('');
-                $('#historyBahan').val('');
-                $('#historyShift').val('');
-                $('#historyDateFrom').val($('#tanggal').val() || '');
-                $('#historyDateTo').val($('#tanggal').val() || '');
-                loadHistoryData();
+
+            window.addEventListener('online', function () {
+                if (loaded && validateHeader()) {
+                    setStatus('loading', 'Online - sinkron...');
+                    $('#infoText').text('Internet kembali. Autosave server tetap OFF; klik Simpan Draft untuk kirim ke server.');
+                    scheduleAutoSave();
+                }
             });
 
             // initial UI
+            if (!AUTO_SAVE_ENABLED) {
+                updateLastSavedBadge('pending');
+                $('#infoText').text('Autosave server OFF. Input aman lokal; klik Simpan Draft untuk kirim ke server.');
+            }
             gateMeta = {};
             updateShiftGate(gateMeta);
             refreshButtons();

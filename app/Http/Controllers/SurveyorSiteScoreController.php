@@ -711,12 +711,14 @@ class SurveyorSiteScoreController extends Controller
             'sekolah' => 0,
             'kesehatan' => 0,
             'market' => 0,
-            'kompetitor_geprek' => 0
+            'kompetitor_geprek' => 0,
+            'raksasa_ojol' => 0,
+            'raksasa_ojol_list' => []
         ];
 
         $headers = [
             'X-Goog-Api-Key' => $apiKey,
-            'X-Goog-FieldMask' => 'places.id',
+            'X-Goog-FieldMask' => 'places.id,places.userRatingCount,places.displayName',
             'Content-Type' => 'application/json',
             'Referer' => 'https://report.geprekincloud.tech/' // Menambahkan referer agar lolos dari Website Restriction Google
         ];
@@ -800,6 +802,41 @@ class SurveyorSiteScoreController extends Controller
             ]);
             $data = json_decode($res->getBody(), true);
             if (isset($data['places'])) $results['kompetitor_geprek'] = count($data['places']);
+        } catch (\Exception $e) {}
+
+        // 5. Scan for F&B Hotzone (Raksasa Ojol) di radius 2000m
+        try {
+            $payload = [
+                'includedTypes' => ['restaurant', 'cafe', 'fast_food_restaurant'],
+                'maxResultCount' => 20,
+                'locationRestriction' => [
+                    'circle' => [
+                        'center' => ['latitude' => $lat, 'longitude' => $lng],
+                        'radius' => 2000 // Radius 2KM khusus untuk deteksi Hotzone
+                    ]
+                ]
+            ];
+            $res = $client->post("https://places.googleapis.com/v1/places:searchNearby", [
+                'headers' => $headers,
+                'json' => $payload
+            ]);
+            $data = json_decode($res->getBody(), true);
+            $hotzoneCount = 0;
+            $hotzoneList = [];
+            if (isset($data['places'])) {
+                foreach ($data['places'] as $place) {
+                    $ratingCount = isset($place['userRatingCount']) ? (int) $place['userRatingCount'] : 0;
+                    if ($ratingCount > 1000) { // Threshold > 1000 ulasan
+                        $hotzoneCount++;
+                        $hotzoneList[] = [
+                            'name' => isset($place['displayName']['text']) ? $place['displayName']['text'] : 'Restoran Besar',
+                            'reviews' => $ratingCount
+                        ];
+                    }
+                }
+            }
+            $results['raksasa_ojol'] = $hotzoneCount;
+            $results['raksasa_ojol_list'] = $hotzoneList;
         } catch (\Exception $e) {}
 
         return response()->json($results);

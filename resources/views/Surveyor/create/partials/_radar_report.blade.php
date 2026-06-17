@@ -106,6 +106,24 @@
                     </div>
                 </div>
 
+                <!-- Ekosistem Ojol (F&B Hotzone) -->
+                <div class="accordion-item bg-transparent border-top">
+                    <h2 class="accordion-header" id="flush-headingOjol">
+                        <button class="accordion-button collapsed bg-transparent fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#flush-collapseOjol" aria-expanded="false" aria-controls="flush-collapseOjol">
+                            <i class="bi bi-fire text-danger me-2"></i> Ekosistem Ojol (F&B Hotzone) <span class="badge bg-danger ms-auto" id="count_ojol">0</span>
+                        </button>
+                    </h2>
+                    <div id="flush-collapseOjol" class="accordion-collapse collapse" aria-labelledby="flush-headingOjol" data-bs-parent="#accordionRadarReport">
+                        <div class="accordion-body pt-0 pb-3">
+                            <div class="alert alert-danger p-2 mb-2" style="font-size: 0.7rem; border-radius: 8px;">
+                                <i class="bi bi-info-circle-fill me-1"></i> Mendeteksi restoran besar (>1.000 ulasan) di radius 2KM. Keberadaan restoran ini menjamin tingginya traffic Ojol.
+                            </div>
+                            <ul class="list-group list-group-flush small" id="list_ojol">
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

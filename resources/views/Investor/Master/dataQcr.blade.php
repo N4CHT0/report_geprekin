@@ -36,6 +36,11 @@
     $canHargaOutletView = hasAnyPermission(['master.qcr.dataqcr', 'master.qcr.index']);
     $canHargaOutletEdit = hasAnyPermission(['master.qcr.uangplus.save', 'master.qcr.hide.save']);
 
+    // Submenu baru: Bahan HO & MITRA
+    // Permission sementara mengikuti akses harga outlet agar tidak mengganggu permission lama.
+    $canBahanHoMitraView = $canHargaOutletView;
+    $canBahanHoMitraEdit = $canHargaOutletEdit;
+
     $canBomView = hasAnyPermission(['bum.store', 'bum.update', 'bum.destroy', 'bum.export', 'bum.detail']);
     $canBomStore = hasPermission('bum.store');
     $canBomUpdate = hasPermission('bum.update');
@@ -53,6 +58,7 @@
     $defaultPane = null;
     if ($canMenuView) $defaultPane = 'pane-menu';
     elseif ($canBahanView) $defaultPane = 'pane-bahan';
+    elseif ($canBahanHoMitraView) $defaultPane = 'pane-bahan-ho-mitra';
     elseif ($canBahanDscView) $defaultPane = 'pane-bahan-dsc';
     elseif ($canHargaOutletView) $defaultPane = 'pane-bahan-harga-outlet';
     elseif ($canBomView) $defaultPane = 'pane-bom';
@@ -655,6 +661,12 @@
                         </button>
                     @endif
 
+                    @if($canBahanHoMitraView)
+                        <button class="office-tab {{ $defaultPane === 'pane-bahan-ho-mitra' ? 'active' : '' }}" data-target="#pane-bahan-ho-mitra" type="button">
+                            <i class="bi bi-cash-coin"></i> Bahan HO & MITRA
+                        </button>
+                    @endif
+
                     @if($canBahanDscView)
                         <button class="office-tab {{ $defaultPane === 'pane-bahan-dsc' ? 'active' : '' }}" data-target="#pane-bahan-dsc" type="button">
                             <i class="bi bi-clipboard2-check"></i> Bahan DSC
@@ -857,6 +869,123 @@
                             </div>
                         </div>
                     </div></div>
+                @endif
+
+                {{-- ===================== BAHAN HO & MITRA ===================== --}}
+                @if($canBahanHoMitraView)
+                <div id="pane-bahan-ho-mitra" class="office-pane {{ $defaultPane === 'pane-bahan-ho-mitra' ? '' : 'd-none' }}">
+                    @php
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Outlet dropdown untuk Bahan HO & MITRA
+                        |--------------------------------------------------------------------------
+                        | Dibuat di blade agar tidak mengubah method controller pembuka halaman.
+                        | Outlet duplikat nama digabung menjadi 1 option.
+                        | value option berisi array id outlet gabungan, contoh: 901,1461
+                        */
+                        $bahanHoMitraOutlets = DB::table('tbl_outlets')
+                            ->select(
+                                DB::raw('MIN(id) as id'),
+                                DB::raw('UPPER(TRIM(nama_outlet)) as nama_outlet'),
+                                DB::raw('GROUP_CONCAT(id ORDER BY id SEPARATOR ",") as outlet_ids'),
+                                DB::raw("SUBSTRING_INDEX(GROUP_CONCAT(kategori_harga ORDER BY FIELD(kategori_harga, 'HO', 'MITRA') SEPARATOR ','), ',', 1) as kategori_harga")
+                            )
+                            ->whereNotNull('nama_outlet')
+                            ->where('nama_outlet', '!=', '')
+                            ->whereNotNull('kategori_harga')
+                            ->groupBy(DB::raw('UPPER(TRIM(nama_outlet))'))
+                            ->orderBy(DB::raw('UPPER(TRIM(nama_outlet))'))
+                            ->get();
+                    @endphp
+
+                    <div class="office-card">
+                        <div class="office-card-hd">
+                            <div>
+                                <div class="office-card-title">Bahan HO & MITRA</div>
+                                <div class="office-card-desc">Kelola harga bahan berdasarkan kategori HO / MITRA. Data baru tampil setelah filter dijalankan.</div>
+                            </div>
+                            <div class="office-card-tools">
+                                <button id="btnReloadBahanHoMitra" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="office-card-bd">
+                            <div class="office-filter">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">Kategori Harga</label>
+                                        <select id="filterKategoriBahanHoMitra" class="form-select">
+                                            <option value="all">Semua</option>
+                                            <option value="HO">HO</option>
+                                            <option value="MITRA">MITRA</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold">Outlet</label>
+                                        <select id="filterOutletBahanHoMitra" class="form-select">
+                                            <option value="">Semua Outlet</option>
+                                            @foreach($bahanHoMitraOutlets as $o)
+                                                <option
+                                                    value="{{ $o->outlet_ids }}"
+                                                    data-kategori="{{ $o->kategori_harga }}"
+                                                >
+                                                    {{ $o->nama_outlet }} [{{ $o->kategori_harga }}]
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <button type="button" id="btnLoadBahanHoMitra" class="btn btn-primary btn-sm">
+                                            <i class="bi bi-search me-1"></i> Tampilkan
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-office table-sticky align-middle w-100">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:70px">#</th>
+                                            <th style="width:220px">Nama Sheet</th>
+                                            <th>Nama Bahan</th>
+                                            <th style="width:120px" class="center">Kategori</th>
+                                            <th style="width:170px">Harga</th>
+                                            <th style="width:190px" class="center">Update</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bahanHoMitraBody">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">
+                                                Pilih filter lalu klik Tampilkan.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="mt-3 d-flex justify-content-end">
+                                @if($canBahanHoMitraEdit)
+                                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm btn-simpan-kategori-bahan-ho-mitra" data-kategori="HO">
+                                        <i class="bi bi-save me-1"></i> Simpan All HO
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success btn-sm btn-simpan-kategori-bahan-ho-mitra" data-kategori="MITRA">
+                                        <i class="bi bi-save me-1"></i> Simpan All MITRA
+                                    </button>
+                                    <button type="button" class="btn btn-success btn-sm" id="btnSimpanBahanHoMitra">
+                                        <i class="bi bi-save me-1"></i> Simpan Semua
+                                    </button>
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 @endif
 
 
@@ -1731,6 +1860,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const canHargaOutletEdit = @json($canHargaOutletEdit);
+    const canBahanHoMitraEdit = @json($canBahanHoMitraEdit ?? false);
     const canMenuUpdate = @json($canMenuUpdate);
     const canMenuDestroy = @json($canMenuDestroy);
     const canBahanUpdate = @json($canBahanUpdate);
@@ -1796,13 +1926,20 @@ document.addEventListener("DOMContentLoaded", () => {
     function initSelect2Element(selector, options = {}) {
         if (!(window.$ && $.fn.select2) || !$(selector).length) return;
 
+        const el = $(selector);
+        if (!el.closest('body').length) return;
+
         const defaultOptions = {
             width: '100%',
             placeholder: '-- Pilih --',
             allowClear: false
         };
 
-        $(selector).select2({ ...defaultOptions, ...options });
+        try {
+            el.select2({ ...defaultOptions, ...options });
+        } catch (e) {
+            console.warn('Select2 init skipped:', selector, e);
+        }
     }
 
     function refreshSelect2Outlet() {
@@ -1816,6 +1953,227 @@ document.addEventListener("DOMContentLoaded", () => {
             placeholder: '-- Pilih Outlet --'
         });
     }
+
+    const bahanHoMitraOutletOptions = $('#filterOutletBahanHoMitra option').clone();
+
+    function refreshSelect2BahanHoMitra() {
+        if (!(window.$ && $.fn.select2)) return;
+
+        ['#filterKategoriBahanHoMitra', '#filterOutletBahanHoMitra'].forEach(function(selector) {
+            if (!$(selector).length) return;
+            if ($(selector).hasClass('select2-hidden-accessible')) {
+                try { $(selector).select2('destroy'); } catch (e) {}
+            }
+        });
+
+        initSelect2Element('#filterKategoriBahanHoMitra', {
+            placeholder: 'Pilih kategori'
+        });
+
+        initSelect2Element('#filterOutletBahanHoMitra', {
+            placeholder: 'Semua Outlet'
+        });
+    }
+
+    function rebuildOutletBahanHoMitraOptions() {
+        if (!$('#filterOutletBahanHoMitra').length) return;
+
+        const kategori = $('#filterKategoriBahanHoMitra').val() || 'all';
+        const select = $('#filterOutletBahanHoMitra');
+
+        if (select.hasClass('select2-hidden-accessible')) {
+            try { select.select2('destroy'); } catch (e) {}
+        }
+
+        select.empty();
+
+        bahanHoMitraOutletOptions.each(function() {
+            const opt = $(this).clone();
+            const optKategori = String(opt.data('kategori') || '');
+
+            if (!opt.val() || kategori === 'all' || optKategori === kategori) {
+                select.append(opt);
+            }
+        });
+
+        select.val('');
+        refreshSelect2BahanHoMitra();
+
+        $('#bahanHoMitraBody').html(`
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    Pilih filter lalu klik Tampilkan.
+                </td>
+            </tr>
+        `);
+    }
+
+
+
+    function getBahanHoMitraParams() {
+        return {
+            kategori_harga: $('#filterKategoriBahanHoMitra').val() || 'all',
+            outlet_id: $('#filterOutletBahanHoMitra').val() || ''
+        };
+    }
+
+    function loadBahanHoMitra() {
+        if (!$('#bahanHoMitraBody').length) return;
+
+        const params = getBahanHoMitraParams();
+
+        $('#bahanHoMitraBody').html(`
+            <tr>
+                <td colspan="6" class="ux-loading-row">Memuat...</td>
+            </tr>
+        `);
+
+        $.get('/inventory/qcr/bahan-ho-mitra/list', params, function(res) {
+            const rows = (res && res.data) ? res.data : [];
+
+            if (!rows.length) {
+                $('#bahanHoMitraBody').html(`
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Data harga bahan tidak ditemukan.</td>
+                    </tr>
+                `);
+                return;
+            }
+
+            let html = '';
+            rows.forEach((r, idx) => {
+                const harga = r.harga_bahan ?? 0;
+                html += `
+                    <tr>
+                        <td class="center">${idx + 1}</td>
+                        <td class="fw-semibold">${r.nama_sheet || '-'}</td>
+                        <td>${r.nama_bahan || '-'}</td>
+                        <td class="center">
+                            <span class="badge ${r.kategori_harga === 'HO' ? 'text-bg-primary' : 'text-bg-success'}">${r.kategori_harga}</span>
+                        </td>
+                        <td>
+                            <input
+                                type="number"
+                                class="form-control form-control-sm input-bahan-ho-mitra"
+                                data-bahan-id="${r.id}"
+                                data-nama-bahan="${r.nama_bahan || ''}"
+                                data-kategori="${r.kategori_harga}"
+                                value="${harga}"
+                                step="0.01"
+                                ${canBahanHoMitraEdit ? '' : 'readonly'}
+                            >
+                        </td>
+                        <td class="center">
+                            ${canBahanHoMitraEdit ? `
+                            <button
+                                type="button"
+                                class="btn btn-outline-primary btn-sm btn-update-all-kategori-bahan"
+                                data-bahan-id="${r.id}"
+                                data-nama-bahan="${r.nama_bahan || ''}"
+                                data-kategori="${r.kategori_harga}">
+                                Update All ${r.kategori_harga}
+                            </button>` : `<span class="text-muted small">Read only</span>`}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            $('#bahanHoMitraBody').html(html);
+        }).fail(function(xhr) {
+            const message = xhr?.responseJSON?.message || 'Gagal memuat data harga bahan HO & MITRA.';
+            $('#bahanHoMitraBody').html(`
+                <tr>
+                    <td colspan="6" class="text-center text-danger">${message}</td>
+                </tr>
+            `);
+        });
+    }
+
+    $('#filterKategoriBahanHoMitra').on('change', function() {
+        rebuildOutletBahanHoMitraOptions();
+    });
+
+    $('#btnLoadBahanHoMitra').on('click', function() {
+        loadBahanHoMitra();
+    });
+
+    $('#btnReloadBahanHoMitra').on('click', function() {
+        loadBahanHoMitra();
+    });
+
+
+    $(document).on('click', '.btn-update-all-kategori-bahan', function() {
+        if (!canBahanHoMitraEdit) return;
+
+        const bahanId = $(this).data('bahan-id');
+        const kategori = $(this).data('kategori');
+        const input = $(`.input-bahan-ho-mitra[data-bahan-id="${bahanId}"][data-kategori="${kategori}"]`);
+        const harga = input.val();
+
+        if (!bahanId || !kategori) {
+            uxToast('error', 'Data bahan/kategori tidak valid.');
+            return;
+        }
+
+        $.ajax({
+            url: '/inventory/qcr/bahan-ho-mitra/update-all-kategori',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                bahan_id: bahanId,
+                kategori_harga: kategori,
+                harga: harga
+            },
+            success: function(res) {
+                if (res && res.success) {
+                    uxToast('success', res.message || 'Harga berhasil diupdate.');
+                    loadBahanHoMitra();
+                } else {
+                    uxToast('error', res.message || 'Gagal update harga.');
+                }
+            },
+            error: function(xhr) {
+                uxToast('error', xhr?.responseJSON?.message || 'Gagal update harga.');
+            }
+        });
+    });
+
+    $('#btnSimpanBahanHoMitra').on('click', function() {
+        if (!canBahanHoMitraEdit) return;
+
+        const harga = {};
+
+        $('.input-bahan-ho-mitra').each(function() {
+            const bahanId = $(this).data('bahan-id');
+            const kategori = $(this).data('kategori');
+
+            if (!harga[bahanId]) {
+                harga[bahanId] = {};
+            }
+
+            harga[bahanId][kategori] = $(this).val();
+        });
+
+        $.ajax({
+            url: '/inventory/qcr/bahan-ho-mitra/bulk-update',
+            method: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                harga: harga
+            },
+            success: function(res) {
+                if (res && res.success) {
+                    uxToast('success', res.message || 'Harga bahan HO & MITRA berhasil disimpan.');
+                    loadBahanHoMitra();
+                } else {
+                    uxToast('error', res.message || 'Gagal menyimpan harga.');
+                }
+            },
+            error: function(xhr) {
+                uxToast('error', xhr?.responseJSON?.message || 'Gagal menyimpan harga.');
+            }
+        });
+    });
 
     function loadHargaOutlet() {
         const outletId = getSelectedOutletId();
@@ -1831,7 +2189,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         $('#bahanHargaOutletBody').html(`
             <tr>
-                <td colspan="5" class="ux-loading-row">Memuat...</td>
+                <td colspan="6" class="ux-loading-row">Memuat...</td>
             </tr>
         `);
 
@@ -1847,7 +2205,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const allowedBahanHargaOutlet = ['ayam besar', 'ayam kecil', 'ayam utuh', 'beras'];
+            const allowedBahanHargaOutlet = ['ayam besar', 'ayam kecil', 'ayam utuh', 'beras', 'ayam cut 14'];
             const filteredRows = rows.filter((r) => {
                 const nama = String(r.nama_bahan || '').trim().toLowerCase();
                 return allowedBahanHargaOutlet.includes(nama);
@@ -2055,6 +2413,8 @@ document.addEventListener("DOMContentLoaded", () => {
             setTimeout(() => {
                 try { $($.fn.dataTable.tables(true)).DataTable().columns.adjust(); } catch(e){}
                 refreshSelect2Outlet();
+    refreshSelect2BahanHoMitra();
+                refreshSelect2BahanHoMitra();
             }, 150);
         });
     });

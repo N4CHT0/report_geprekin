@@ -1732,6 +1732,601 @@
     }
   }
 
+
+
+  /* ==========================================================
+     MOBILE TABLE MODE - QCR/BOM & NON-BOM
+     Request: di HP tetap berbentuk tabel, bukan card.
+     Freeze/sticky dimatikan khusus mobile supaya scroll tidak mengganggu.
+     ========================================================== */
+  @media (max-width: 767.98px){
+    .qcr-table-wrap,
+    .qcr-nonbom-scroll,
+    .uplus-table-wrap,
+    .qcr-hide-table-wrap{
+      width:100%!important;
+      max-width:100%!important;
+      overflow-x:auto!important;
+      overflow-y:auto!important;
+      -webkit-overflow-scrolling:touch!important;
+      touch-action:pan-x pan-y!important;
+    }
+
+    /* QCR utama tetap tabel compact */
+    #laporanTable{
+      width:1080px!important;
+      min-width:1080px!important;
+      table-layout:fixed!important;
+      border-collapse:separate!important;
+      border-spacing:0!important;
+      white-space:nowrap!important;
+      margin:0!important;
+    }
+
+    #laporanTable thead th,
+    #laporanTable tbody td,
+    #laporanTable tbody th{
+      position:static!important;
+      left:auto!important;
+      right:auto!important;
+      z-index:auto!important;
+      box-shadow:none!important;
+      padding:.62rem .55rem!important;
+      font-size:.72rem!important;
+      line-height:1.25!important;
+      vertical-align:middle!important;
+      white-space:nowrap!important;
+      background:inherit;
+    }
+
+    #laporanTable thead th{
+      background:#f8f9fa!important;
+    }
+
+    #laporanTable th:nth-child(1),
+    #laporanTable td:nth-child(1){
+      width:52px!important;
+      min-width:52px!important;
+      max-width:52px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(2),
+    #laporanTable td:nth-child(2){
+      width:190px!important;
+      min-width:190px!important;
+      max-width:190px!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      font-weight:800!important;
+    }
+
+    #laporanTable th:nth-child(3),
+    #laporanTable td:nth-child(3){
+      width:120px!important;
+      min-width:120px!important;
+      max-width:120px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(4),
+    #laporanTable td:nth-child(4),
+    #laporanTable th:nth-child(5),
+    #laporanTable td:nth-child(5),
+    #laporanTable th:nth-child(6),
+    #laporanTable td:nth-child(6){
+      width:105px!important;
+      min-width:105px!important;
+      max-width:105px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(n+7),
+    #laporanTable td:nth-child(n+7){
+      width:105px!important;
+      min-width:105px!important;
+      max-width:105px!important;
+      text-align:center!important;
+    }
+
+    /* Summary tetap tabel, tapi freeze kiri dimatikan di HP */
+    #summaryTable{
+      width:1000px!important;
+      min-width:1000px!important;
+      table-layout:fixed!important;
+    }
+
+    #summaryTable th.qcr-sticky-head,
+    #summaryTable th.qcr-sticky-col,
+    #summaryTable thead th,
+    #summaryTable tbody th,
+    #summaryTable tbody td{
+      position:static!important;
+      left:auto!important;
+      z-index:auto!important;
+      box-shadow:none!important;
+    }
+
+    #summaryTable th.qcr-sticky-head,
+    #summaryTable th.qcr-sticky-col{
+      width:190px!important;
+      min-width:190px!important;
+      max-width:190px!important;
+      background:#f8f9fa!important;
+    }
+
+    /* Non-BOM di HP juga tetap tabel, bukan card */
+    .qcr-nonbom-table-desktop{
+      display:block!important;
+    }
+
+    .qcr-nonbom-cards-mobile{
+      display:none!important;
+    }
+
+    .qcr-nonbom-scroll{
+      max-height:none!important;
+      border-top:1px solid var(--qcr-border-soft)!important;
+    }
+
+    .qcr-nonbom-scroll table,
+    #nonBomTable{
+      width:1120px!important;
+      min-width:1120px!important;
+      table-layout:fixed!important;
+    }
+
+    #nonBomTable thead th,
+    #nonBomTable tbody td,
+    #nonBomTable tbody th{
+      position:static!important;
+      left:auto!important;
+      z-index:auto!important;
+      box-shadow:none!important;
+      padding:.6rem .52rem!important;
+      font-size:.72rem!important;
+      line-height:1.25!important;
+      white-space:nowrap!important;
+    }
+
+    #nonBomTable thead th{
+      background:#f8f9fa!important;
+    }
+
+    #nonBomTable th:nth-child(1),
+    #nonBomTable td:nth-child(1){ width:52px!important; min-width:52px!important; max-width:52px!important; }
+
+    #nonBomTable th:nth-child(2),
+    #nonBomTable td:nth-child(2){
+      width:180px!important;
+      min-width:180px!important;
+      max-width:180px!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      font-weight:800!important;
+    }
+
+    #nonBomTable th:nth-child(3),
+    #nonBomTable td:nth-child(3){ width:78px!important; min-width:78px!important; max-width:78px!important; }
+
+    #nonBomTable th:nth-child(n+4),
+    #nonBomTable td:nth-child(n+4){
+      width:98px!important;
+      min-width:98px!important;
+      max-width:98px!important;
+      text-align:center!important;
+    }
+
+    .dataTables_scrollHead,
+    .dataTables_scrollHeadInner,
+    .dataTables_scrollBody{
+      width:100%!important;
+    }
+
+    .dataTables_scrollBody{
+      overflow:auto!important;
+      max-height:none!important;
+      height:auto!important;
+    }
+
+    .DTFC_LeftWrapper,
+    .DTFC_RightWrapper,
+    .dtfc-fixed-left,
+    .dtfc-fixed-right{
+      display:none!important;
+    }
+  }
+
+  @media (max-width:420px){
+    #laporanTable{ width:1020px!important; min-width:1020px!important; }
+    #summaryTable{ width:900px!important; min-width:900px!important; }
+    #nonBomTable{ width:1040px!important; min-width:1040px!important; }
+  }
+
+
+  /* ==========================================================
+     MOBILE FINAL FIX - tabel tetap mirip desktop + freeze kolom penting
+     - Summary: kolom Keterangan freeze kiri
+     - Tabel QCR/BOM: kolom No + Nama Menu freeze kiri
+     - Header bahan tidak dibuat vertikal; tabel diperlebar agar dibaca dengan scroll horizontal
+     ========================================================== */
+  @media (max-width: 767.98px){
+    .qcr-table-wrap{
+      overflow-x:auto!important;
+      overflow-y:auto!important;
+      max-width:100%!important;
+      -webkit-overflow-scrolling:touch!important;
+      position:relative!important;
+    }
+
+    /* TABEL QCR / BOM */
+    #laporanTable{
+      width:max-content!important;
+      min-width:1320px!important;
+      table-layout:fixed!important;
+      border-collapse:separate!important;
+      border-spacing:0!important;
+    }
+
+    #laporanTable thead th,
+    #laporanTable tbody td{
+      white-space:nowrap!important;
+      word-break:normal!important;
+      overflow:visible!important;
+      line-height:1.25!important;
+      vertical-align:middle!important;
+    }
+
+    #laporanTable th:nth-child(1),
+    #laporanTable td:nth-child(1){
+      position:sticky!important;
+      left:0!important;
+      z-index:20!important;
+      width:52px!important;
+      min-width:52px!important;
+      max-width:52px!important;
+      text-align:center!important;
+      background:var(--qcr-card,#fff)!important;
+    }
+
+    #laporanTable thead th:nth-child(1){
+      z-index:35!important;
+      background:#f8f9fa!important;
+    }
+
+    #laporanTable th:nth-child(2),
+    #laporanTable td:nth-child(2){
+      position:sticky!important;
+      left:52px!important;
+      z-index:19!important;
+      width:230px!important;
+      min-width:230px!important;
+      max-width:230px!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      font-weight:800!important;
+      background:var(--qcr-card,#fff)!important;
+      box-shadow:10px 0 12px -12px rgba(0,0,0,.55)!important;
+    }
+
+    #laporanTable thead th:nth-child(2){
+      z-index:34!important;
+      background:#f8f9fa!important;
+    }
+
+    #laporanTable th:nth-child(3),
+    #laporanTable td:nth-child(3){
+      width:135px!important;
+      min-width:135px!important;
+      max-width:135px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(4),
+    #laporanTable td:nth-child(4),
+    #laporanTable th:nth-child(5),
+    #laporanTable td:nth-child(5),
+    #laporanTable th:nth-child(6),
+    #laporanTable td:nth-child(6){
+      width:110px!important;
+      min-width:110px!important;
+      max-width:110px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(n+7),
+    #laporanTable td:nth-child(n+7){
+      width:132px!important;
+      min-width:132px!important;
+      max-width:132px!important;
+      text-align:center!important;
+    }
+
+    #laporanTable th:nth-child(n+7){
+      white-space:normal!important;
+      word-break:normal!important;
+      overflow-wrap:anywhere!important;
+      line-height:1.2!important;
+    }
+
+    /* SUMMARY PEMAKAIAN BAHAN */
+    #summaryTable{
+      width:max-content!important;
+      min-width:1280px!important;
+      table-layout:fixed!important;
+      border-collapse:separate!important;
+      border-spacing:0!important;
+    }
+
+    #summaryTable thead th,
+    #summaryTable tbody td{
+      width:138px!important;
+      min-width:138px!important;
+      max-width:138px!important;
+      white-space:normal!important;
+      word-break:normal!important;
+      overflow-wrap:anywhere!important;
+      line-height:1.22!important;
+      text-align:center!important;
+    }
+
+    #summaryTable th.qcr-sticky-head,
+    #summaryTable th.qcr-sticky-col,
+    #summaryTable tbody th:first-child,
+    #summaryTable thead th:first-child{
+      position:sticky!important;
+      left:0!important;
+      z-index:25!important;
+      width:185px!important;
+      min-width:185px!important;
+      max-width:185px!important;
+      text-align:left!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      background:var(--qcr-card,#fff)!important;
+      box-shadow:10px 0 12px -12px rgba(0,0,0,.55)!important;
+    }
+
+    #summaryTable thead th:first-child,
+    #summaryTable th.qcr-sticky-head{
+      z-index:40!important;
+      background:#f8f9fa!important;
+    }
+
+    #summaryTable thead th:not(:first-child){
+      font-size:.68rem!important;
+      min-height:72px!important;
+    }
+
+    /* Non-BOM tetap tabel, tapi kolom nama bahan juga freeze supaya sama feel-nya */
+    #nonBomTable th:nth-child(1),
+    #nonBomTable td:nth-child(1){
+      position:sticky!important;
+      left:0!important;
+      z-index:20!important;
+      background:var(--qcr-card,#fff)!important;
+    }
+
+    #nonBomTable thead th:nth-child(1){
+      z-index:35!important;
+      background:#f8f9fa!important;
+    }
+
+    #nonBomTable th:nth-child(2),
+    #nonBomTable td:nth-child(2){
+      position:sticky!important;
+      left:52px!important;
+      z-index:19!important;
+      background:var(--qcr-card,#fff)!important;
+      box-shadow:10px 0 12px -12px rgba(0,0,0,.55)!important;
+    }
+
+    #nonBomTable thead th:nth-child(2){
+      z-index:34!important;
+      background:#f8f9fa!important;
+    }
+  }
+
+  @media (max-width:420px){
+    #laporanTable{ min-width:1280px!important; }
+    #summaryTable{ min-width:1220px!important; }
+  }
+
+
+
+  /* ==========================================================
+     FINAL MOBILE PATCH V2
+     - Selisih Persediaan & Quality Cost tidak dipaksa 3 kolom di HP kecil
+     - Tabel QCR tetap tabel, tetapi freeze hanya Nama Menu agar tidak menutup kolom lain
+     - Summary tetap tabel dan kolom Keterangan freeze dengan lebar lebih proporsional
+     ========================================================== */
+  @media (max-width: 767.98px){
+    .qcr-stat--compare{
+      overflow:hidden!important;
+    }
+
+    .qcr-stat--compare .qcr-summary-compare,
+    .qcr-stat--compare .qcr-summary-compare.qcr-summary-compare-three{
+      grid-template-columns:1fr!important;
+      gap:10px!important;
+    }
+
+    .qcr-summary-line{
+      min-width:0!important;
+      padding:10px 11px!important;
+    }
+
+    .qcr-summary-line-label{
+      font-size:.72rem!important;
+      line-height:1.25!important;
+      word-break:normal!important;
+      overflow-wrap:anywhere!important;
+    }
+
+    .qcr-summary-line-value{
+      font-size:1rem!important;
+      line-height:1.25!important;
+      word-break:break-word!important;
+    }
+
+    .qcr-stat--compare .qcr-badge{
+      width:auto!important;
+      max-width:100%!important;
+      white-space:normal!important;
+    }
+
+    .qcr-table-wrap,
+    .dataTables_scrollBody{
+      overflow-x:auto!important;
+      overflow-y:auto!important;
+      -webkit-overflow-scrolling:touch!important;
+      overscroll-behavior-x:contain!important;
+    }
+
+    #laporanTable{
+      width:max-content!important;
+      min-width:1260px!important;
+      table-layout:fixed!important;
+      border-collapse:separate!important;
+      border-spacing:0!important;
+    }
+
+    /* Reset freeze lama supaya No tidak ikut menutup ruang layar */
+    #laporanTable th:nth-child(1),
+    #laporanTable td:nth-child(1){
+      position:static!important;
+      left:auto!important;
+      z-index:auto!important;
+      width:48px!important;
+      min-width:48px!important;
+      max-width:48px!important;
+      background:inherit!important;
+      box-shadow:none!important;
+      text-align:center!important;
+    }
+
+    /* Freeze hanya Nama Menu */
+    #laporanTable th:nth-child(2),
+    #laporanTable td:nth-child(2){
+      position:sticky!important;
+      left:0!important;
+      z-index:28!important;
+      width:168px!important;
+      min-width:168px!important;
+      max-width:168px!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      overflow:hidden!important;
+      background:var(--qcr-card,#fff)!important;
+      box-shadow:8px 0 10px -10px rgba(0,0,0,.65)!important;
+    }
+
+    #laporanTable thead th:nth-child(2){
+      z-index:42!important;
+      background:#f8f9fa!important;
+    }
+
+    #laporanTable th:nth-child(3),
+    #laporanTable td:nth-child(3){
+      width:118px!important;
+      min-width:118px!important;
+      max-width:118px!important;
+    }
+
+    #laporanTable th:nth-child(4),
+    #laporanTable td:nth-child(4),
+    #laporanTable th:nth-child(5),
+    #laporanTable td:nth-child(5),
+    #laporanTable th:nth-child(6),
+    #laporanTable td:nth-child(6){
+      width:102px!important;
+      min-width:102px!important;
+      max-width:102px!important;
+    }
+
+    #laporanTable th:nth-child(n+7),
+    #laporanTable td:nth-child(n+7){
+      width:124px!important;
+      min-width:124px!important;
+      max-width:124px!important;
+    }
+
+    /* Summary: header bahan lebih lebar supaya tidak pecah huruf per huruf */
+    #summaryTable{
+      width:max-content!important;
+      min-width:1180px!important;
+      table-layout:fixed!important;
+      border-collapse:separate!important;
+      border-spacing:0!important;
+    }
+
+    #summaryTable thead th:not(:first-child),
+    #summaryTable tbody td{
+      width:132px!important;
+      min-width:132px!important;
+      max-width:132px!important;
+      white-space:normal!important;
+      word-break:normal!important;
+      overflow-wrap:break-word!important;
+      line-height:1.22!important;
+      text-align:center!important;
+    }
+
+    #summaryTable th.qcr-sticky-head,
+    #summaryTable th.qcr-sticky-col,
+    #summaryTable tbody th:first-child,
+    #summaryTable thead th:first-child{
+      position:sticky!important;
+      left:0!important;
+      z-index:30!important;
+      width:155px!important;
+      min-width:155px!important;
+      max-width:155px!important;
+      white-space:normal!important;
+      word-break:break-word!important;
+      text-align:left!important;
+      background:var(--qcr-card,#fff)!important;
+      box-shadow:8px 0 10px -10px rgba(0,0,0,.65)!important;
+    }
+
+    #summaryTable thead th:first-child,
+    #summaryTable th.qcr-sticky-head{
+      z-index:45!important;
+      background:#f8f9fa!important;
+    }
+  }
+
+  @media (min-width: 421px) and (max-width: 767.98px){
+    .qcr-stat--compare .qcr-summary-compare.qcr-summary-compare-three{
+      grid-template-columns:1fr 1fr!important;
+    }
+
+    .qcr-stat--compare .qcr-summary-compare.qcr-summary-compare-three .qcr-summary-line:first-child{
+      grid-column:1 / -1!important;
+    }
+  }
+
+  @media (max-width: 420px){
+    #laporanTable{ min-width:1180px!important; }
+    #summaryTable{ min-width:1080px!important; }
+
+    #laporanTable th:nth-child(2),
+    #laporanTable td:nth-child(2){
+      width:150px!important;
+      min-width:150px!important;
+      max-width:150px!important;
+    }
+
+    #summaryTable th.qcr-sticky-head,
+    #summaryTable th.qcr-sticky-col,
+    #summaryTable tbody th:first-child,
+    #summaryTable thead th:first-child{
+      width:140px!important;
+      min-width:140px!important;
+      max-width:140px!important;
+    }
+  }
+
 </style>
 
 <div class="qcr-page">
@@ -1792,8 +2387,8 @@
                       <i class="bi bi-shop me-1 text-primary"></i> Outlet
                     </label>
                       <select name="outlet_id" id="outletInput" class="form-select select2" required>
-                          <option value="all" {{ $outletId == 'all' ? 'selected' : '' }}>
-                              Semua Outlet
+                          <option value="" {{ empty($outletId) ? 'selected' : '' }} disabled>
+                              Wajib pilih outlet dulu
                           </option>
 
                           @foreach ($outletGroups as $groupKey => $group)
@@ -1808,14 +2403,14 @@
                     <label for="startDateInput" class="form-label">
                       <i class="bi bi-calendar-date me-1 text-primary"></i> Start
                     </label>
-                    <input type="date" name="start_date" id="startDateInput" class="form-control" value="{{ $start_date }}">
+                    <input type="date" name="start_date" id="startDateInput" class="form-control" value="{{ $start_date }}" required>
                   </div>
 
                   <div class="col-6 col-md-3 col-xl-2">
                     <label for="endDateInput" class="form-label">
                       <i class="bi bi-calendar-date me-1 text-primary"></i> End
                     </label>
-                    <input type="date" name="end_date" id="endDateInput" class="form-control" value="{{ $end_date }}">
+                    <input type="date" name="end_date" id="endDateInput" class="form-control" value="{{ $end_date }}" required>
                   </div>
 
                   <div class="col-6 col-md-3 col-xl-2">
@@ -1893,7 +2488,7 @@
             </div>
 
             <div class="qcr-summary-line after-hide">
-              <div class="qcr-summary-line-label">Data Setelah Dihapus Minus</div>
+              <div class="qcr-summary-line-label">Bahan Baku Minus</div>
               <div class="qcr-summary-line-value neg" id="qcrAfterMinusSelisihValue">
                 -Rp {{ number_format($qcrInitialMinusAfter, 0, ',', '.') }}
               </div>
@@ -1903,7 +2498,7 @@
             </div>
 
             <div class="qcr-summary-line after-hide">
-              <div class="qcr-summary-line-label">Data Setelah Dihapus Plus</div>
+              <div class="qcr-summary-line-label">Bahan Baku Plus</div>
               <div class="qcr-summary-line-value pos" id="qcrAfterPlusSelisihValue">
                 Rp {{ number_format($qcrInitialPlusAfter, 0, ',', '.') }}
               </div>
@@ -1914,7 +2509,9 @@
           </div>
         </div>
 
-        <div class="qcr-stat qcr-stat--compare">
+        {{-- Quality Cost after-minus/after-plus sementara di-hide karena rumus belum final. --}}
+        <div class="qcr-stat qcr-stat--compare d-none">
+
           <div class="qcr-stat-label">Quality Cost</div>
 
           @php
@@ -1967,23 +2564,53 @@
       <div class="card qcr-card mb-4">
         <div class="card-header">
           <div class="qcr-toolbar w-100 justify-content-between">
-            
-
-<h5 class="qcr-section-title">Tabel QCR</h5>
+            <h5 class="qcr-section-title">Tabel QCR</h5>
 
             <div class="qcr-actions">
               <input type="text" id="customSearch" class="form-control qcr-search" placeholder="Cari data...">
 
-              <a
-                href="{{ route('master.qcr.export', [
-                    'outlet_id' => $outletId,
-                    'start_date' => $start_date,
-                    'end_date' => $end_date,
-                ]) }}"
-                class="btn btn-excel"
-              >
-                <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
-              </a>
+                <button
+                    type="button"
+                    class="btn btn-excel"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalExportExcel"
+                >
+                    <i class="bi bi-file-earmark-excel me-1"></i>
+                    Export Excel
+                </button>
+                
+                <div class="modal fade" id="modalExportExcel" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    Export Excel QCR
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                
+                            <div class="modal-body">
+                                <div class="alert alert-warning mb-0">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    Fitur export queue sedang dinonaktifkan sementara.
+                                </div>
+                            </div>
+                
+                            <div class="modal-footer">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    data-bs-dismiss="modal"
+                                >
+                                    Tutup
+                                </button>
+            
+                            </div>
+                
+                        </div>
+                    </div>
+                </div>
 
               <button type="button" class="btn btn-uang-plus" id="btnManageUangPlus">
                 <i class="bi bi-cash-coin me-1"></i> Membelanjakan Uang Plus
@@ -2299,8 +2926,19 @@
                 <tr>
                   <th class="qcr-sticky-col">Price / Unit</th>
                   @foreach ($visibleBahan as $b)
+                    @php
+                      // FIX DISPLAY SAJA: harga outlet di QCR jangan dibulatkan 0 desimal.
+                      // Contoh 4956.71 harus tampil Rp 4.956,71, bukan Rp 4.957.
+                      // Logika perhitungan/HPP/usage tidak diubah.
+                      $priceUnit = (float) ($b->harga_bahan ?? 0);
+                      $priceUnitText = number_format($priceUnit, 2, ',', '.');
+
+                      if (str_contains($priceUnitText, ',')) {
+                          $priceUnitText = rtrim(rtrim($priceUnitText, '0'), ',');
+                      }
+                    @endphp
                     <td class="text-center">
-                      Rp {{ number_format($b->harga_bahan ?? 0, 0, ',', '.') }}
+                      Rp {{ $priceUnitText }}
                     </td>
                   @endforeach
                 </tr>
@@ -2516,7 +3154,7 @@
         /*
          | Variance Non-BOM / Operasional
          | - Minus 0 sampai 0,5% dari Total Sales = aman / beban perusahaan, disembunyikan dari tabel utama.
-         | - Minus di atas 0,5% = beban karyawan. Nilai beban dibulatkan ke atas per 1% sales.
+         | - Minus di atas 0,5% = beban. Nilai beban dibulatkan ke atas per 1% sales.
          |   Contoh: sales Rp 500.000 dan variance 0,51% => charge 1% x sales = Rp 5.000.
          */
         $totalSalesForVariance = max(0, (float) ($summary['sales'] ?? 0));
@@ -2579,7 +3217,7 @@
             <span class="qcr-range-badge">
               <span>{{ number_format($nonBomDisplayRows->count(), 0, ',', '.') }} tampil / {{ number_format($nonBomRows->count(), 0, ',', '.') }} bahan</span>
               <span>•</span>
-              <span>Beban karyawan: Rp {{ number_format($nonBomTotalLoss, 0, ',', '.') }}</span>
+              <span>Beban : Rp {{ number_format($nonBomTotalLoss, 0, ',', '.') }}</span>
             </span>
           </div>
         </div>
@@ -2607,11 +3245,11 @@
               <div class="qcr-nonbom-mini-value text-warning">{{ number_format($nonBomCompanyBurdenCount, 0, ',', '.') }}</div>
             </div>
             <div class="qcr-nonbom-mini">
-              <div class="qcr-nonbom-mini-label">Beban Karyawan > 0,5%</div>
+              <div class="qcr-nonbom-mini-label">Beban > 0,5%</div>
               <div class="qcr-nonbom-mini-value text-danger">{{ number_format($nonBomEmployeeBurdenCount, 0, ',', '.') }}</div>
             </div>
             <div class="qcr-nonbom-mini">
-              <div class="qcr-nonbom-mini-label">Total Beban Karyawan</div>
+              <div class="qcr-nonbom-mini-label">Total Beban</div>
               <div class="qcr-nonbom-mini-value text-danger">Rp {{ number_format($nonBomTotalLoss, 0, ',', '.') }}</div>
             </div>
           </div>
@@ -2872,7 +3510,7 @@
                         <thead>
                           <tr>
                             <th style="width:60px;">No</th>
-                            <th>Menu</th>
+                            <th>Nama Menu / Jenis Transaksi</th>
                             <th style="width:120px;">Qty</th>
                             <th style="width:160px;">Harga</th>
                             <th style="width:180px;">Subtotal</th>
@@ -2904,54 +3542,58 @@
                   </div>
                 </div>
 
-                <div class="col-12">
-                  <div class="uplus-card">
-                    <div class="uplus-label">Menu Terjual / Referensi Menu</div>
-                    <div class="uplus-table-wrap">
-                      <table class="table table-bordered table-hover align-middle uplus-table" id="uplusMenuTable">
-                        <thead>
-                          <tr>
-                            <th style="width:60px;">No</th>
-                            <th>Nama Menu</th>
-                            <th style="width:140px;">Tipe</th>
-                            <th style="width:120px;">Unit Sold</th>
-                            <th style="width:160px;">Harga</th>
-                            <th style="width:180px;">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @php $uplusNo = 1; @endphp
-                          @forelse ($menuData as $key => $data)
-                            @php
-                              $namaMenu = $data['nama_menu'] ?? (is_string($key) ? $key : '-');
-                              $tipeMenu = $data['tipe'] ?? 'Regular';
-                              $unitSold = (float) ($data['unit_sold'] ?? 0);
-                              $harga    = (float) ($data['harga'] ?? 0);
-                              $total    = (float) ($data['total_sales'] ?? ($unitSold * $harga));
-                            @endphp
-                            <tr
-                              data-menu-name="{{ $namaMenu }}"
-                              data-menu-type="{{ $tipeMenu }}"
-                              data-menu-price="{{ $harga }}"
-                            >
-                              <td class="text-center">{{ $uplusNo++ }}</td>
-                              <td class="fw-semibold">{{ $namaMenu }}</td>
-                              <td class="text-center">{{ $tipeMenu }}</td>
-                              <td class="text-center">{{ number_format($unitSold, 0, ',', '.') }}</td>
-                              <td class="text-end">Rp {{ number_format($harga, 0, ',', '.') }}</td>
-                              <td class="text-end">Rp {{ number_format($total, 0, ',', '.') }}</td>
-                            </tr>
-                          @empty
-                            <tr>
-                              <td colspan="6" class="uplus-empty">Belum ada menu referensi.</td>
-                            </tr>
-                          @endforelse
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
 
+              </div>
+            </div>
+            
+            <div class="uplus-card mt-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <div class="uplus-label mb-0">History Pembelian Uang Plus</div>
+                  <div class="small text-muted">Riwayat penukaran uang plus sesuai filter aktif.</div>
+                </div>
+              </div>
+            
+              <div class="uplus-table-wrap">
+                <table class="table table-bordered table-hover align-middle uplus-table mb-0">
+                  <thead>
+                    <tr>
+                      <th style="width:60px;">No</th>
+                      <th>Waktu</th>
+                      <th>Outlet</th>
+                      <th>Nama Menu</th>
+                      <th class="text-end">Saldo Awal</th>
+                      <th class="text-end">Belanja</th>
+                      <th class="text-end">Sisa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @forelse (($qcrUangPlusHistory ?? collect()) as $i => $h)
+                      @php
+                        $tanggalHistory = $h->sesi_tanggal ?? $h->created_at ?? null;
+                        $jamHistory = $h->tr_waktu ?? null;
+                        $waktuHistory = $tanggalHistory
+                            ? \Carbon\Carbon::parse($tanggalHistory)->format('d-m-Y') . ($jamHistory ? ' ' . substr((string) $jamHistory, 0, 5) : '')
+                            : '-';
+                      @endphp
+                      <tr>
+                        <td class="text-center">{{ $i + 1 }}</td>
+                        <td>{{ $waktuHistory }}</td>
+                        <td>{{ $h->nama_outlet ?? ('Outlet ID '.$h->outlet_id) }}</td>
+                        <td>{{ $h->item_nama ?? '-' }}</td>
+                        <td class="text-end">Rp {{ number_format($h->saldo_awal ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold text-warning">Rp {{ number_format($h->total_belanja ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-end fw-bold">Rp {{ number_format($h->saldo_sisa ?? 0, 0, ',', '.') }}</td>
+                      </tr>
+                    @empty
+                      <tr>
+                        <td colspan="7" class="uplus-empty">
+                          Belum ada history pembelian uang plus pada filter ini.
+                        </td>
+                      </tr>
+                    @endforelse
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -3172,25 +3814,37 @@
 <script>
         $(document).ready(function() {
           const $table = $('#laporanTable');
+          const isQcrMobile = window.matchMedia('(max-width: 767.98px)').matches;
 
           if ($.fn.DataTable.isDataTable('#laporanTable')) {
             $table.DataTable().destroy();
           }
 
-          const isQcrMobile = window.matchMedia('(max-width: 767.98px)').matches;
+          if (isQcrMobile) {
+            // Mobile: tetap tabel biasa, tanpa DataTables scroll/freeze.
+            // Ini mencegah header/body pecah dan fixed column menutup isi.
+            $('#customSearch').off('keyup.qcrMobile').on('keyup.qcrMobile', function() {
+              const q = (this.value || '').toLowerCase();
+              $('#laporanTable tbody tr').each(function() {
+                const text = ($(this).text() || '').toLowerCase();
+                $(this).toggle(text.includes(q));
+              });
+            });
+            return;
+          }
 
           let table = $table.DataTable({
             destroy: true,
             paging: false,
-            ordering: !isQcrMobile,
+            ordering: true,
             searching: true,
             info: false,
             scrollX: true,
-            scrollY: isQcrMobile ? "72vh" : "500px",
+            scrollY: "500px",
             scrollCollapse: true,
             autoWidth: false,
             dom: 'rt',
-            fixedColumns: isQcrMobile ? false : {
+            fixedColumns: {
               left: 3,
               right: 0
             }
@@ -3200,7 +3854,7 @@
             table.columns.adjust().draw(false);
           }, 250);
 
-          $('#customSearch').off('keyup').on('keyup', function() {
+          $('#customSearch').off('keyup.qcrDesktop').on('keyup.qcrDesktop', function() {
             table.search(this.value).draw();
           });
 
@@ -3208,13 +3862,15 @@
           $(window).on('resize.qcrTable', function(){
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(function(){
-              table.columns.adjust().draw(false);
+              if ($.fn.DataTable.isDataTable('#laporanTable')) {
+                table.columns.adjust().draw(false);
+              }
             }, 180);
           });
         });
 
-          // Non-BOM sengaja tidak pakai DataTables.
-          // Tabel desktop memakai wrapper scroll manual, mobile memakai card list agar responsive.
+          // Non-BOM tidak pakai DataTables.
+          // Desktop dan mobile sama-sama tabel scroll manual agar bentuknya konsisten.
       </script>
 <script>
         const containers = document.querySelectorAll('.qcr-table-wrap');
@@ -3259,6 +3915,21 @@
     });
   });
 </script>
+<script>
+  /*
+   |--------------------------------------------------------------------------
+   | DATA MENU UANG PLUS
+   |--------------------------------------------------------------------------
+   | Source dari controller:
+   | $qcrUangPlusMenuOptions
+   |
+   | Format option:
+   | Nama Menu | Harga | Jenis Transaksi
+   |--------------------------------------------------------------------------
+   */
+  window.qcrUangPlusMenuOptions = @json(collect($qcrUangPlusMenuOptions ?? [])->values());
+</script>
+
 <script>
   $(document).ready(function() {
     const uangPlusModalEl = document.getElementById('uangPlusModal');
@@ -3343,22 +4014,32 @@
       const $select = $('#uplusMenuSelect');
       $select.empty().append('<option value="">-- Pilih menu --</option>');
 
-      $('#uplusMenuTable tbody tr').each(function() {
-        const name = $(this).data('menu-name');
-        const type = $(this).data('menu-type');
-        const price = $(this).data('menu-price');
+      const menus = Array.isArray(window.qcrUangPlusMenuOptions)
+        ? window.qcrUangPlusMenuOptions
+        : [];
 
-        if (name !== undefined && price !== undefined) {
-          $select.append(`
-            <option
-              value="${name}"
-              data-type="${type}"
-              data-price="${price}"
-            >
-              ${name} - ${type} - ${formatRupiah(price)}
-            </option>
-          `);
+      menus.forEach(function(menu) {
+        const name = menu.nama_menu || '';
+        const type = menu.jenis_transaksi || menu.tipe || 'Regular';
+        const price = Number(menu.harga || 0);
+        const category = menu.kategori || '';
+        const key = menu.key || `${name}||${type}||${price}`;
+
+        if (!name) {
+          return;
         }
+
+        $select.append(`
+          <option
+            value="${key}"
+            data-name="${name}"
+            data-type="${type}"
+            data-price="${price}"
+            data-category="${category}"
+          >
+            ${name} | ${formatRupiah(price)} | ${type}
+          </option>
+        `);
       });
     }
 
@@ -3403,7 +4084,7 @@
 
     $('#btnTambahUangPlusItem').on('click', function() {
       const selected = $('#uplusMenuSelect').find(':selected');
-      const namaMenu = selected.val();
+      const namaMenu = selected.data('name') || '';
       const tipe = selected.data('type') || 'Regular';
       const harga = Number(selected.data('price') || 0);
       const qty = Number($('#uplusQty').val() || 0);

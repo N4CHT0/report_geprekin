@@ -88,6 +88,11 @@
                                 <span class="text-danger" style="font-size: 0.70rem;" id="bdMinusHarga">-0.00%</span>
                             </div>
                         </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top" id="bdBonusOptimismeContainer" style="display: none;">
+                            <span class="text-primary small fw-bold"><i class="bi bi-rocket-takeoff-fill me-1"></i> Faktor Optimisme (Ekstra)</span>
+                            <b class="text-success small" id="bdBonusOptimisme">+0.00%</b>
+                        </div>
                     </div>
 
                     <!-- Traffic Efektif -->
@@ -152,7 +157,7 @@
                         <div class="mt-3 pt-3 border-top" style="border-style: dashed !important; border-color: #e2e8f0 !important;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">TARGET KONTRIBUSI (HARIAN)</span>
-                                <span class="badge bg-light text-secondary border" style="font-size: 0.65rem; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#modalAdvancedConfig" title="Atur Rasio"><i class="bi bi-gear"></i> Rasio</span>
+                                <span class="badge bg-warning text-dark border shadow-sm px-2 py-1 pulse-button" style="font-size: 0.70rem; cursor: pointer;" onclick="document.getElementById('section-konfigurasi').scrollIntoView({behavior: 'smooth'}); if(document.getElementById('config-body').style.display === 'none') toggleConfig();" title="Koreksi Rasio Secara Manual"><i class="bi bi-gear-fill"></i> Sesuaikan Manual</span>
                             </div>
                             
                             <div class="d-flex justify-content-between align-items-center mb-1">

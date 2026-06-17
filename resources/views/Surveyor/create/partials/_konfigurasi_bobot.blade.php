@@ -214,6 +214,27 @@ function togglePanduan() {
                     </div>
 
                     <div class="field-col-12 border-bottom pb-1 mb-2 mt-3">
+                        <span class="fw-bold text-primary" style="font-size:14px;"><i class="bi bi-geo-alt-fill me-2"></i> Algoritma Kanibalisasi Internal (Market Capacity)</span>
+                    </div>
+                    
+                    <div class="field-col-6">
+                        <label class="field-label">Radius Max Kanibal (Aman > X m)</label>
+                        <input type="number" step="50" class="cell-input yellow-cell config-cannibal" data-cannibal="max_radius" value="1500" placeholder="1500">
+                    </div>
+                    <div class="field-col-6">
+                        <label class="field-label">Radius Sangat Rawan (Maksimum Penalti)</label>
+                        <input type="number" step="50" class="cell-input yellow-cell config-cannibal" data-cannibal="critical_radius" value="800" placeholder="800">
+                    </div>
+                    <div class="field-col-6">
+                        <label class="field-label">Threshold Pasar Super Padat (Q1-Q4)</label>
+                        <input type="number" step="100" class="cell-input yellow-cell config-cannibal" data-cannibal="super_dense" value="3000" placeholder="3000">
+                    </div>
+                    <div class="field-col-6">
+                        <label class="field-label">Threshold Pasar Sempit (Q1-Q4)</label>
+                        <input type="number" step="100" class="cell-input yellow-cell config-cannibal" data-cannibal="narrow_market" value="1500" placeholder="1500">
+                    </div>
+
+                    <div class="field-col-12 border-bottom pb-1 mb-2 mt-3">
                         <span class="fw-bold text-primary" style="font-size:14px;"><i class="bi bi-building me-2"></i> Bobot Bonus Fisik Bangunan (Max Penambah %)</span>
                     </div>
 
@@ -443,7 +464,8 @@ function updateCustomJson() {
         traffic: {},
         pedestrian: {},
         elit: {},
-        multipliers: {}
+        multipliers: {},
+        cannibal: {}
     };
     
     document.querySelectorAll('.config-weight').forEach(el => {
@@ -485,6 +507,10 @@ function updateCustomJson() {
     document.querySelectorAll('.config-multiplier').forEach(el => {
         json.multipliers[el.dataset.multiplier] = parseFloat(el.value) || 1.0;
     });
+
+    document.querySelectorAll('.config-cannibal').forEach(el => {
+        json.cannibal[el.dataset.cannibal] = parseFloat(el.value) || 0;
+    });
     
     document.getElementById('custom_weights_json').value = JSON.stringify(json);
 }
@@ -494,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleConfigInputs();
     
     // Bind change events
-    document.querySelectorAll('.config-weight, .config-ratio, .config-keyword, .config-cap, .config-extra, .config-heuristic, .config-traffic, .config-pedestrian, .config-elit, .config-multiplier').forEach(el => {
+    document.querySelectorAll('.config-weight, .config-ratio, .config-keyword, .config-cap, .config-extra, .config-heuristic, .config-traffic, .config-pedestrian, .config-elit, .config-multiplier, .config-cannibal').forEach(el => {
         el.addEventListener('input', () => {
             updateCustomJson();
             if (typeof hitungLiveScore === 'function') hitungLiveScore();
@@ -554,6 +580,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (parsed.multipliers) {
                 document.querySelectorAll('.config-multiplier').forEach(el => {
                     if (parsed.multipliers[el.dataset.multiplier] !== undefined) el.value = parsed.multipliers[el.dataset.multiplier];
+                });
+            }
+            if (parsed.cannibal) {
+                document.querySelectorAll('.config-cannibal').forEach(el => {
+                    if (parsed.cannibal[el.dataset.cannibal] !== undefined) el.value = parsed.cannibal[el.dataset.cannibal];
                 });
             }
         } catch(e) { console.error('Error parsing custom config', e); }

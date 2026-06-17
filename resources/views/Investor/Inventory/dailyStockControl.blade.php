@@ -1,11 +1,12 @@
+<!-- INI ADALAH BLADE DAILYSTOCKCONTROL -->
 {{-- EXPORT STOCK OPNAME TEMPLATE --}}
 @section('title', 'Daily Stock Control')
 @section('breadcrumb', 'Inventory / DSC')
 
 @include('Temp.Investor.header')
 
-{{-- Alpine dipertahankan untuk komponen ADJUSTMENT. Tailwind CDN dihapus agar halaman lebih ringan. --}}
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{{-- ADJUSTMENT disembunyikan sementara, Alpine tidak diload agar halaman lebih ringan. --}}
+{{-- <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
 
 @php
     $startDate = $startDate ?? request('start_date', '');
@@ -13,7 +14,7 @@
     $missingOutlets = $missingOutlets ?? [];
     $missingCheckStartDate = $missingCheckStartDate ?? \Carbon\Carbon::parse($today ?? date('Y-m-d'))->subDay()->format('Y-m-d');
     $missingCheckEndDate = $missingCheckEndDate ?? $missingCheckStartDate;
-    $missingCount = is_countable($missingOutlets) ? count($missingOutlets) : 0;
+    $missingCount = $missingCount ?? (is_countable($missingOutlets) ? count($missingOutlets) : 0);
 @endphp
 
 @php
@@ -30,12 +31,73 @@
 
     $rekapRows = $rekapRows ?? [];
     $shiftRows = $shiftRows ?? [];
+    $periodRows = $periodRows ?? [];
+    $periodSummary = $periodSummary ?? [];
+    $periodStartDate = $periodStartDate ?? ($startDate ?: $today);
+    $periodEndDate = $periodEndDate ?? ($endDate ?: $periodStartDate);
+    $periodMaxDays = $periodMaxDays ?? 31;
+    $periodLabel = \Carbon\Carbon::parse($periodStartDate)->format('d-m-Y') . ' s/d ' . \Carbon\Carbon::parse($periodEndDate)->format('d-m-Y');
+    $isPeriodLoaded = (bool) ($isPeriodLoaded ?? request()->boolean('load_period') || request('active_tab') === 'periode');
+    $periodLoadUrl = request()->fullUrlWithQuery(['load_period' => 1, 'active_tab' => 'periode']);
+    $rapelOutletId = (int) ($selectedOutletIds[0] ?? 0);
+
+    // Data existing untuk modal Rapel/Revisi Uang Plus.
+    // Diisi dari detail shift yang sudah dibangun controller: draft lebih dulu, fallback final.
+    // Tambahan aman: __all__ hanya untuk tampilan total semua bahan di modal, tidak mengubah rumus.
+    $rapelExistingMap = [];
+    foreach (collect($shiftRows ?? []) as $row) {
+        $shiftKey = (string) data_get($row, 'shift', '');
+        $bahanKey = (string) data_get($row, 'bahan_id', '');
+        if ($shiftKey !== '' && $bahanKey !== '') {
+            $uangExisting = (float) (data_get($row, 'uang') ?? data_get($row, 'uang_plus') ?? 0);
+            $ketExisting = (string) (data_get($row, 'ket') ?? data_get($row, 'keterangan') ?? '');
+            $sourceExisting = (string) (data_get($row, 'source') ?? '');
+
+            $rapelExistingMap[$shiftKey][$bahanKey] = [
+                'uang_plus' => $uangExisting,
+                'keterangan' => $ketExisting,
+                'source' => $sourceExisting,
+                'nama' => (string) (data_get($row, 'nama') ?? data_get($row, 'nama_bahan') ?? ''),
+            ];
+
+            if (!isset($rapelExistingMap[$shiftKey]['__all__'])) {
+                $rapelExistingMap[$shiftKey]['__all__'] = [
+                    'uang_plus' => 0,
+                    'keterangan' => '',
+                    'source' => '',
+                    'nama' => 'Semua Bahan',
+                ];
+            }
+
+            $rapelExistingMap[$shiftKey]['__all__']['uang_plus'] += $uangExisting;
+
+            if ($ketExisting !== '') {
+                // FIX tampilan existing: jangan ulang keterangan yang sama puluhan kali.
+                $existingKetParts = collect(explode('|', $rapelExistingMap[$shiftKey]['__all__']['keterangan'] ?? ''))
+                    ->merge(explode('|', $ketExisting))
+                    ->map(fn ($v) => trim((string) $v))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                $rapelExistingMap[$shiftKey]['__all__']['keterangan'] = $existingKetParts->implode(' | ');
+            }
+
+            if ($sourceExisting === 'draft') {
+                $rapelExistingMap[$shiftKey]['__all__']['source'] = 'draft';
+            } elseif ($rapelExistingMap[$shiftKey]['__all__']['source'] === '') {
+                $rapelExistingMap[$shiftKey]['__all__']['source'] = $sourceExisting;
+            }
+        }
+    }
 
     // MODE RINGAN: sebelum outlet dipilih, jangan render data besar ke tabel.
     // Ini mencegah halaman berat karena semua row DSC/shift/ADJUSTMENT tidak dibangun di Blade.
     if (!$hasRequiredFilter) {
         $rekapRows = [];
         $shiftRows = [];
+        $periodRows = [];
+        $periodSummary = [];
     }
 
     $omsetActive = $omsetActive ?? [
@@ -58,7 +120,9 @@
     ];
 
     $role = auth()->user()->role ?? null;
-    $canADJUSTMENT = in_array($role, ['superadmin', 'superadmin_audit', 'tm_manager', 'spv'], true);
+    // ADJUSTMENT DI-HIDE SEMENTARA.
+    // Tab lain tetap tampil: REKAP, PERIODE DSC, DETAIL PER SHIFT, OMSET & SETORAN, SALES.
+    $canADJUSTMENT = false;
 
     // Tampilan outlet dibuat bersih: tanpa array/group id, tanpa kode unik, tanpa daftar ID panjang.
     $cleanOutletName = function ($value) {
@@ -76,26 +140,38 @@
 
 <style>
     :root{
-        --aws-bg:#f7f8fa;
-        --aws-card:#ffffff;
-        --aws-text:#16191f;
-        --aws-muted:#5f6b7a;
-        --aws-line:#d5dbdb;
-        --aws-line-soft:#e9ebed;
-        --aws-blue:#0972d3;
-        --aws-blue-dark:#033160;
-        --aws-green:#037f0c;
-        --aws-red:#d13212;
-        --aws-orange:#b7791f;
-        --aws-radius:8px;
-        --aws-shadow:0 1px 2px rgba(15,23,42,.06);
-        --aws-focus:0 0 0 3px rgba(9,114,211,.18);
+        --dsc-bg:#f5f7fb;
+        --dsc-card:#ffffff;
+        --dsc-soft:#f8fafc;
+        --dsc-text:#111827;
+        --dsc-muted:#64748b;
+        --dsc-line:#d9e0e8;
+        --dsc-line-soft:#edf1f5;
+        --dsc-primary:#0972d3;
+        --dsc-primary-dark:#033160;
+        --dsc-success:#038b18;
+        --dsc-danger:#d13212;
+        --dsc-warning:#b7791f;
+        --dsc-radius:14px;
+        --dsc-radius-sm:10px;
+        --dsc-shadow:0 8px 24px rgba(15,23,42,.06);
+        --dsc-focus:0 0 0 3px rgba(9,114,211,.20);
+        --dsc-page-pad:clamp(12px,2.2vw,24px);
     }
 
+    *, *::before, *::after{ box-sizing:border-box; }
+
+    html, body{ max-width:100%; overflow-x:hidden; }
+
     .dsc-shell{
+        width:100%;
+        max-width:100%;
+        min-width:0;
         display:flex;
         flex-direction:column;
-        gap:16px;
+        gap:clamp(12px,2vw,18px);
+        padding:var(--dsc-page-pad);
+        color:var(--dsc-text);
     }
 
     .dsc-page,
@@ -104,23 +180,28 @@
     .dsc-body,
     .tab-content,
     .tab-pane{
+        width:100%;
+        min-width:0;
         background:transparent;
         border:0;
         overflow:visible;
     }
 
     .dsc-header{
+        width:100%;
         display:flex;
-        align-items:flex-end;
+        align-items:flex-start;
         justify-content:space-between;
-        gap:16px;
+        gap:14px;
         flex-wrap:wrap;
-        padding-bottom:14px;
-        border-bottom:1px solid var(--aws-line);
-        margin-bottom:0;
+        padding:0 0 14px;
+        border-bottom:1px solid var(--dsc-line);
     }
 
+    .dsc-header > .d-flex{ width:100%; min-width:0; }
+
     .dsc-title{
+        min-width:0;
         display:flex;
         align-items:center;
         gap:10px;
@@ -129,38 +210,45 @@
 
     .dsc-title h4{
         margin:0;
-        font-size:1.5rem;
-        font-weight:700;
+        max-width:100%;
+        font-size:clamp(1.1rem,2vw,1.55rem);
+        line-height:1.15;
+        font-weight:800;
         letter-spacing:-.02em;
-        color:var(--aws-text);
+        color:var(--dsc-text);
+        overflow-wrap:anywhere;
     }
 
     .dsc-title-mark{
-        width:36px;
-        height:36px;
+        width:40px;
+        height:40px;
+        flex:0 0 40px;
         display:grid;
         place-items:center;
-        border-radius:8px;
-        background:#f1f8ff;
-        color:var(--aws-blue);
+        border-radius:12px;
+        background:#eef7ff;
+        color:var(--dsc-primary);
         border:1px solid #b6d7f5;
     }
 
-    .dsc-badge{
+    .dsc-badge,
+    .badge-wh{
         display:inline-flex;
         align-items:center;
         gap:6px;
-        padding:5px 9px;
+        padding:6px 10px;
         border-radius:999px;
-        background:#f1f8ff;
-        color:var(--aws-blue);
+        background:#eef7ff;
+        color:var(--dsc-primary);
         border:1px solid #b6d7f5;
         font-size:.72rem;
-        font-weight:800;
+        font-weight:900;
+        line-height:1;
         white-space:nowrap;
     }
 
     .dsc-toolbar{
+        min-width:0;
         display:flex;
         gap:8px;
         flex-wrap:wrap;
@@ -179,105 +267,84 @@
     .dsc-bell-wrap{ position:relative; }
     .dsc-bell-btn{
         position:relative;
-        width:38px;
-        height:38px;
+        width:40px;
+        height:40px;
         display:grid;
         place-items:center;
-        border:1px solid var(--aws-line)!important;
-        background:#fff!important;
-        color:var(--aws-text)!important;
-        border-radius:8px!important;
+        border:1px solid var(--dsc-line)!important;
+        background:var(--dsc-card)!important;
+        color:var(--dsc-text)!important;
+        border-radius:12px!important;
     }
     .dsc-bell-count{
         position:absolute;
         top:-7px;
         right:-7px;
-        min-width:20px;
-        height:20px;
+        min-width:21px;
+        height:21px;
         padding:0 5px;
         display:grid;
         place-items:center;
         border-radius:999px;
-        background:var(--aws-red);
+        background:var(--dsc-danger);
         color:#fff;
         font-size:.68rem;
         font-weight:900;
-        border:2px solid #fff;
+        border:2px solid var(--dsc-card);
     }
     .dsc-bell-panel{
-        min-width:360px;
-        max-width:440px;
+        width:min(92vw,440px);
+        min-width:min(92vw,360px);
         padding:0;
-        border:1px solid var(--aws-line);
-        border-radius:10px;
+        border:1px solid var(--dsc-line);
+        border-radius:14px;
         box-shadow:0 18px 48px rgba(15,23,42,.18);
         overflow:hidden;
     }
     .dsc-bell-head{
         padding:12px 14px;
-        background:#fbfbfb;
-        border-bottom:1px solid var(--aws-line);
+        background:var(--dsc-soft);
+        border-bottom:1px solid var(--dsc-line);
         font-weight:900;
-        color:var(--aws-text);
+        color:var(--dsc-text);
     }
-    .dsc-bell-body{ max-height:360px; overflow:auto; }
+    .dsc-bell-body{ max-height:360px; overflow:auto; -webkit-overflow-scrolling:touch; }
     .dsc-bell-item{
         padding:10px 14px;
-        border-bottom:1px solid var(--aws-line-soft);
+        border-bottom:1px solid var(--dsc-line-soft);
         font-weight:700;
     }
-    .dsc-bell-item small{ color:var(--aws-muted); font-weight:700; }
+    .dsc-bell-item small{ color:var(--dsc-muted); font-weight:700; }
     .dsc-bell-foot{
         padding:10px 14px;
-        background:#fff;
-        color:var(--aws-muted);
+        background:var(--dsc-card);
+        color:var(--dsc-muted);
         font-size:.78rem;
         font-weight:700;
     }
 
-
     .btn{
-        border-radius:8px!important;
-        font-weight:700!important;
+        min-height:40px;
+        border-radius:10px!important;
+        font-weight:800!important;
         box-shadow:none!important;
         transform:none!important;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:4px;
     }
-
-    .btn-sm{
-        padding:.42rem .72rem;
-        font-size:.84rem;
-    }
-
-    .btn-primary{
-        background:var(--aws-blue)!important;
-        border-color:var(--aws-blue)!important;
-    }
-
+    .btn-sm{ padding:.45rem .75rem; font-size:.82rem; }
+    .btn-primary{ background:var(--dsc-primary)!important; border-color:var(--dsc-primary)!important; }
     .btn-primary:hover,
-    .btn-primary:focus{
-        background:var(--aws-blue-dark)!important;
-        border-color:var(--aws-blue-dark)!important;
-    }
-
-    .btn-success{
-        background:var(--aws-green)!important;
-        border-color:var(--aws-green)!important;
-    }
-
-    .btn-ghost{
-        background:#fff!important;
-        border:1px solid var(--aws-line)!important;
-        color:#414d5c!important;
-    }
-
-    .btn-ghost:hover{
-        background:#f2f3f3!important;
-        color:var(--aws-text)!important;
-    }
+    .btn-primary:focus{ background:var(--dsc-primary-dark)!important; border-color:var(--dsc-primary-dark)!important; }
+    .btn-success{ background:var(--dsc-success)!important; border-color:var(--dsc-success)!important; }
+    .btn-ghost{ background:var(--dsc-card)!important; border:1px solid var(--dsc-line)!important; color:#414d5c!important; }
+    .btn-ghost:hover{ background:#f2f6fb!important; color:var(--dsc-text)!important; }
 
     .dsc-meta-grid{
         display:grid;
-        grid-template-columns:1.4fr .7fr;
+        grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);
         gap:14px;
         margin:16px 0 0;
     }
@@ -286,57 +353,43 @@
     .kpi,
     .soft-alert,
     .dsc-filter-bar{
-        background:#fff;
-        border:1px solid var(--aws-line);
-        border-radius:var(--aws-radius);
-        box-shadow:var(--aws-shadow);
+        min-width:0;
+        background:var(--dsc-card);
+        border:1px solid var(--dsc-line);
+        border-radius:var(--dsc-radius);
+        box-shadow:var(--dsc-shadow);
     }
 
     .dsc-card .dsc-card-head{
         padding:13px 14px;
-        border-bottom:1px solid var(--aws-line);
-        background:#fbfbfb;
-        color:var(--aws-text);
-        font-weight:700;
+        border-bottom:1px solid var(--dsc-line);
+        background:var(--dsc-soft);
+        color:var(--dsc-text);
+        font-weight:800;
     }
-
-    .dsc-card .dsc-card-body{
-        padding:14px;
-    }
+    .dsc-card .dsc-card-body{ padding:14px; min-width:0; }
 
     .dsc-kv{
         display:grid;
-        grid-template-columns:170px 1fr;
+        grid-template-columns:minmax(120px,170px) minmax(0,1fr);
         gap:8px 14px;
         font-size:.9rem;
-        align-items:center;
+        align-items:start;
     }
-
-    .dsc-kv .k{
-        color:var(--aws-muted);
-        font-weight:700;
-    }
-
-    .dsc-kv .v{
-        color:var(--aws-text);
-        font-weight:700;
-    }
+    .dsc-kv .k{ color:var(--dsc-muted); font-weight:800; }
+    .dsc-kv .v{ color:var(--dsc-text); font-weight:800; min-width:0; overflow-wrap:anywhere; }
 
     .dsc-note{
-        padding:10px 12px;
+        padding:11px 12px;
         border:1px solid #b6d7f5;
-        background:#f1f8ff;
-        border-radius:var(--aws-radius);
-        color:var(--aws-blue-dark);
-        font-weight:600;
+        background:#eef7ff;
+        border-radius:var(--dsc-radius-sm);
+        color:var(--dsc-primary-dark);
+        font-weight:700;
         font-size:.84rem;
+        line-height:1.45;
     }
-
-    .dsc-help{
-        color:var(--aws-muted);
-        font-size:.82rem;
-        font-weight:600;
-    }
+    .dsc-help{ color:var(--dsc-muted); font-size:.82rem; font-weight:700; line-height:1.4; }
 
     .kpi-grid{
         display:grid;
@@ -344,7 +397,6 @@
         gap:14px;
         margin:14px 0 0;
     }
-
     .kpi{
         display:flex;
         align-items:center;
@@ -352,101 +404,68 @@
         gap:12px;
         padding:14px;
     }
-
-    .kpi .label{
-        font-size:.78rem;
-        color:var(--aws-muted);
-        font-weight:700;
-        margin-bottom:4px;
-    }
-
-    .kpi .value{
-        font-size:1.08rem;
-        font-weight:800;
-        color:var(--aws-text);
-        line-height:1.2;
-    }
-
+    .kpi .label{ font-size:.78rem; color:var(--dsc-muted); font-weight:800; margin-bottom:5px; }
+    .kpi .value{ font-size:clamp(1rem,2vw,1.16rem); font-weight:900; color:var(--dsc-text); line-height:1.2; overflow-wrap:anywhere; }
     .kpi .icon{
-        width:42px;
-        height:42px;
+        width:44px;
+        height:44px;
+        flex:0 0 44px;
         display:grid;
         place-items:center;
-        border-radius:8px;
-        background:#f8f9fa;
-        border:1px solid var(--aws-line);
-        font-size:1rem;
+        border-radius:12px;
+        background:#f8fafc;
+        border:1px solid var(--dsc-line);
+        font-size:1.05rem;
     }
+    .kpi.primary .icon{ background:#eef7ff;color:var(--dsc-primary);border-color:#b6d7f5; }
+    .kpi.success .icon{ background:#ecfdf3;color:var(--dsc-success);border-color:#b7e4bf; }
+    .kpi.warning .icon{ background:#fff7ed;color:var(--dsc-warning);border-color:#f8d7a0; }
 
-    .kpi.primary .icon{ background:#f1f8ff;color:var(--aws-blue);border-color:#b6d7f5; }
-    .kpi.success .icon{ background:#ecfdf3;color:var(--aws-green);border-color:#b7e4bf; }
-    .kpi.warning .icon{ background:#fff7ed;color:var(--aws-orange);border-color:#f8d7a0; }
-
-    .dsc-filter-bar{
-        padding:14px;
-        margin:16px 0;
-    }
-
+    .dsc-filter-bar{ padding:14px; margin:16px 0; }
     .filter-grid{
         display:grid;
-        grid-template-columns:1.35fr .65fr .55fr 1fr auto;
+        grid-template-columns:minmax(260px,1.35fr) minmax(160px,.65fr) minmax(160px,.65fr) minmax(130px,.45fr) minmax(220px,1fr) auto;
         gap:12px;
         align-items:end;
     }
-
+    .filter-item{ min-width:0; }
     .filter-item label,
-    .form-label{
-        display:block;
-        color:var(--aws-text);
-        font-size:.78rem;
-        font-weight:700;
-        margin-bottom:5px;
-    }
+    .form-label{ display:block; color:var(--dsc-text); font-size:.78rem; font-weight:900; margin-bottom:6px; }
 
     .form-control,
     .form-select{
-        min-height:38px;
-        border-radius:8px!important;
-        border:1px solid var(--aws-line)!important;
+        width:100%;
+        min-height:42px;
+        border-radius:12px!important;
+        border:1px solid var(--dsc-line)!important;
         box-shadow:none!important;
-        color:var(--aws-text);
+        color:var(--dsc-text);
+        background:var(--dsc-card);
         font-size:.9rem;
-        font-weight:600;
+        font-weight:700;
     }
-
     .form-control:focus,
-    .form-select:focus{
-        border-color:var(--aws-blue)!important;
-        box-shadow:var(--aws-focus)!important;
-    }
+    .form-select:focus{ border-color:var(--dsc-primary)!important; box-shadow:var(--dsc-focus)!important; }
 
     .nav-pills{
+        width:100%;
+        min-width:0;
         gap:4px;
         margin-bottom:16px!important;
-        border-bottom:1px solid var(--aws-line);
+        border-bottom:1px solid var(--dsc-line);
         flex-wrap:wrap;
     }
-
     .nav-pills .nav-link{
         position:relative;
-        border-radius:0!important;
+        border-radius:10px 10px 0 0!important;
         border:0;
         background:transparent;
-        color:var(--aws-muted);
-        font-weight:700;
-        padding:10px 12px;
+        color:var(--dsc-muted);
+        font-weight:900;
+        padding:11px 13px;
     }
-
-    .nav-pills .nav-link:hover{
-        background:#f2f8fd;
-        color:var(--aws-blue);
-    }
-
-    .nav-pills .nav-link.active{
-        background:transparent!important;
-        color:var(--aws-blue)!important;
-    }
-
+    .nav-pills .nav-link:hover{ background:#eef7ff; color:var(--dsc-primary); }
+    .nav-pills .nav-link.active{ background:transparent!important; color:var(--dsc-primary)!important; }
     .nav-pills .nav-link.active::after{
         content:"";
         position:absolute;
@@ -454,108 +473,68 @@
         right:10px;
         bottom:-1px;
         height:3px;
-        background:var(--aws-blue);
+        background:var(--dsc-primary);
         border-radius:999px 999px 0 0;
     }
 
     .dsc-scroll,
     .dsc-scroll-y{
-        background:#fff;
-        border:1px solid var(--aws-line);
-        border-radius:var(--aws-radius);
-        box-shadow:var(--aws-shadow);
+        width:100%;
+        min-width:0;
+        background:var(--dsc-card);
+        border:1px solid var(--dsc-line);
+        border-radius:var(--dsc-radius);
+        box-shadow:var(--dsc-shadow);
         overflow:auto;
         -webkit-overflow-scrolling:touch;
+        overscroll-behavior:contain;
     }
-
     .dsc-scroll{ max-height:680px; }
-    .dsc-scroll-y{ max-height:680px; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; }
-
-    .dsc-scroll-x{
-        overflow:auto;
-        -webkit-overflow-scrolling:touch;
-        touch-action:pan-x pan-y;
-    }
-
-    .dsc-scroll-x > table{
-        width:max-content;
-        min-width:100%;
-    }
+    .dsc-scroll-y{ max-height:680px; overflow-y:auto; overflow-x:hidden; }
+    .dsc-scroll-x{ width:100%; max-width:100%; overflow:auto; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; }
+    .dsc-scroll-x > table{ width:max-content; min-width:100%; }
 
     .dsc-table{
         width:100%;
         margin:0!important;
-        color:var(--aws-text);
+        color:var(--dsc-text);
         vertical-align:middle;
         font-size:.86rem;
         border-collapse:separate;
         border-spacing:0;
     }
-
     .dsc-table th,
     .dsc-table td{
-        border-bottom:1px solid var(--aws-line-soft)!important;
+        border-bottom:1px solid var(--dsc-line-soft)!important;
         padding:10px 11px;
         font-size:.84rem;
         white-space:nowrap;
         vertical-align:middle;
-        background:#fff;
-        color:var(--aws-text);
+        background:var(--dsc-card);
+        color:var(--dsc-text);
     }
-
     .dsc-table th{
         position:sticky;
         top:0;
         z-index:5;
-        background:#f8f9fa!important;
+        background:var(--dsc-soft)!important;
         color:#414d5c;
         font-size:.72rem;
-        font-weight:800;
+        font-weight:900;
         text-align:center;
         text-transform:uppercase;
         letter-spacing:.04em;
-        border-bottom:1px solid var(--aws-line)!important;
+        border-bottom:1px solid var(--dsc-line)!important;
     }
+    .dsc-table td.num{ text-align:right; font-variant-numeric:tabular-nums; font-weight:800; }
+    .dsc-table td.center{ text-align:center; font-weight:800; }
+    .dsc-table td.item{ font-weight:900; }
+    .dsc-table tbody tr:hover td{ background:#f2f8fd; }
 
-    .dsc-table td.num{
-        text-align:right;
-        font-variant-numeric:tabular-nums;
-        font-weight:700;
-    }
-
-    .dsc-table td.center{
-        text-align:center;
-        font-weight:700;
-    }
-
-    .dsc-table td.item{
-        font-weight:800;
-    }
-
-    .dsc-table tbody tr:hover td{
-        background:#f2f8fd;
-    }
-
-    .sticky-1{
-        position:sticky;
-        left:0;
-        z-index:4;
-        background:#fff!important;
-    }
-
-    .sticky-2{
-        position:sticky;
-        left:62px;
-        z-index:4;
-        background:#fff!important;
-        box-shadow:10px 0 0 rgba(15,23,42,.03);
-    }
-
+    .sticky-1{ position:sticky; left:0; z-index:4; background:var(--dsc-card)!important; }
+    .sticky-2{ position:sticky; left:62px; z-index:4; background:var(--dsc-card)!important; box-shadow:10px 0 0 rgba(15,23,42,.03); }
     thead .sticky-1,
-    thead .sticky-2{
-        background:#f8f9fa!important;
-        z-index:6;
-    }
+    thead .sticky-2{ background:var(--dsc-soft)!important; z-index:6; }
 
     .w-no{ width:62px; min-width:62px; }
     .w-name{ width:300px; min-width:300px; }
@@ -563,76 +542,43 @@
     .w-num{ width:124px; min-width:124px; }
     .w-wide{ width:300px; min-width:300px; }
 
-    .cell-negative{
-        background:#fff1f0!important;
-        color:var(--aws-red)!important;
-        font-weight:800!important;
-    }
+    .cell-negative{ background:#fff1f0!important; color:var(--dsc-danger)!important; font-weight:900!important; }
 
-    .soft-alert{
-        padding:13px 14px;
-        margin-bottom:14px;
-    }
-
-    .soft-alert.primary{ border-color:#b6d7f5; background:#f1f8ff; }
+    .soft-alert{ padding:13px 14px; margin-bottom:14px; }
+    .soft-alert.primary{ border-color:#b6d7f5; background:#eef7ff; }
     .soft-alert.warning{ border-color:#f8d7a0; background:#fff7ed; }
     .soft-alert.danger{ border-color:#f3b8ad; background:#fff1f0; }
+    .soft-alert .title{ color:var(--dsc-text); font-weight:900; margin-bottom:4px; }
+    .soft-alert .desc{ color:var(--dsc-muted); font-weight:700; font-size:.84rem; margin:0; line-height:1.45; }
 
-    .soft-alert .title{
-        color:var(--aws-text);
-        font-weight:800;
-        margin-bottom:4px;
-    }
-
-    .soft-alert .desc{
-        color:var(--aws-muted);
-        font-weight:600;
-        font-size:.84rem;
-        margin:0;
-    }
-
-    .modal .modal-content{
-        border-radius:10px;
-        border:1px solid var(--aws-line);
-        box-shadow:0 24px 64px rgba(15,23,42,.18);
-        overflow:hidden;
-    }
-
+    .modal .modal-dialog{ max-width:min(96vw,1100px); margin:.75rem auto; }
+    .modal .modal-content{ border-radius:14px; border:1px solid var(--dsc-line); box-shadow:0 24px 64px rgba(15,23,42,.18); overflow:hidden; }
     .modal .modal-header,
-    .modal .modal-footer{
-        background:#fbfbfb;
-        border-color:var(--aws-line);
-    }
+    .modal .modal-footer{ background:var(--dsc-soft); border-color:var(--dsc-line); }
+    .omset-photo{ max-width:100%; max-height:240px; border-radius:10px; border:1px solid var(--dsc-line); box-shadow:var(--dsc-shadow); width:auto; background:var(--dsc-card); }
 
-    .omset-photo{
-        max-height:240px;
-        border-radius:8px;
-        border:1px solid var(--aws-line);
-        box-shadow:var(--aws-shadow);
-        width:auto;
-        background:#fff;
-    }
-
-    .select2-container{ width:100%!important; }
-
+    .select2-container{ width:100%!important; min-width:0!important; }
     .select2-container--default .select2-selection--single{
-        border:1px solid var(--aws-line)!important;
-        border-radius:8px!important;
-        min-height:38px;
+        border:1px solid var(--dsc-line)!important;
+        border-radius:12px!important;
+        min-height:42px;
         display:flex!important;
         align-items:center;
-        background:#fff;
+        background:var(--dsc-card);
     }
-
     .select2-container .select2-selection--single .select2-selection__rendered{
-        line-height:36px!important;
-        padding-left:.7rem!important;
-        font-weight:700;
+        width:100%;
+        min-width:0;
+        line-height:40px!important;
+        padding-left:.75rem!important;
+        padding-right:2rem!important;
+        font-weight:800;
+        overflow:hidden;
+        text-overflow:ellipsis;
     }
-
-    .select2-container .select2-selection--single .select2-selection__arrow{
-        height:36px!important;
-    }
+    .select2-container .select2-selection--single .select2-selection__arrow{ height:40px!important; }
+    .select2-dropdown,
+    .select2-results__option{ background:var(--dsc-card)!important; color:var(--dsc-text)!important; }
 
     #tab-missing-dsc .dsc-scroll{ overflow:visible; }
     #tab-missing-dsc table.dsc-table th{ position:static!important; }
@@ -640,68 +586,485 @@
     #tab-missing-dsc .sticky-2{ position:static!important; left:auto!important; box-shadow:none!important; }
     #tab-missing-dsc table.dsc-table td,
     #tab-missing-dsc table.dsc-table th{ white-space:normal!important; }
+    #dscTableADJUSTMENT tr.row-warning td{ background:#fff7ed!important; }
 
-    #dscTableADJUSTMENT tr.row-warning td{
-        background:#fff7ed!important;
-    }
-
-    @media (max-width:1200px){
-        .filter-grid{ grid-template-columns:1fr 1fr 1fr; }
+    @media (max-width:1400px){
+        .filter-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
         .filter-grid .span-2{ grid-column:span 2; }
     }
 
     @media (max-width:992px){
         .dsc-meta-grid,
-        .kpi-grid{
-            grid-template-columns:1fr;
-        }
+        .kpi-grid{ grid-template-columns:1fr; }
+        .filter-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .filter-grid .span-2{ grid-column:span 2; }
+        .dsc-toolbar{ justify-content:flex-start; }
     }
 
     @media (max-width:768px){
-        .dsc-title h4{ font-size:1.15rem; }
-        .dsc-toolbar{ width:100%; justify-content:flex-start; }
-        .dsc-toolbar .btn{ flex:1 1 calc(50% - 8px); }
-        .nav-pills{ overflow-x:auto; flex-wrap:nowrap; padding-bottom:0; }
-        .nav-pills .nav-link{ white-space:nowrap; }
-        .filter-grid{ grid-template-columns:1fr; }
+        :root{ --dsc-page-pad:10px; --dsc-radius:12px; }
+        .dsc-shell{ gap:12px; padding:10px 8px 80px; }
+        .dsc-header{ padding-bottom:12px; }
+        .dsc-header > .d-flex{ gap:12px!important; }
+        .dsc-title{ gap:8px; align-items:flex-start; }
+        .dsc-title-mark{ width:36px; height:36px; flex-basis:36px; border-radius:10px; }
+        .dsc-title h4{ font-size:1.06rem; max-width:calc(100vw - 78px); }
+        .dsc-badge{ font-size:.66rem; padding:5px 8px; }
+        .dsc-toolbar{ width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+        .dsc-toolbar .dsc-bell-wrap{ grid-column:auto; }
+        .dsc-toolbar .btn,
+        .dsc-toolbar a.btn{ width:100%; min-width:0; padding:.48rem .5rem; font-size:.72rem; white-space:normal; line-height:1.2; }
+        .dsc-bell-btn{ width:100%!important; height:42px!important; }
+        .dsc-bell-panel{ width:calc(100vw - 20px); min-width:calc(100vw - 20px); }
+        .dsc-meta-grid{ margin-top:12px; gap:12px; }
+        .dsc-card .dsc-card-body,
+        .dsc-filter-bar{ padding:12px; }
+        .dsc-kv{ grid-template-columns:1fr; gap:3px 0; font-size:.84rem; }
+        .dsc-kv .v{ margin-bottom:7px; }
+        .dsc-kv .v::first-letter{ color:inherit; }
+        .dsc-note{ font-size:.8rem; }
+        .kpi-grid{ gap:10px; margin-top:12px; }
+        .kpi{ padding:12px; border-radius:12px; }
+        .kpi .label{ font-size:.75rem; }
+        .kpi .value{ font-size:1.02rem; }
+        .kpi .icon{ width:42px; height:42px; flex-basis:42px; }
+        .filter-grid{ grid-template-columns:1fr; gap:11px; }
         .filter-grid .span-2{ grid-column:auto; }
+        .filter-item label{ font-size:.78rem; }
+        .form-control,
+        .form-select,
+        .select2-container--default .select2-selection--single{ min-height:44px; }
+        .nav-pills{
+            display:flex;
+            flex-wrap:nowrap;
+            overflow-x:auto;
+            overflow-y:hidden;
+            gap:6px;
+            padding:0 0 8px;
+            margin-bottom:12px!important;
+            scrollbar-width:thin;
+        }
+        .nav-pills .nav-item{ flex:0 0 auto; }
+        .nav-pills .nav-link{ white-space:nowrap; padding:10px 12px; font-size:.78rem; border-radius:999px!important; background:var(--dsc-card); border:1px solid var(--dsc-line); }
+        .nav-pills .nav-link.active{ background:#eef7ff!important; border-color:#b6d7f5; }
+        .nav-pills .nav-link.active::after{ display:none; }
+        .dsc-scroll,
+        .dsc-scroll-y{ max-height:65vh; border-radius:12px; }
+        .dsc-scroll-x table,
+        .dsc-scroll table{ min-width:1100px; }
+
+        /* MOBILE: matikan freeze/sticky tabel supaya swipe lebih enak di HP. */
+        .dsc-table th{ position:static!important; top:auto!important; z-index:auto!important; }
+        .sticky-1,
+        .sticky-2,
+        thead .sticky-1,
+        thead .sticky-2{
+            position:static!important;
+            left:auto!important;
+            right:auto!important;
+            z-index:auto!important;
+            box-shadow:none!important;
+        }
+        .w-no{ width:48px; min-width:48px; }
+        .w-name{ width:170px; min-width:170px; max-width:170px; }
+        .w-sat{ width:66px; min-width:66px; }
+        .w-num{ width:104px; min-width:104px; }
+        .w-wide{ width:220px; min-width:220px; }
+        .dsc-table th,
+        .dsc-table td{ padding:8px 8px; font-size:.74rem; }
+        .dsc-table th{ font-size:.64rem; }
+        .dsc-table td.item{ max-width:170px; overflow:hidden; text-overflow:ellipsis; }
+        .modal .modal-dialog{ width:calc(100vw - 16px); margin:.5rem auto; }
+        .modal .modal-body{ padding:12px; }
+        .row.g-3 > [class*="col-"]{ min-width:0; }
+    }
+
+    @media (max-width:420px){
+        .dsc-shell{ padding-left:6px; padding-right:6px; }
+        .dsc-toolbar{ grid-template-columns:1fr; }
+        .dsc-title h4{ max-width:calc(100vw - 64px); }
+        .dsc-card .dsc-card-body,
+        .dsc-filter-bar,
+        .soft-alert{ padding:10px; }
+        .kpi{ padding:10px; }
+        .kpi .icon{ width:38px; height:38px; flex-basis:38px; }
+        .dsc-scroll,
+        .dsc-scroll-y{ max-height:62vh; }
+    }
+
+
+
+    /* ==========================================================
+       PATCH FREEZE TABLE TOP + LEFT
+       Desktop/tablet:
+       - Header tabel freeze saat scroll vertical.
+       - Kolom NO dan NAMA BARANG freeze saat scroll horizontal.
+       - Berlaku untuk REKAP, PERIODE DSC, DETAIL SHIFT, ADJUSTMENT, IMPORT.
+       Mobile:
+       - Freeze tetap aktif tapi ukuran kolom kiri diperkecil agar tidak menutup kolom lain.
+       ========================================================== */
+
+    .dsc-scroll,
+    .dsc-scroll-y,
+    .dsc-scroll-x{
+        position: relative;
+    }
+
+    .dsc-scroll,
+    .dsc-scroll-y{
+        overflow: auto !important;
+        max-height: 70vh;
+    }
+
+    .dsc-scroll-x{
+        overflow: visible !important;
+        min-width: max-content;
+    }
+
+    .dsc-scroll-x > table,
+    .dsc-scroll > table{
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+    }
+
+    .dsc-table thead th{
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 30 !important;
+        background: var(--dsc-soft) !important;
+        box-shadow: 0 1px 0 var(--dsc-line);
+    }
+
+    .dsc-table .sticky-1,
+    .dsc-table .sticky-2{
+        position: sticky !important;
+        background: var(--dsc-card) !important;
+    }
+
+    .dsc-table .sticky-1{
+        left: 0 !important;
+        z-index: 25 !important;
+    }
+
+    .dsc-table .sticky-2{
+        left: 62px !important;
+        z-index: 25 !important;
+        box-shadow: 10px 0 12px rgba(15,23,42,.06) !important;
+    }
+
+    .dsc-table thead .sticky-1{
+        z-index: 45 !important;
+        background: var(--dsc-soft) !important;
+    }
+
+    .dsc-table thead .sticky-2{
+        z-index: 45 !important;
+        background: var(--dsc-soft) !important;
+    }
+
+    .dsc-table tbody tr:hover .sticky-1,
+    .dsc-table tbody tr:hover .sticky-2{
+        background: #f2f8fd !important;
+    }
+
+    /* Khusus tabel PERIODE: kolom TANGGAL ada di antara NO dan NAMA BARANG. */
+    #dscTablePeriode th:nth-child(2),
+    #dscTablePeriode td:nth-child(2){
+        position: sticky !important;
+        left: 62px !important;
+        z-index: 24 !important;
+        background: var(--dsc-card) !important;
+        box-shadow: 10px 0 12px rgba(15,23,42,.04) !important;
+    }
+
+    #dscTablePeriode thead th:nth-child(2){
+        z-index: 44 !important;
+        background: var(--dsc-soft) !important;
+    }
+
+    #dscTablePeriode .sticky-2{
+        left: 186px !important;
+    }
+
+    #dscTablePeriode thead .sticky-2{
+        left: 186px !important;
+    }
+
+    #dscTablePeriodeSummary thead th,
+    #dscTableOmset thead th{
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 30 !important;
+    }
+
+    @media (max-width: 768px){
         .dsc-scroll,
         .dsc-scroll-y{
-            max-height:66vh;
+            max-height: 65vh;
+            overflow: auto !important;
         }
-        .dsc-scroll-x table,
-        .dsc-scroll table{
-            min-width:1200px;
+
+        .dsc-scroll-x{
+            overflow: visible !important;
+            min-width: max-content;
         }
-        .sticky-1{
-            left:0;
-        }
-        .sticky-2{
-            left:54px;
-        }
-        .w-no{ width:54px; min-width:54px; }
-        .w-name{ width:180px; min-width:180px; max-width:180px; }
-        .dsc-table th,
-        .dsc-table td{
-            padding:8px 9px;
-            font-size:.76rem;
-        }
+
+        /* Override rule lama yang mematikan sticky di mobile. */
         .dsc-table th{
-            font-size:.68rem;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 30 !important;
+        }
+
+        .sticky-1,
+        .sticky-2,
+        thead .sticky-1,
+        thead .sticky-2{
+            position: sticky !important;
+            z-index: 25 !important;
+        }
+
+        .w-no{
+            width: 46px !important;
+            min-width: 46px !important;
+            max-width: 46px !important;
+        }
+
+        .w-name{
+            width: 155px !important;
+            min-width: 155px !important;
+            max-width: 155px !important;
+        }
+
+        .dsc-table .sticky-1{
+            left: 0 !important;
+        }
+
+        .dsc-table .sticky-2{
+            left: 46px !important;
+            max-width: 155px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+
+        .dsc-table thead .sticky-1,
+        .dsc-table thead .sticky-2{
+            z-index: 45 !important;
+            background: var(--dsc-soft) !important;
+        }
+
+        #dscTablePeriode th:nth-child(2),
+        #dscTablePeriode td:nth-child(2){
+            left: 46px !important;
+            width: 104px !important;
+            min-width: 104px !important;
+            max-width: 104px !important;
+            position: sticky !important;
+        }
+
+        #dscTablePeriode .sticky-2{
+            left: 150px !important;
         }
     }
 
-    @media (max-width:576px){
-        .dsc-shell{ gap:12px; }
-        .dsc-kv{ grid-template-columns:1fr; }
-        .dsc-toolbar .btn{ flex:1 1 100%; }
-        .dsc-card .dsc-card-body,
-        .dsc-filter-bar{
-            padding:12px;
-        }
-        .kpi{ padding:12px; }
-        .kpi .value{ font-size:1rem; }
+
+    /* ==========================================================
+       FINAL PERFORMANCE PATCH - STICKY OPTIMIZED DSC
+       Tujuan:
+       - Sticky tetap dipakai.
+       - Desktop/tablet: header + NO + NAMA BARANG tetap freeze.
+       - Mobile: freeze hanya NAMA BARANG agar swipe lebih ringan.
+       - Box-shadow besar diganti garis tipis.
+       - Tidak mengubah rumus, data, route, form, modal, atau JavaScript.
+       ========================================================== */
+
+    .dsc-scroll,
+    .dsc-scroll-y,
+    .dsc-scroll-x{
+        position:relative;
+        -webkit-overflow-scrolling:touch!important;
+        overscroll-behavior:contain!important;
     }
+
+    .dsc-scroll,
+    .dsc-scroll-y{
+        overflow:auto!important;
+        max-height:70vh;
+        contain:layout paint;
+    }
+
+    .dsc-scroll-x{
+        overflow:visible!important;
+        min-width:max-content;
+    }
+
+    .dsc-card,
+    .kpi,
+    .soft-alert,
+    .dsc-filter-bar,
+    .dsc-scroll,
+    .dsc-scroll-y,
+    .modal .modal-content,
+    .omset-photo{
+        box-shadow:0 1px 2px rgba(15,23,42,.04)!important;
+    }
+
+    .dsc-table{
+        border-collapse:separate!important;
+        border-spacing:0!important;
+    }
+
+    .dsc-table thead th{
+        position:sticky!important;
+        top:0!important;
+        z-index:30!important;
+        background:var(--dsc-soft)!important;
+        box-shadow:0 1px 0 var(--dsc-line-soft)!important;
+    }
+
+    .dsc-table .sticky-1,
+    .dsc-table .sticky-2{
+        position:sticky!important;
+        background:var(--dsc-card)!important;
+    }
+
+    .dsc-table .sticky-1{
+        left:0!important;
+        z-index:25!important;
+        box-shadow:none!important;
+    }
+
+    .dsc-table .sticky-2{
+        left:62px!important;
+        z-index:25!important;
+        box-shadow:1px 0 0 var(--dsc-line-soft)!important;
+    }
+
+    .dsc-table thead .sticky-1,
+    .dsc-table thead .sticky-2{
+        z-index:45!important;
+        background:var(--dsc-soft)!important;
+    }
+
+    .dsc-table tbody tr:hover td:not(.sticky-1):not(.sticky-2){
+        background:#f2f8fd!important;
+    }
+
+    .dsc-table tbody tr:hover .sticky-1,
+    .dsc-table tbody tr:hover .sticky-2{
+        background:var(--dsc-card)!important;
+    }
+
+    /* PERIODE DSC: tanggal ikut freeze di desktop/tablet karena posisinya di antara NO dan NAMA */
+    #dscTablePeriode th:nth-child(2),
+    #dscTablePeriode td:nth-child(2){
+        position:sticky!important;
+        left:62px!important;
+        z-index:24!important;
+        background:var(--dsc-card)!important;
+        box-shadow:1px 0 0 var(--dsc-line-soft)!important;
+    }
+
+    #dscTablePeriode thead th:nth-child(2){
+        z-index:44!important;
+        background:var(--dsc-soft)!important;
+    }
+
+    #dscTablePeriode .sticky-2{
+        left:186px!important;
+    }
+
+    #dscTablePeriode thead .sticky-2{
+        left:186px!important;
+    }
+
+    #dscTablePeriodeSummary thead th,
+    #dscTableOmset thead th{
+        position:sticky!important;
+        top:0!important;
+        z-index:30!important;
+        background:var(--dsc-soft)!important;
+        box-shadow:0 1px 0 var(--dsc-line-soft)!important;
+    }
+
+    @media (max-width:768px){
+        .dsc-scroll,
+        .dsc-scroll-y{
+            max-height:65vh;
+            overflow:auto!important;
+        }
+
+        .dsc-scroll-x{
+            overflow:visible!important;
+            min-width:max-content;
+        }
+
+        .dsc-table th{
+            position:sticky!important;
+            top:0!important;
+            z-index:30!important;
+        }
+
+        .w-no{
+            width:46px!important;
+            min-width:46px!important;
+            max-width:46px!important;
+        }
+
+        .w-name{
+            width:160px!important;
+            min-width:160px!important;
+            max-width:160px!important;
+        }
+
+        /* Mobile: NO dibuat biasa, NAMA BARANG saja yang freeze */
+        .dsc-table .sticky-1,
+        .dsc-table thead .sticky-1{
+            position:static!important;
+            left:auto!important;
+            z-index:auto!important;
+            box-shadow:none!important;
+            background:inherit!important;
+        }
+
+        .dsc-table .sticky-2{
+            position:sticky!important;
+            left:0!important;
+            z-index:28!important;
+            width:160px!important;
+            min-width:160px!important;
+            max-width:160px!important;
+            overflow:hidden!important;
+            text-overflow:ellipsis!important;
+            white-space:nowrap!important;
+            background:var(--dsc-card)!important;
+            box-shadow:1px 0 0 var(--dsc-line-soft)!important;
+        }
+
+        .dsc-table thead .sticky-2{
+            z-index:45!important;
+            background:var(--dsc-soft)!important;
+        }
+
+        /* Mobile periode: tanggal tidak freeze, NAMA BARANG saja freeze */
+        #dscTablePeriode th:nth-child(2),
+        #dscTablePeriode td:nth-child(2){
+            position:static!important;
+            left:auto!important;
+            z-index:auto!important;
+            width:104px!important;
+            min-width:104px!important;
+            max-width:104px!important;
+            background:inherit!important;
+            box-shadow:none!important;
+        }
+
+        #dscTablePeriode .sticky-2{
+            left:0!important;
+        }
+    }
+
 </style>
 
 <div class="dsc-shell">
@@ -733,7 +1096,7 @@
                                             <div class="dsc-help mt-1">PERIODE: {{ \Carbon\Carbon::parse($missingCheckStartDate)->format('d-m-Y') }}</div>
                                         </div>
                                         <div class="dsc-bell-body">
-                                            @forelse($missingOutlets as $o)
+                                            @forelse(collect($missingOutlets)->take(50) as $o)
                                                 <div class="dsc-bell-item">
                                                     <div>{{ $cleanOutletName($o->nama_outlet ?? '-') }}</div>
                                                     <small>TERAKHIR ISI: {{ !empty($o->last_input_date) ? \Carbon\Carbon::parse($o->last_input_date)->format('d-m-Y') : '-' }}</small>
@@ -745,7 +1108,7 @@
                                             @endforelse
                                         </div>
                                         <div class="dsc-bell-foot d-flex align-items-center justify-content-between gap-2">
-                                            <span>DATA RINGKAS H-1.</span>
+                                            <span>DATA RINGKAS H-1. @if(($missingCount ?? 0) > 50) Ditampilkan 50 dari {{ $missingCount }}. @endif</span>
                                             <a class="btn btn-sm btn-primary" href="{{ route('master.dsc.missing', ['start_date' => $missingCheckStartDate, 'end_date' => $missingCheckEndDate]) }}">
                                                 LIHAT SEMUA
                                             </a>
@@ -759,14 +1122,21 @@
                                 <i class="bi bi-arrow-clockwise me-1"></i> REFRESH
                             </button>
 
+                            <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalRapelUangPlus"
+                                @if (!$hasRequiredFilter) disabled @endif>
+                                <i class="bi bi-cash-stack me-1"></i> RAPEL UANG PLUS
+                            </button>
+
                             <a class="btn btn-sm btn-success"
                                 href="{{ route('master.dsc.export', [
                                     'outlet_id' => $outletId,
                                     'tanggal' => $today,
+                                    'start_date' => $exportStartDate,
+                                    'end_date' => $exportEndDate,
                                     'shift_filter' => $shiftFilter,
                                 ]) }}"
                                 @if (!$hasRequiredFilter) style="pointer-events:none;opacity:.55;" aria-disabled="true" @endif>
-                                <i class="bi bi-file-earmark-excel me-1"></i> EXPORT HARI INI
+                                <i class="bi bi-file-earmark-excel me-1"></i> EXPORT PERIODE AKHIR
                             </a>
 
                             <a class="btn btn-sm btn-success"
@@ -791,15 +1161,17 @@
                         <div class="dsc-card">
                             <div class="dsc-card-body">
                                 <div class="dsc-kv">
-                                    <div class="k"><i class="bi bi-calendar2-week me-1"></i>Hari / Tanggal</div>
-                                    <div class="v">: {{ \Carbon\Carbon::parse($today)->format('d-m-Y') }}</div>
+                                    <div class="k"><i class="bi bi-calendar2-week me-1"></i>Periode</div>
+                                    <div class="v">: {{ \Carbon\Carbon::parse($periodStartDate)->format('d-m-Y') }} s/d {{ \Carbon\Carbon::parse($periodEndDate)->format('d-m-Y') }}</div>
+                                    <div class="k"><i class="bi bi-calendar-range me-1"></i>Periode DSC</div>
+                                    <div class="v">: {{ $periodLabel }}</div>
                                     <div class="k"><i class="bi bi-journal-text me-1"></i>Catatan</div>
                                     <div class="v">: Monitoring + Koreksi SPV/Territorial Manager</div>
                                 </div>
 
                                 <div class="mt-3 dsc-note">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Gunakan filter Outlet & Tanggal untuk melihat data report.
+                                    Gunakan filter Outlet, Periode Awal, dan Periode Akhir. REKAP mengikuti akumulasi periode, dengan rumus stok lama tetap dipertahankan.
                                 </div>
                             </div>
                         </div>
@@ -807,12 +1179,12 @@
                         <div class="dsc-card">
                             <div class="dsc-card-body">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <div class="text-muted fw-bold">Tanggal</div>
+                                    <div class="text-muted fw-bold">Periode Akhir</div>
                                     <div class="fw-bold" style="font-size:1.25rem;">
                                         {{ (int) \Carbon\Carbon::parse($today)->format('d') }}
                                     </div>
                                 </div>
-                                <div class="dsc-help mt-2">Tanggal mengikuti filter.</div>
+                                <div class="dsc-help mt-2">Data harian mengikuti periode akhir.</div>
                             </div>
                         </div>
                     </div>
@@ -864,9 +1236,17 @@
                                     </select>
                                 </div>
 
+                                <input type="hidden" name="tanggal" value="{{ $periodEndDate }}">
+                                <input type="hidden" name="load_period" value="1">
+
                                 <div class="filter-item">
-                                    <label><i class="bi bi-calendar-event me-1"></i>TANGGAL</label>
-                                    <input type="date" name="tanggal" class="form-control" value="{{ $today }}">
+                                    <label><i class="bi bi-calendar-range me-1"></i>PERIODE AWAL</label>
+                                    <input type="date" name="start_date" class="form-control" value="{{ $periodStartDate }}" required>
+                                </div>
+
+                                <div class="filter-item">
+                                    <label><i class="bi bi-calendar-range-fill me-1"></i>PERIODE AKHIR</label>
+                                    <input type="date" name="end_date" class="form-control" value="{{ $periodEndDate }}" required>
                                 </div>
 
                                 <div class="filter-item">
@@ -897,8 +1277,14 @@
                 <div class="dsc-body">
                     <ul class="nav nav-pills">
                         <li class="nav-item">
-                            <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-rekap" type="button">
+                            <button class="nav-link {{ request('active_tab') === 'periode' ? '' : 'active' }}" data-bs-toggle="pill" data-bs-target="#tab-rekap" type="button">
                                 <i class="bi bi-table me-1"></i > REKAP
+                            </button>
+                        </li>
+
+                        <li class="nav-item">
+                            <button class="nav-link {{ request('active_tab') === 'periode' ? 'active' : '' }}" data-bs-toggle="pill" data-bs-target="#tab-periode" type="button">
+                                <i class="bi bi-calendar-range me-1"></i > PERIODE DSC
                             </button>
                         </li>
 
@@ -932,7 +1318,7 @@
                     <div class="tab-content">
 
                         {{-- REKAP --}}
-                        <div class="tab-pane fade show active" id="tab-rekap">
+                        <div class="tab-pane fade {{ request('active_tab') === 'periode' ? '' : 'show active' }}" id="tab-rekap">
                             <div class="dsc-scroll-y">
                               <div class="dsc-scroll-x">
                                 <table id="dscTableRekap" class="table dsc-table">
@@ -992,7 +1378,7 @@
                                                 <td class="num">{{ number_format($r['pin'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['mi'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['mo'] ?? 0, 0, ',', '.') }}</td>
-                                                <td class="num">{{ number_format($r['ADJUSTMENT'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['adj'] ?? $r['ADJUSTMENT'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num fw-bold">{{ number_format($r['total'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['ending_stock'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num {{ ($r['used'] ?? 0) < 0 ? 'cell-negative' : '' }}">
@@ -1011,7 +1397,7 @@
                                         @empty
                                             <tr>
                                                 <td colspan="21" class="text-center text-muted py-4">
-                                                    Data dikosongkan. Pilih outlet dan tanggal lalu klik <b>TERAPKAN</b>.
+                                                    Data dikosongkan. Pilih outlet dan periode lalu klik <b>TERAPKAN</b>.
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -1020,6 +1406,148 @@
                               </div>
                             </div>
                         </div>
+
+
+                        {{-- PERIODE DSC --}}
+                        <div class="tab-pane fade {{ request('active_tab') === 'periode' ? 'show active' : '' }}" id="tab-periode">
+                            @if(!$isPeriodLoaded)
+                                <div class="soft-alert warning">
+                                    <div class="title"><i class="bi bi-lightning-charge me-1"></i> Mode ringan aktif</div>
+                                    <p class="desc mb-2">Detail Periode DSC belum dimuat supaya halaman awal tetap ringan. Klik tombol di bawah hanya saat perlu melihat data lintas tanggal.</p>
+                                    <a class="btn btn-primary" href="{{ $periodLoadUrl }}">
+                                        <i class="bi bi-cloud-download me-1"></i> Muat Periode DSC
+                                    </a>
+                                </div>
+                            @else
+
+                            <div class="dsc-scroll mb-3">
+                                <table id="dscTablePeriodeSummary" class="table dsc-table" style="min-width:1150px;">
+                                    <thead>
+                                        <tr>
+                                            <th class="w-num">TANGGAL</th>
+                                            <th class="w-num">STATUS DSC</th>
+                                            <th class="w-num">ITEM TAMPIL</th>
+                                            <th class="w-num">SALES S1</th>
+                                            <th class="w-num">SALES S2</th>
+                                            <th class="w-num">TOTAL SALES</th>
+                                            <th class="w-num">UANG PLUS</th>
+                                            <th class="w-num">USED MINUS</th>
+                                            <th class="w-num">USED PLUS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($periodSummary as $s)
+                                            <tr>
+                                                <td class="center">{{ \Carbon\Carbon::parse($s['tanggal'])->format('d-m-Y') }}</td>
+                                                <td class="center">
+                                                    @if (!empty($s['has_dsc']))
+                                                        <span class="badge text-bg-success">ADA DATA</span>
+                                                    @else
+                                                        <span class="badge text-bg-warning">BELUM ADA</span>
+                                                    @endif
+                                                </td>
+                                                <td class="num">{{ number_format($s['row_count'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">Rp {{ number_format($s['sales_s1'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">Rp {{ number_format($s['sales_s2'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num fw-bold">Rp {{ number_format($s['sales_total'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">Rp {{ number_format($s['uang_plus'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num {{ ($s['used_minus_count'] ?? 0) > 0 ? 'cell-negative' : '' }}">{{ number_format($s['used_minus_count'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($s['used_plus_count'] ?? 0, 0, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="9" class="text-center text-muted py-4">
+                                                    Data periode dikosongkan. Pilih outlet dan periode lalu klik <b>TERAPKAN</b>.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="dsc-scroll-y">
+                              <div class="dsc-scroll-x">
+                                <table id="dscTablePeriode" class="table dsc-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="w-no sticky-1">NO</th>
+                                            <th class="w-num">TANGGAL</th>
+                                            <th class="w-name sticky-2">NAMA BARANG</th>
+                                            <th class="w-num">STATUS</th>
+                                            <th class="w-sat">SAT</th>
+                                            <th class="w-num">OPEN</th>
+                                            <th class="w-num">PURCHASE IN</th>
+                                            <th class="w-num">MUTASI IN</th>
+                                            <th class="w-num">MUTASI OUT</th>
+                                            <th class="w-num">ADJUSTMENT</th>
+                                            <th class="w-num">TOTAL</th>
+                                            <th class="w-num">ENDING</th>
+                                            <th class="w-num">USED</th>
+                                            <th class="w-num">WASTE PRODUK</th>
+                                            <th class="w-num">WASTE BAHAN</th>
+                                            <th class="w-num">WASTE TEPUNG</th>
+                                            <th class="w-num">ACTUAL TEPUNG</th>
+                                            <th class="w-num">USED S1</th>
+                                            <th class="w-num">USED S2</th>
+                                            <th class="w-num">UANG PLUS</th>
+                                            <th class="w-wide">KETERANGAN</th>
+                                            <th class="w-num">OPEN NEXT (R)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($periodRows as $r)
+                                            <tr>
+                                                <td class="center sticky-1">{{ $r['no'] }}</td>
+                                                <td class="center">{{ \Carbon\Carbon::parse($r['tanggal'])->format('d-m-Y') }}</td>
+                                                <td class="sticky-2 item">{{ $r['nama'] }}</td>
+                                                <td class="center">
+                                                    @if ($shiftFilter === 'all')
+                                                        <div class="d-flex flex-column gap-1 align-items-center">
+                                                            <span class="badge {{ ($r['source_s1'] ?? null) === 'final' ? 'text-bg-success' : (($r['source_s1'] ?? null) === 'draft' ? 'text-bg-warning' : 'text-bg-secondary') }}">S1 {{ strtoupper($r['source_s1'] ?? '-') }}</span>
+                                                            <span class="badge {{ ($r['source_s2'] ?? null) === 'final' ? 'text-bg-success' : (($r['source_s2'] ?? null) === 'draft' ? 'text-bg-warning' : 'text-bg-secondary') }}">S2 {{ strtoupper($r['source_s2'] ?? '-') }}</span>
+                                                        </div>
+                                                    @else
+                                                        @if (($r['source'] ?? null) === 'final')
+                                                            <span class="badge text-bg-success">FINAL</span>
+                                                        @elseif(($r['source'] ?? null) === 'draft')
+                                                            <span class="badge text-bg-warning">DRAFT</span>
+                                                        @else
+                                                            <span class="badge text-bg-secondary">-</span>
+                                                        @endif
+                                                    @endif
+                                                </td>
+                                                <td class="center">{{ $r['sat'] }}</td>
+                                                <td class="num">{{ number_format($r['open'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['pin'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['mi'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['mo'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['adj'] ?? $r['adj'] ?? $r['ADJUSTMENT'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num fw-bold">{{ number_format($r['total'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['ending_stock'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num {{ ($r['used'] ?? 0) < 0 ? 'cell-negative' : '' }}">{{ number_format($r['used'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['wP'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['wB'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['wT_input'] ?? $r['waste_tepung_input'] ?? $r['waste_tepung'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['actualTepung'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['shift1'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['shift2'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['uang'] ?? 0, 0, ',', '.') }}</td>
+                                                <td>{{ $r['ket'] ?? '' }}</td>
+                                                <td class="num">{{ number_format($r['open_stock_right'] ?? 0, 0, ',', '.') }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="22" class="text-center text-muted py-4">
+                                                    Data periode dikosongkan. Pilih outlet dan periode lalu klik <b>TERAPKAN</b>.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                              </div>
+                            </div>
+                        </div>
+                            @endif
 
                         {{-- DETAIL SHIFT --}}
                         <div class="tab-pane fade" id="tab-shift">
@@ -1066,7 +1594,7 @@
                                                 <td class="num">{{ number_format($r['pin'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['mi'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['mo'] ?? 0, 0, ',', '.') }}</td>
-                                                <td class="num">{{ number_format($r['ADJUSTMENT'] ?? 0, 0, ',', '.') }}</td>
+                                                <td class="num">{{ number_format($r['adj'] ?? $r['ADJUSTMENT'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num fw-bold">{{ number_format($r['total'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num">{{ number_format($r['ending_stock'] ?? 0, 0, ',', '.') }}</td>
                                                 <td class="num {{ ($r['used'] ?? 0) < 0 ? 'cell-negative' : '' }}">
@@ -1079,7 +1607,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="17" class="text-center text-muted py-4">Data dikosongkan. Pilih outlet dan tanggal lalu klik <b>TERAPKAN</b>.</td>
+                                                <td colspan="17" class="text-center text-muted py-4">Data dikosongkan. Pilih outlet dan periode lalu klik <b>TERAPKAN</b>.</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -1407,7 +1935,7 @@
                                           $pin  = (float) ($r['pin'] ?? 0);
                                           $mi   = (float) ($r['mi'] ?? 0);
                                           $mo   = (float) ($r['mo'] ?? 0);
-                                          $ADJUSTMENT  = (float) ($r['ADJUSTMENT'] ?? 0);
+                                          $ADJUSTMENT  = (float) ($r['adj'] ?? $r['ADJUSTMENT'] ?? 0);
                                           $total = (float) ($r['total'] ?? ($open + $pin + $mi - $mo + $ADJUSTMENT));
                                           $ending = (float) ($r['ending_stock'] ?? 0);
                                           $used = (float) ($r['used'] ?? ($total - $ending));
@@ -1502,7 +2030,7 @@
                                       @empty
                                         <tr>
                                           <td colspan="18" class="text-center text-muted py-4">
-                                            Data dikosongkan. Pilih outlet dan tanggal lalu klik <b>TERAPKAN</b>.
+                                            Data dikosongkan. Pilih outlet dan periode lalu klik <b>TERAPKAN</b>.
                                           </td>
                                         </tr>
                                       @endforelse
@@ -1637,7 +2165,110 @@
 
 
 
+
+{{-- MODAL RAPEL / REVISI UANG PLUS --}}
+<div class="modal fade" id="modalRapelUangPlus" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash-stack me-1"></i> Rapel / Revisi Uang Plus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="soft-alert primary">
+                    <div class="title"><i class="bi bi-info-circle me-1"></i> Catatan Aman</div>
+                    <p class="desc mb-0">Fitur ini hanya mengubah <b>uang_plus</b> dan menambah <b>keterangan</b>. Purchase, mutasi, adjustment, ending, used, dan rumus stok tidak diubah.</p>
+                </div>
+
+                <div class="soft-alert warning" id="rapelExistingBox">
+                    <div class="title"><i class="bi bi-database-check me-1"></i> Data Saat Ini</div>
+                    <p class="desc mb-1">
+                        Uang Plus: <b id="rapelCurrentUang">-</b>
+                        <span class="ms-2">Status: <b id="rapelCurrentSource">-</b></span>
+                    </p>
+                    <p class="desc mb-0">Keterangan: <span id="rapelCurrentKet">-</span></p>
+                    <button type="button" class="btn btn-sm btn-ghost mt-2" id="btnUseCurrentRapelValue">
+                        <i class="bi bi-arrow-down-circle me-1"></i> Pakai Nominal Saat Ini
+                    </button>
+                </div>
+
+                <form id="formRapelUangPlus">
+                    <input type="hidden" name="outlet_id" value="{{ $rapelOutletId }}">
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Tanggal Input / Periode Akhir</label>
+                            <input type="date" name="tanggal" class="form-control" value="{{ $today }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Shift</label>
+                            <select name="shift" id="rapel_shift" class="form-select" required>
+                                <option value="1">Shift 1</option>
+                                <option value="2">Shift 2</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Mode</label>
+                            <select name="mode" id="rapel_mode" class="form-select" required>
+                                <option value="set" selected>Set / Revisi Total</option>
+                                <option value="add">Tambah / Rapel</option>
+                            </select>
+                            <div class="dsc-help mt-1">Untuk koreksi dari 15.000 ke 20.000 gunakan Set/Revisi Total.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Target Uang Plus</label>
+                            <select name="apply_all_bahan" id="rapel_apply_all_bahan" class="form-select select2-rapel" required>
+                                <option value="1" selected>Semua Bahan</option>
+                                <option value="0">Per Bahan</option>
+                            </select>
+                            <div class="dsc-help mt-1">Pilih Semua Bahan jika uang plus berlaku global untuk shift tersebut.</div>
+                        </div>
+
+                        <div class="col-md-4" id="rapelBahanWrap">
+                            <label class="form-label">Bahan</label>
+                            <select name="bahan_id" id="rapel_bahan_id" class="form-select select2-rapel">
+                                <option value="">Pilih bahan</option>
+                                @php
+                                    $rapelOptions = collect($rapelBahanRows ?? [])->isNotEmpty()
+                                        ? collect($rapelBahanRows ?? [])
+                                        : collect($rekapRows ?? []);
+                                @endphp
+                                @foreach($rapelOptions as $r)
+                                    @php
+                                        $bid = data_get($r, 'bahan_id') ?: data_get($r, 'id');
+                                        $nama = data_get($r, 'nama') ?: data_get($r, 'nama_bahan');
+                                        $sat = data_get($r, 'sat') ?: data_get($r, 'satuan') ?: '-';
+                                    @endphp
+                                    @if(!empty($bid))
+                                        <option value="{{ $bid }}">{{ $nama }} ({{ $sat }})</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            <div class="dsc-help mt-1">Diaktifkan hanya jika target Per Bahan.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nominal Uang Plus</label>
+                            <input type="number" name="uang_plus" id="rapel_uang_plus" class="form-control" min="0" step="1" placeholder="0" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Keterangan</label>
+                            <input type="text" name="keterangan" id="rapel_keterangan" class="form-control" maxlength="255" value="RAPEL UANG PLUS" placeholder="Contoh: RAPEL UANG PLUS AYAM 12-06-2026">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="btnSubmitRapelUangPlus" @if(!$hasRequiredFilter || !$rapelOutletId) disabled @endif>
+                    <i class="bi bi-save me-1"></i> Simpan Rapel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
+@if ($canADJUSTMENT)
 <script>
 (function () {
     if (typeof Swal === 'undefined') {
@@ -2180,6 +2811,7 @@
 
 })();
 </script>
+@endif
 
 
 <script>
@@ -2190,6 +2822,68 @@
             close: () => {}
         };
     }
+
+    const URL_DSC_UANG_PLUS_RAPEL = `{{ url('/inventory/dsc/uang-plus/rapel') }}`;
+    const RAPEL_EXISTING_MAP = @json($rapelExistingMap ?? []);
+
+    function rapelFormatNumber(n) {
+        n = Number(n || 0);
+        return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    }
+
+    function isRapelAllBahan() {
+        return ($('#rapel_apply_all_bahan').val() || '1').toString() === '1';
+    }
+
+    function getRapelCurrentData() {
+        const shift = ($('#rapel_shift').val() || '').toString();
+        const bahanId = isRapelAllBahan() ? '__all__' : ($('#rapel_bahan_id').val() || '').toString();
+        return RAPEL_EXISTING_MAP?.[shift]?.[bahanId] || null;
+    }
+
+    function refreshRapelTargetMode() {
+        const allBahan = isRapelAllBahan();
+        $('#rapel_bahan_id')
+            .prop('disabled', allBahan)
+            .prop('required', !allBahan);
+
+        $('#rapelBahanWrap').toggleClass('opacity-50', allBahan);
+
+        if (allBahan) {
+            $('#rapel_bahan_id').val('').trigger('change.select2');
+        }
+    }
+
+    function refreshRapelExistingBox({ forceFill = false } = {}) {
+        refreshRapelTargetMode();
+        const data = getRapelCurrentData();
+        const $uang = $('#rapel_uang_plus');
+        const mode = ($('#rapel_mode').val() || 'add').toString();
+
+        if (!data) {
+            $('#rapelCurrentUang').text('-');
+            $('#rapelCurrentSource').text(isRapelAllBahan() ? 'Belum ada data DSC pada shift ini' : 'Belum ada data DSC');
+            $('#rapelCurrentKet').text('-');
+            $('#btnUseCurrentRapelValue').prop('disabled', true);
+            if (mode === 'set' && forceFill) $uang.val('');
+            return;
+        }
+
+        const currentUang = Number(data.uang_plus || 0);
+        $('#rapelCurrentUang').text('Rp ' + rapelFormatNumber(currentUang));
+        $('#rapelCurrentSource').text((data.source || '-').toUpperCase());
+        $('#rapelCurrentKet').text(data.keterangan || '-');
+        $('#btnUseCurrentRapelValue').prop('disabled', false);
+
+        if (mode === 'set' && (forceFill || !$uang.val())) {
+            $uang.val(currentUang);
+        }
+
+        if (!$('#rapel_keterangan').val()) {
+            $('#rapel_keterangan').val('REVISI UANG PLUS');
+        }
+    }
+
 
     $(document).ready(function() {
         if ($.fn.select2) {
@@ -2202,23 +2896,36 @@
 
             $('#outlet_id').select2({
                 width: '100%',
-                placeholder: 'Cari outlet...',
+                placeholder: 'Ketik minimal 2 huruf outlet...',
                 allowClear: true,
+                minimumInputLength: 2,
                 templateResult: item => cleanOutletText(item.text),
                 templateSelection: item => cleanOutletText(item.text),
                 ajax: {
                     url: `{{ route('outlets') }}`,
                     dataType: 'json',
-                    delay: 250,
-                    data: params => ({ q: params.term || '' }),
-                    processResults: data => ({
-                        results: (data.results || []).map(item => ({
-                            ...item,
-                            text: cleanOutletText(item.text)
-                        }))
-                    }),
+                    delay: 350,
+                    data: params => ({ q: params.term || '', page: params.page || 1, limit: 25 }),
+                    processResults: (data, params) => {
+                        params.page = params.page || 1;
+                        const rows = data.results || data.items || [];
+                        return {
+                            results: rows.map(item => ({
+                                ...item,
+                                text: cleanOutletText(item.text || item.nama_outlet || item.label || '')
+                            })),
+                            pagination: { more: !!(data.pagination && data.pagination.more) }
+                        };
+                    },
                     cache: true
                 }
+            });
+
+
+            $('#modalRapelUangPlus .select2-rapel').select2({
+                width: '100%',
+                dropdownParent: $('#modalRapelUangPlus'),
+                placeholder: 'Pilih data'
             });
         }
 
@@ -2231,8 +2938,88 @@
             }
         });
 
-        $('#searchBarang').on('keyup', function() {
-            const q = (this.value || '').toLowerCase();
+
+        $('#modalRapelUangPlus').on('shown.bs.modal', function() {
+            refreshRapelTargetMode();
+            refreshRapelExistingBox({ forceFill: true });
+        });
+
+        $('#rapel_shift, #rapel_bahan_id, #rapel_mode, #rapel_apply_all_bahan').on('change', function() {
+            refreshRapelExistingBox({ forceFill: true });
+        });
+
+        $('#btnUseCurrentRapelValue').on('click', function() {
+            const data = getRapelCurrentData();
+            if (!data) return;
+            $('#rapel_mode').val('set');
+            $('#rapel_uang_plus').val(Number(data.uang_plus || 0));
+            $('#rapel_keterangan').val('REVISI UANG PLUS');
+            refreshRapelExistingBox();
+        });
+
+
+
+        $('#btnSubmitRapelUangPlus').off('click').on('click', async function() {
+            const form = document.getElementById('formRapelUangPlus');
+            if (!form) return;
+
+            refreshRapelTargetMode();
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            if (!isRapelAllBahan() && !($('#rapel_bahan_id').val() || '').toString()) {
+                Swal.fire({ icon: 'warning', title: 'Bahan wajib dipilih', text: 'Pilih bahan jika targetnya Per Bahan.' });
+                return;
+            }
+
+            const fd = new FormData(form);
+            const payload = Object.fromEntries(fd.entries());
+            payload.apply_all_bahan = isRapelAllBahan() ? 1 : 0;
+            if (isRapelAllBahan()) {
+                delete payload.bahan_id;
+            }
+
+            try {
+                Swal.fire({
+                    title: 'Menyimpan rapel uang plus...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const meta = document.querySelector('meta[name="csrf-token"]');
+                const res = await fetch(URL_DSC_UANG_PLUS_RAPEL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': meta ? meta.content : ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json.ok) {
+                    throw new Error(json.message || 'Gagal menyimpan rapel uang plus.');
+                }
+
+                Swal.close();
+                await Swal.fire({ icon: 'success', title: 'Berhasil', text: json.message || 'Rapel uang plus berhasil disimpan.', timer: 1300, showConfirmButton: false });
+                location.reload();
+            } catch (err) {
+                Swal.close();
+                Swal.fire({ icon: 'error', title: 'Gagal', text: err.message });
+            }
+        });
+
+        let searchBarangTimer = null;
+        $('#searchBarang').on('input', function() {
+            clearTimeout(searchBarangTimer);
+            const input = this;
+            searchBarangTimer = setTimeout(function() {
+            const q = (input.value || '').toLowerCase();
 
             $('#dscTableRekap tbody tr').each(function() {
                 const name = ($(this).find('td').eq(1).text() || '').toLowerCase();
@@ -2244,12 +3031,11 @@
                 $(this).toggle(name.includes(q));
             });
 
-            if ($('#dscTableADJUSTMENT').length) {
-                $('#dscTableADJUSTMENT tbody tr').each(function() {
-                    const name = ($(this).find('td').eq(1).text() || '').toLowerCase();
-                    $(this).toggle(name.includes(q));
-                });
-            }
+            $('#dscTablePeriode tbody tr').each(function() {
+                const name = ($(this).find('td').eq(2).text() || '').toLowerCase();
+                $(this).toggle(name.includes(q));
+            });
+
 
             if ($('#dscTableOmset').length) {
                 $('#dscTableOmset tbody tr').each(function() {
@@ -2257,10 +3043,9 @@
                     $(this).toggle(label.includes(q));
                 });
             }
+            }, 300);
         });
     });
-
-
     // ADJUSTMENT autosave/import handlers are defined once in the script above.
     // This lower script only initializes Select2/search to avoid duplicate global const/event binding.
 </script>

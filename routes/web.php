@@ -144,6 +144,15 @@ Route::post('/master/bulk-user-outlet-mapping/save', [MasterInvestorController::
     ->name('master.bulk_user_outlet_mapping.save');
 Route::post('/user/update-outlet', [MasterInvestorController::class, 'updateOutletTesting'])->name('user.updateOutlet');
 
+    // ---------- BAHAN HO & MITRA ----------
+    // FIX 404: endpoint dipakai AJAX di tab Bahan HO & MITRA.
+    Route::get('/inventory/qcr/bahan-ho-mitra/list', [MasterInvestorController::class, 'bahanHoMitraList'])
+        ->name('master.qcr.bahanHoMitra.list');
+    Route::post('/inventory/qcr/bahan-ho-mitra/update-all-kategori', [MasterInvestorController::class, 'bahanHoMitraUpdateAllKategori'])
+        ->name('master.qcr.bahanHoMitra.updateAllKategori');
+    Route::post('/inventory/qcr/bahan-ho-mitra/bulk-update', [MasterInvestorController::class, 'bahanHoMitraBulkUpdate'])
+        ->name('master.qcr.bahanHoMitra.bulkUpdate');
+
 // Data Menu Laporan Investor
 Route::middleware(['auth'])->group(function () {
     Route::get('/investor/auth/user/investor', [AuthController::class, 'userInvestor'])->name('investor.user.auth');
