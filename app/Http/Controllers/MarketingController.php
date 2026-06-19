@@ -18,53 +18,162 @@ class MarketingController extends Controller
         $filters = [
             'start_date' => $request->get('start_date'),
             'end_date' => $request->get('end_date'),
-            'provinsi' => $request->get('provinsi', 'All'),
-            'kota' => $request->get('kota', 'All'),
-            'tahun' => $request->get('tahun', date('Y')),
-            'bulan' => $request->get('bulan', 'All'),
-            'quarter' => $request->get('quarter', 'All'),
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'kota' => (array) $request->get('kota', ['All']),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'quarter' => (array) $request->get('quarter', ['All']),
         ];
 
         // Ensure models are available
         $query = \App\Models\LaporanBulanan::query()
             ->join('tbl_outlets', 'tbl_laporan_bulanan.outlet_id', '=', 'tbl_outlets.id')
-            ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->select(
                 'tbl_laporan_bulanan.tanggal',
                 'tbl_laporan_bulanan.total_omset as omzet',
                 'tbl_laporan_bulanan.total_cu as cu',
                 'tbl_outlets.nama_outlet as outlet',
-                'tbl_area_outlet.area_kota as kota',
-                'tbl_area_outlet.area_provinsi as provinsi'
+                'tbl_outlets.status',
+                \Illuminate\Support\Facades\DB::raw("COALESCE(master_outlets.kota_kab, 
+                    CASE 
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' THEN 'Sleman'
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' THEN 'Bantul'
+                        ELSE '-'
+                    END
+                ) as kota"),
+                \Illuminate\Support\Facades\DB::raw("COALESCE(master_outlets.provinsi, 
+                    CASE 
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'DI Yogyakarta'
+                        ELSE '-'
+                    END
+                ) as provinsi"),
+                'master_outlets.tanggal_closed'
             );
 
         if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
             $query->whereBetween('tbl_laporan_bulanan.tanggal', [$filters['start_date'], $filters['end_date']]);
         } else {
-            if ($filters['tahun'] !== 'All') {
-                $query->whereYear('tbl_laporan_bulanan.tanggal', $filters['tahun']);
+            if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                $query->whereIn(\DB::raw('YEAR(tbl_laporan_bulanan.tanggal)'), $filters['tahun']);
             }
-            if ($filters['bulan'] !== 'All') {
-                $query->whereMonth('tbl_laporan_bulanan.tanggal', date('m', strtotime($filters['bulan'])));
+            if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                $query->whereIn(\DB::raw('MONTH(tbl_laporan_bulanan.tanggal)'), $months);
             }
-            if ($filters['quarter'] !== 'All') {
-                $qStr = str_replace('Q', '', $filters['quarter']);
-                $query->whereRaw('QUARTER(tbl_laporan_bulanan.tanggal) = ?', [$qStr]);
+            if (!empty($filters['quarter']) && !in_array('All', $filters['quarter'])) {
+                $quarters = array_map(function($q) { return str_replace('Q', '', $q); }, $filters['quarter']);
+                $query->whereIn(\DB::raw('QUARTER(tbl_laporan_bulanan.tanggal)'), $quarters);
             }
         }
 
-        if ($filters['provinsi'] !== 'All') {
-            $query->where('tbl_area_outlet.area_provinsi', $filters['provinsi']);
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $query->where(function($q) use ($filters) {
+                $q->whereIn('master_outlets.provinsi', $filters['provinsi']);
+                
+                // Smart Fallback jika join gagal namun nama mengandung kota di provinsi tersebut
+                if (in_array('DI Yogyakarta', $filters['provinsi'])) {
+                    $q->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%SLEMAN%')
+                      ->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%BANTUL%')
+                      ->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%DIY%');
+                }
+            });
         }
-        if ($filters['kota'] !== 'All') {
-            $query->where('tbl_area_outlet.area_kota', $filters['kota']);
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $query->where(function($q) use ($filters) {
+                foreach ($filters['kota'] as $k) {
+                    $q->orWhere('master_outlets.kota_kab', 'LIKE', '%' . $k . '%')
+                      ->orWhere('tbl_outlets.nama_outlet', 'LIKE', '%' . $k . '%');
+                }
+            });
         }
 
-        $allData = $query->get();
+        $knownLocations = \Illuminate\Support\Facades\Cache::remember('known_locations_v1', 3600, function() {
+            return \App\Models\MasterOutlet::select('kota_kab', 'provinsi')
+                ->whereNotNull('kota_kab')->where('kota_kab', '!=', '')
+                ->distinct()->get()
+                ->map(function($o) {
+                    return [
+                        'kota' => trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $o->kota_kab)),
+                        'provinsi' => $o->provinsi
+                    ];
+                })->filter(fn($loc) => strlen($loc['kota']) > 3)->values()->all();
+        });
+
+        $allData = $query->get()->map(function($item) use ($knownLocations) {
+            if ($item->kota && $item->kota !== '-') {
+                $item->kota = trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $item->kota));
+                if (!$item->provinsi || $item->provinsi === '-') {
+                    $item->provinsi = 'Unidentified Area';
+                }
+            } else {
+                $namaOutlet = strtoupper($item->outlet);
+                $foundKota = null;
+                $foundProvinsi = null;
+                
+                // 1. Dictionary Match
+                foreach ($knownLocations as $loc) {
+                    if (str_contains($namaOutlet, strtoupper($loc['kota']))) {
+                        $foundKota = $loc['kota'];
+                        $foundProvinsi = $loc['provinsi'];
+                        break;
+                    }
+                }
+                
+                // 2. Hardcoded fallback for DIY
+                if (!$foundKota && (str_contains($namaOutlet, 'DIY ') || str_ends_with($namaOutlet, 'DIY') || str_contains($namaOutlet, 'YOGYA'))) {
+                    $foundKota = 'Yogyakarta';
+                    $foundProvinsi = 'DI Yogyakarta';
+                }
+                
+                // 3. Fallback to parsing after hyphen "-"
+                if (!$foundKota && str_contains($namaOutlet, '-')) {
+                    $parts = explode('-', $namaOutlet);
+                    $potentialKota = trim(end($parts));
+                    // Remove terms like "NOT USE"
+                    if (strlen($potentialKota) > 2 && !str_contains($potentialKota, 'NOT USE')) {
+                        $foundKota = ucwords(strtolower($potentialKota));
+                    }
+                }
+                
+                if ($foundKota) {
+                    $item->kota = $foundKota;
+                    // Only overwrite province if we found one from dictionary, otherwise keep SQL province
+                    if ($foundProvinsi) {
+                        $item->provinsi = $foundProvinsi;
+                    } else if (!$item->provinsi || $item->provinsi === '-') {
+                        $item->provinsi = 'Unidentified Area';
+                    }
+                } else {
+                    $item->kota = 'Unidentified Area';
+                    // Preserve SQL fallback province if it exists! (e.g. DI Yogyakarta)
+                    if (!$item->provinsi || $item->provinsi === '-') {
+                        $item->provinsi = 'Unidentified Area';
+                    }
+                }
+            }
+            return $item;
+        });
 
         $totalOmzet = $allData->sum('omzet');
         $totalCu = $allData->sum('cu');
-        $totalOutlet = $allData->pluck('outlet')->filter()->unique()->count();
+        
+        $outletQuery = \App\Models\MasterOutlet::where(function($q) {
+            $q->whereNull('tanggal_closed')->orWhere('tanggal_closed', '=', '');
+        })->whereNotNull('tanggal_open')->where('tanggal_open', '!=', '');
+
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $outletQuery->whereIn('provinsi', $filters['provinsi']);
+        }
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $outletQuery->where(function($q) use ($filters) {
+                foreach ($filters['kota'] as $k) {
+                    $q->orWhere('kota_kab', 'LIKE', '%' . $k . '%');
+                }
+            });
+        }
+        
+        $totalOutlet = $outletQuery->distinct('nama_outlet')->count('nama_outlet');
 
         $avgBasket = $totalCu > 0 ? round($totalOmzet / $totalCu) : 0;
         $avgOmzet = $totalOutlet > 0 ? round($totalOmzet / $totalOutlet) : 0;
@@ -79,7 +188,7 @@ class MarketingController extends Controller
             'avg_cu' => number_format($avgCu, 0, ',', '.'),
             'jumlah_data' => $allData->count(),
             'status_sheet' => 'Connected to Database',
-            'message_sheet' => 'Data tahun ' . ($filters['tahun'] == 'All' ? 'Semua Tahun' : $filters['tahun']) . ' berhasil ditarik.',
+            'message_sheet' => 'Data tahun ' . (in_array('All', $filters['tahun']) ? 'Semua Tahun' : implode(', ', $filters['tahun'])) . ' berhasil ditarik.',
         ];
 
         // Format dates into Months (Jan, Feb, etc)
@@ -127,8 +236,8 @@ class MarketingController extends Controller
         // Need unfiltered data for options
         $allUnfiltered = \App\Models\LaporanBulanan::query()
             ->join('tbl_outlets', 'tbl_laporan_bulanan.outlet_id', '=', 'tbl_outlets.id')
-            ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
-            ->select('tbl_area_outlet.area_provinsi as provinsi', 'tbl_area_outlet.area_kota as kota');
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select('master_outlets.provinsi as provinsi', 'master_outlets.kota_kab as kota');
             
         if ($filters['tahun'] !== 'All') {
             $allUnfiltered->whereYear('tbl_laporan_bulanan.tanggal', $filters['tahun']);
@@ -138,10 +247,18 @@ class MarketingController extends Controller
 
         $years = \App\Models\LaporanBulanan::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values();
 
+        $kotaByProvinsi = $allUnfilteredData->groupBy('provinsi')->map(function($items) {
+            return $items->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values();
+        });
+
         $options = [
             'tahun' => $years,
             'provinsi' => $allUnfilteredData->pluck('provinsi')->filter()->unique()->sort()->values(),
-            'kota' => $allUnfilteredData->pluck('kota')->filter()->unique()->sort()->values(),
+            'kota' => $allUnfilteredData->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values(),
             'bulan' => collect(['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']), // Static or from DB
             'quarter' => collect(['Q1','Q2','Q3','Q4']),
         ];
@@ -151,7 +268,8 @@ class MarketingController extends Controller
             'kpi',
             'monthlyTrend',
             'topCities',
-            'options'
+            'options',
+            'kotaByProvinsi'
         ));
     }
 
@@ -273,58 +391,108 @@ class MarketingController extends Controller
         $filters = [
             'start_date' => $request->get('start_date'),
             'end_date' => $request->get('end_date'),
-            'tahun' => $request->get('tahun', date('Y')),
-            'bulan' => $request->get('bulan', 'All'),
-            'status' => $request->get('status', 'All'),
-            'provinsi' => $request->get('provinsi', 'All'),
-            'kota' => $request->get('kota', 'All'),
-            'zona' => $request->get('zona', 'All'),
-            'search' => $request->get('search', ''),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'kota' => (array) $request->get('kota', ['All']),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'status' => (array) $request->get('status', ['All']),
+            'zona' => (array) $request->get('zona', ['All']),
+            'outlet' => (array) $request->get('outlet', ['All']),
         ];
 
         $query = \App\Models\M_Outlet::query()
-            ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->leftJoin('tbl_laporan_bulanan', function($join) use ($filters) {
                 $join->on('tbl_outlets.id', '=', 'tbl_laporan_bulanan.outlet_id');
                 if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
                     $join->whereBetween('tbl_laporan_bulanan.tanggal', [$filters['start_date'], $filters['end_date']]);
                 } else {
-                    if ($filters['tahun'] !== 'All') {
-                        $join->whereYear('tbl_laporan_bulanan.tanggal', $filters['tahun']);
+                    if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                        $join->whereIn(\Illuminate\Support\Facades\DB::raw('YEAR(tbl_laporan_bulanan.tanggal)'), $filters['tahun']);
                     }
-                    if ($filters['bulan'] !== 'All') {
-                        $join->whereMonth('tbl_laporan_bulanan.tanggal', date('m', strtotime($filters['bulan'])));
+                    if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                        $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                        $join->whereIn(\Illuminate\Support\Facades\DB::raw('MONTH(tbl_laporan_bulanan.tanggal)'), $months);
                     }
                 }
             })
             ->select(
-                'tbl_outlets.id',
-                'tbl_outlets.nama_outlet',
-                'tbl_outlets.status', // 'existing', 'tutup', 'go'
-                'tbl_area_outlet.area_kota as kota',
-                'tbl_area_outlet.area_provinsi as provinsi',
+                // Mengambil nama dari master_outlets jika ada, jika tidak pakai dari tbl_outlets
+                \Illuminate\Support\Facades\DB::raw('MAX(master_outlets.id) as master_id'),
+                \Illuminate\Support\Facades\DB::raw('COALESCE(master_outlets.nama_outlet, TRIM(tbl_outlets.nama_outlet)) as nama_outlet'),
+                \Illuminate\Support\Facades\DB::raw('MAX(tbl_outlets.status) as status'), // 'existing', 'tutup', 'go'
+                \Illuminate\Support\Facades\DB::raw("MAX(COALESCE(master_outlets.kota_kab, 
+                    CASE 
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' THEN 'Sleman'
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' THEN 'Bantul'
+                        ELSE '-'
+                    END
+                )) as kota"),
+                \Illuminate\Support\Facades\DB::raw("MAX(COALESCE(master_outlets.provinsi, 
+                    CASE 
+                        WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'DI Yogyakarta'
+                        ELSE '-'
+                    END
+                )) as provinsi"),
+                'master_outlets.tanggal_closed',
+                'master_outlets.tanggal_open',
                 \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as omset'),
                 \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as cu')
             )
-            ->groupBy('tbl_outlets.id', 'tbl_outlets.nama_outlet', 'tbl_outlets.status', 'tbl_area_outlet.area_kota', 'tbl_area_outlet.area_provinsi');
+            ->groupBy(
+                \Illuminate\Support\Facades\DB::raw('COALESCE(master_outlets.nama_outlet, TRIM(tbl_outlets.nama_outlet))'),
+                'master_outlets.kota_kab',
+                'master_outlets.provinsi',
+                'master_outlets.tanggal_closed',
+                'master_outlets.tanggal_open'
+            );
 
-        if ($filters['provinsi'] !== 'All') {
-            $query->where('tbl_area_outlet.area_provinsi', $filters['provinsi']);
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $query->where(function($q) use ($filters) {
+                $q->whereIn('master_outlets.provinsi', $filters['provinsi']);
+                
+                // Smart Fallback jika join gagal namun nama mengandung kota di provinsi tersebut
+                if (in_array('DI Yogyakarta', $filters['provinsi'])) {
+                    $q->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%SLEMAN%')
+                      ->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%BANTUL%')
+                      ->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(tbl_outlets.nama_outlet)'), 'LIKE', '%DIY%');
+                }
+            });
         }
-        if ($filters['kota'] !== 'All') {
-            $query->where('tbl_area_outlet.area_kota', $filters['kota']);
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $query->where(function($q) use ($filters) {
+                foreach ($filters['kota'] as $k) {
+                    $q->orWhere('master_outlets.kota_kab', 'LIKE', '%' . $k . '%');
+                }
+            });
         }
-        if ($filters['status'] !== 'All') {
-            $dbStatus = strtolower($filters['status']);
-            if ($dbStatus === 'closed') $dbStatus = 'tutup';
-            if ($dbStatus === 'new') $dbStatus = 'go';
-            $query->where('tbl_outlets.status', $dbStatus);
+        if (!empty($filters['status']) && !in_array('All', $filters['status'])) {
+            $dbStatuses = [];
+            foreach ($filters['status'] as $s) {
+                $dbStatus = strtolower($s);
+                if ($dbStatus === 'closed') $dbStatus = 'tutup';
+                if ($dbStatus === 'new') $dbStatus = 'go';
+                $dbStatuses[] = $dbStatus;
+            }
+            $query->whereIn('tbl_outlets.status', $dbStatuses);
         }
-        if (!empty($filters['search'])) {
-            $query->where('tbl_outlets.nama_outlet', 'like', '%' . $filters['search'] . '%');
+        if (!empty($filters['outlet']) && !in_array('All', $filters['outlet'])) {
+            $query->whereIn('tbl_outlets.nama_outlet', $filters['outlet']);
         }
 
-        $allData = $query->orderByDesc('omset')->orderByDesc('cu')->get()->unique('nama_outlet');
+        $allData = $query->orderByDesc('omset')->orderByDesc('cu')->get();
+        
+        $allData = $allData->reject(function ($row) {
+            $isClosed = ($row->status === 'tutup') || !empty($row->tanggal_closed);
+            
+            // Buang outlet bayangan (yatim piatu tanpa master) jika omsetnya 0
+            if (empty($row->master_id) && (float)$row->omset == 0) {
+                return true;
+            }
+
+            // Hanya sembunyikan outlet yang sudah tutup JIKA omsetnya benar-benar 0
+            return $isClosed && (float)$row->omset == 0;
+        });
 
         $kpi = [
             'total' => 0,
@@ -337,9 +505,13 @@ class MarketingController extends Controller
 
         if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
             $daysInMonth = max(1, round((strtotime($filters['end_date']) - strtotime($filters['start_date'])) / (60 * 60 * 24)) + 1);
-        } else if ($filters['bulan'] !== 'All') {
-            $yearStr = $filters['tahun'] !== 'All' ? $filters['tahun'] : date('Y');
-            $daysInMonth = \Carbon\Carbon::parse("1 " . $filters['bulan'] . " " . $yearStr)->daysInMonth;
+        } else if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+            $yearStr = (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) ? $filters['tahun'][0] : date('Y');
+            $totalDays = 0;
+            foreach ($filters['bulan'] as $m) {
+                $totalDays += \Carbon\Carbon::parse("1 " . $m . " " . $yearStr)->daysInMonth;
+            }
+            $daysInMonth = $totalDays;
         } else {
             $daysInMonth = 365; // Approx for 'All'
         }
@@ -359,7 +531,7 @@ class MarketingController extends Controller
             else if ($rank <= $q2) { $zona = 'Z2'; $zonaClass = 'blue'; }
             else if ($rank <= $q3) { $zona = 'Z3'; $zonaClass = 'yellow'; }
 
-            if ($filters['zona'] !== 'All' && $zona !== $filters['zona']) {
+            if (!empty($filters['zona']) && !in_array('All', $filters['zona']) && !in_array($zona, $filters['zona'])) {
                 continue;
             }
 
@@ -378,9 +550,11 @@ class MarketingController extends Controller
             $avgOmset = (float) $row->omset / max(1, $daysInMonth);
             $avgCu = (int) $row->cu / max(1, $daysInMonth);
 
+            $cleanedKota = $row->kota ? trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $row->kota)) : '-';
+
             $outlets[] = [
                 'nama' => $row->nama_outlet,
-                'kota' => $row->kota ?: '-',
+                'kota' => $cleanedKota,
                 'provinsi' => $row->provinsi ?: '-',
                 'status_label' => $statusLabel,
                 'status_class' => $statusClass,
@@ -401,19 +575,62 @@ class MarketingController extends Controller
 
         $years = \App\Models\LaporanBulanan::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values();
         
-        $areaData = \App\Models\M_Outlet::join('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')->get();
+        $areaData = \App\Models\M_Outlet::leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select('master_outlets.provinsi', 'master_outlets.kota_kab as kota')
+            ->get();
+
+        $kotaByProvinsi = $areaData->groupBy('provinsi')->map(function($items) {
+            return $items->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values();
+        });
 
         // Filter options
         $options = [
             'tahun' => $years,
             'bulan' => ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'],
             'status' => ['Existing', 'Closed', 'New'],
-            'provinsi' => $areaData->pluck('area_provinsi')->filter()->unique()->sort()->values(),
-            'kota' => $areaData->pluck('area_kota')->filter()->unique()->sort()->values(),
+            'provinsi' => $areaData->pluck('provinsi')->filter()->unique()->sort()->values(),
+            'kota' => $areaData->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values(),
             'zona' => ['Z1', 'Z2', 'Z3', 'Z4'],
+            'outlet' => \App\Models\M_Outlet::pluck('nama_outlet')->filter()->unique()->sort()->values(),
         ];
 
-        return view('Marketing.outlet-z', compact('filters', 'kpi', 'outlets', 'options'));
+        if ($request->has('export')) {
+            $filename = "export_outlet_z_" . date('Y-m-d_H-i-s') . ".csv";
+            $headers = [
+                "Content-type"        => "text/csv",
+                "Content-Disposition" => "attachment; filename=$filename",
+                "Pragma"              => "no-cache",
+                "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+                "Expires"             => "0"
+            ];
+            $columns = ['Outlet', 'Kab/Kota', 'Provinsi', 'Zona', 'Status', 'Total Omset', 'Avg Omset', 'Total CU', 'Avg CU'];
+            
+            $callback = function() use($outlets, $columns) {
+                $file = fopen('php://output', 'w');
+                fputcsv($file, $columns);
+                foreach ($outlets as $row) {
+                    fputcsv($file, [
+                        $row['nama'],
+                        $row['kota'],
+                        $row['provinsi'],
+                        $row['zona'],
+                        $row['status_label'],
+                        $row['omset'],
+                        $row['avg_omset'],
+                        $row['cu'],
+                        $row['avg_cu']
+                    ]);
+                }
+                fclose($file);
+            };
+            return response()->stream($callback, 200, $headers);
+        }
+
+        return view('Marketing.outlet-z', compact('filters', 'outlets', 'kpi', 'options', 'kotaByProvinsi'));
     }
 
     public function apiGetCityInsights(Request $request)
@@ -500,9 +717,9 @@ class MarketingController extends Controller
         $filters = [
             'start_date' => $startDate,
             'end_date' => $endDate,
-            'tahun' => $request->get('tahun', date('Y')),
-            'bulan' => $request->get('bulan', 'All'),
-            'outlet' => $request->get('outlet', 'All'),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'outlet' => (array) $request->get('outlet', ['All']),
         ];
 
         $queryPareto = \App\Models\LaporanPareto::query()
@@ -516,23 +733,24 @@ class MarketingController extends Controller
             $queryPareto->whereBetween('tanggal', [$startDate, $endDate]);
             $queryEcom->whereBetween('tanggal', [$startDate, $endDate]);
         } else {
-            if ($filters['tahun'] !== 'All') {
-                $queryPareto->whereYear('tanggal', $filters['tahun']);
-                $queryEcom->whereYear('tanggal', $filters['tahun']);
+            if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                $queryPareto->whereIn(\DB::raw('YEAR(tanggal)'), $filters['tahun']);
+                $queryEcom->whereIn(\DB::raw('YEAR(tanggal)'), $filters['tahun']);
             }
 
-            if ($filters['bulan'] !== 'All') {
-                $queryPareto->whereMonth('tanggal', date('m', strtotime($filters['bulan'])));
-                $queryEcom->whereMonth('tanggal', date('m', strtotime($filters['bulan'])));
+            if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                $queryPareto->whereIn(\DB::raw('MONTH(tanggal)'), $months);
+                $queryEcom->whereIn(\DB::raw('MONTH(tanggal)'), $months);
             }
         }
         
-        if ($filters['outlet'] !== 'All') {
+        if (!empty($filters['outlet']) && !in_array('All', $filters['outlet'])) {
             $queryPareto->whereHas('outlet', function($q) use ($filters) {
-                $q->where('nama_outlet', $filters['outlet']);
+                $q->whereIn('nama_outlet', $filters['outlet']);
             });
             $queryEcom->whereHas('outlet', function($q) use ($filters) {
-                $q->where('nama_outlet', $filters['outlet']);
+                $q->whereIn('nama_outlet', $filters['outlet']);
             });
         }
 
@@ -1014,73 +1232,115 @@ class MarketingController extends Controller
         $filters = [
             'start_date' => $request->get('start_date'),
             'end_date' => $request->get('end_date'),
-            'tahun' => $request->get('tahun', date('Y')),
-            'outlet' => $request->get('outlet', 'All'),
-            'provinsi' => $request->get('provinsi', 'All'),
-            'kota' => $request->get('kota', 'All'),
-            'bulan' => $request->get('bulan', 'All'),
-            'quarter' => $request->get('quarter', 'All'),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'outlet' => (array) $request->get('outlet', ['All']),
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'kota' => (array) $request->get('kota', ['All']),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'quarter' => (array) $request->get('quarter', ['All']),
             'search' => $request->get('search', ''),
         ];
 
+        $kotaRaw = "COALESCE(master_outlets.kota_kab, 
+            CASE 
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' THEN 'Sleman'
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' THEN 'Bantul'
+                ELSE 'Unidentified Area'
+            END
+        )";
+        $provRaw = "COALESCE(master_outlets.provinsi, 
+            CASE 
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'DI Yogyakarta'
+                ELSE 'Unidentified Area'
+            END
+        )";
+
         $query = \App\Models\LaporanBulanan::query()
             ->join('tbl_outlets', 'tbl_laporan_bulanan.outlet_id', '=', 'tbl_outlets.id')
-            ->leftJoin('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->select(
-                'tbl_outlets.nama_outlet as outlet',
-                'tbl_area_outlet.area_kota as kota',
-                'tbl_area_outlet.area_provinsi as provinsi',
-                'tbl_laporan_bulanan.tanggal',
-                'tbl_laporan_bulanan.total_omset as omset',
-                'tbl_laporan_bulanan.total_cu as cu'
+                \Illuminate\Support\Facades\DB::raw("$kotaRaw as kota"),
+                \Illuminate\Support\Facades\DB::raw("$provRaw as provinsi"),
+                \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT tbl_outlets.id) as jumlah_outlet_aktif'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as omset'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as cu')
             );
 
         if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
             $query->whereBetween('tbl_laporan_bulanan.tanggal', [$filters['start_date'], $filters['end_date']]);
         } else {
-            if ($filters['tahun'] !== 'All') {
-                $query->whereYear('tbl_laporan_bulanan.tanggal', $filters['tahun']);
+            if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                $query->whereIn(\DB::raw('YEAR(tbl_laporan_bulanan.tanggal)'), $filters['tahun']);
             }
-            if ($filters['bulan'] !== 'All') {
-                $query->whereMonth('tbl_laporan_bulanan.tanggal', date('m', strtotime($filters['bulan'])));
+            if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                $query->whereIn(\DB::raw('MONTH(tbl_laporan_bulanan.tanggal)'), $months);
             }
-            if ($filters['quarter'] !== 'All') {
-                $qStr = str_replace('Q', '', $filters['quarter']);
-                $query->whereRaw('QUARTER(tbl_laporan_bulanan.tanggal) = ?', [$qStr]);
+            if (!empty($filters['quarter']) && !in_array('All', $filters['quarter'])) {
+                $quarters = array_map(function($q) { return str_replace('Q', '', $q); }, $filters['quarter']);
+                $query->whereIn(\DB::raw('QUARTER(tbl_laporan_bulanan.tanggal)'), $quarters);
             }
         }
 
-        if ($filters['provinsi'] !== 'All') {
-            $query->where('tbl_area_outlet.area_provinsi', $filters['provinsi']);
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['provinsi']), '?'));
+            $query->whereRaw("($provRaw) IN ($placeholders)", $filters['provinsi']);
         }
-        if ($filters['kota'] !== 'All') {
-            $query->where('tbl_area_outlet.area_kota', $filters['kota']);
+        
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $query->where(function($q) use ($filters, $kotaRaw) {
+                foreach ($filters['kota'] as $k) {
+                    $q->orWhereRaw("($kotaRaw) LIKE ?", ['%' . $k . '%']);
+                }
+            });
         }
-        if ($filters['outlet'] !== 'All') {
-            $query->where('tbl_outlets.nama_outlet', $filters['outlet']);
+        
+        if (!empty($filters['outlet']) && !in_array('All', $filters['outlet'])) {
+            $query->whereIn('tbl_outlets.nama_outlet', $filters['outlet']);
         }
+        
         if (!empty($filters['search'])) {
-            $query->where(function($q) use ($filters) {
+            $query->where(function($q) use ($filters, $kotaRaw, $provRaw) {
                 $q->where('tbl_outlets.nama_outlet', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('tbl_area_outlet.area_kota', 'like', '%' . $filters['search'] . '%');
+                  ->orWhereRaw("($kotaRaw) LIKE ?", ['%' . $filters['search'] . '%'])
+                  ->orWhereRaw("($provRaw) LIKE ?", ['%' . $filters['search'] . '%']);
             });
         }
 
-        $totalOmzet = $query->sum('tbl_laporan_bulanan.total_omset');
-        $totalCu = $query->sum('tbl_laporan_bulanan.total_cu');
-        $avgBasket = $totalCu > 0 ? round($totalOmzet / $totalCu) : 0;
-        $jumlahData = $query->count();
-        
-        $maxOmzet = clone $query;
-        $maxVal = $maxOmzet->max('tbl_laporan_bulanan.total_omset') ?: 1;
+        // Clean zeroes
+        $query->where('tbl_laporan_bulanan.total_omset', '>', 0);
 
-        $paginator = $query->orderByDesc('tbl_laporan_bulanan.total_omset')->paginate(20)->appends($request->all());
+        // Calculate Totals before grouping
+        $baseQuery = clone $query;
+        $baseQuery->select(
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as total_omzet'), 
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as total_cu')
+        );
+        $totals = $baseQuery->first();
+        
+        $totalOmzet = $totals->total_omzet ?? 0;
+        $totalCu = $totals->total_cu ?? 0;
+        $avgBasket = $totalCu > 0 ? round($totalOmzet / $totalCu) : 0;
+        
+        // Apply Grouping
+        $query->groupBy(
+            \Illuminate\Support\Facades\DB::raw($provRaw),
+            \Illuminate\Support\Facades\DB::raw($kotaRaw)
+        );
+
+        $citiesResult = clone $query;
+        $allCities = $citiesResult->get();
+        $jumlahData = $allCities->count();
+        $maxVal = $allCities->max('omset') ?: 1;
+
+        $paginator = $query->orderByDesc(\Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset)'))->paginate(20)->appends($request->all());
 
         $paginator->getCollection()->transform(function($row) use ($maxVal) {
-            $time = strtotime($row->tanggal);
-            $row->bulan_str = strtoupper(date('M', $time));
-            $row->quarter_str = 'Q' . ceil(date('m', $time) / 3);
             $row->skor = round(($row->omset / $maxVal) * 100);
+            if ($row->kota) {
+                $row->kota = trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $row->kota));
+            }
+            $row->avg_basket = $row->cu > 0 ? round($row->omset / $row->cu) : 0;
             return $row;
         });
 
@@ -1093,18 +1353,259 @@ class MarketingController extends Controller
         ];
 
         $years = \App\Models\LaporanBulanan::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values();
-        $areaData = \App\Models\M_Outlet::join('tbl_area_outlet', 'tbl_outlets.area_id', '=', 'tbl_area_outlet.id')->get();
+        $areaData = \App\Models\M_Outlet::leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select(
+                'tbl_outlets.nama_outlet as outlet', 
+                \Illuminate\Support\Facades\DB::raw("$provRaw as provinsi"), 
+                \Illuminate\Support\Facades\DB::raw("$kotaRaw as kota")
+            )
+            ->get();
+
+        $hierarchy = $areaData->map(function($item) {
+            $cleanedKota = $item->kota ? trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $item->kota)) : '';
+            return [
+                'outlet' => $item->outlet,
+                'provinsi' => $item->provinsi,
+                'kota' => $cleanedKota
+            ];
+        });
+
+        $kotaByProvinsi = $areaData->groupBy('provinsi')->map(function($items) {
+            return $items->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values();
+        });
 
         $options = [
             'tahun' => $years,
             'outlet' => \App\Models\M_Outlet::pluck('nama_outlet')->filter()->unique()->sort()->values(),
-            'provinsi' => $areaData->pluck('area_provinsi')->filter()->unique()->sort()->values(),
-            'kota' => $areaData->pluck('area_kota')->filter()->unique()->sort()->values(),
+            'provinsi' => $areaData->pluck('provinsi')->filter()->unique()->sort()->values(),
+            'kota' => $areaData->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values(),
             'bulan' => collect(['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']),
             'quarter' => collect(['Q1','Q2','Q3','Q4']),
         ];
 
-        return view('Marketing.data-sales-perkota', compact('filters', 'paginator', 'snapshot', 'options'));
+        return view('Marketing.data-sales-perkota', compact('filters', 'paginator', 'snapshot', 'options', 'kotaByProvinsi', 'hierarchy'));
+    }
+
+    public function dataSalesProvinsi(Request $request)
+    {
+        $filters = [
+            'start_date' => $request->get('start_date'),
+            'end_date' => $request->get('end_date'),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'quarter' => (array) $request->get('quarter', ['All']),
+            'search' => $request->get('search', ''),
+        ];
+
+        $provRaw = "COALESCE(master_outlets.provinsi, 
+            CASE 
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'DI Yogyakarta'
+                ELSE 'Unidentified Area'
+            END
+        )";
+
+        $query = \App\Models\LaporanBulanan::query()
+            ->join('tbl_outlets', 'tbl_laporan_bulanan.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw("$provRaw as provinsi"),
+                \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT tbl_outlets.id) as jumlah_outlet_aktif'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as omset'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as cu')
+            );
+
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $query->whereBetween('tbl_laporan_bulanan.tanggal', [$filters['start_date'], $filters['end_date']]);
+        } else {
+            if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('YEAR(tbl_laporan_bulanan.tanggal)'), $filters['tahun']);
+            }
+            if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('MONTH(tbl_laporan_bulanan.tanggal)'), $months);
+            }
+            if (!empty($filters['quarter']) && !in_array('All', $filters['quarter'])) {
+                $quarters = array_map(function($q) { return str_replace('Q', '', $q); }, $filters['quarter']);
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('QUARTER(tbl_laporan_bulanan.tanggal)'), $quarters);
+            }
+        }
+
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $placeholders = implode(',', array_fill(0, count($filters['provinsi']), '?'));
+            $query->whereRaw("($provRaw) IN ($placeholders)", $filters['provinsi']);
+        }
+        
+        if (!empty($filters['search'])) {
+            $query->whereRaw("($provRaw) LIKE ?", ['%' . $filters['search'] . '%']);
+        }
+
+        // Clean zeroes
+        $query->where('tbl_laporan_bulanan.total_omset', '>', 0);
+
+        // Calculate Totals before grouping
+        $baseQuery = clone $query;
+        $baseQuery->select(
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as total_omzet'), 
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as total_cu')
+        );
+        $totals = $baseQuery->first();
+        
+        $totalOmzet = $totals->total_omzet ?? 0;
+        $totalCu = $totals->total_cu ?? 0;
+        $avgBasket = $totalCu > 0 ? round($totalOmzet / $totalCu) : 0;
+        
+        // Apply Grouping
+        $query->groupBy(
+            \Illuminate\Support\Facades\DB::raw($provRaw)
+        );
+
+        $provResult = clone $query;
+        $allProv = $provResult->get();
+        $jumlahData = $allProv->count();
+        $maxVal = $allProv->max('omset') ?: 1;
+
+        $paginator = $query->orderByDesc(\Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset)'))->paginate(20)->appends($request->all());
+
+        $paginator->getCollection()->transform(function($row) use ($maxVal) {
+            $row->skor = round(($row->omset / $maxVal) * 100);
+            $row->avg_basket = $row->cu > 0 ? round($row->omset / $row->cu) : 0;
+            return $row;
+        });
+
+        $snapshot = [
+            'total_omzet' => $this->rupiahShort($totalOmzet),
+            'total_cu' => number_format($totalCu, 0, ',', '.'),
+            'avg_basket' => $this->rupiah($avgBasket),
+            'jumlah_data' => $jumlahData,
+            'status_sheet' => 'Connected',
+        ];
+
+        $years = \App\Models\LaporanBulanan::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values();
+        $areaData = \App\Models\M_Outlet::leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select(
+                \Illuminate\Support\Facades\DB::raw("$provRaw as provinsi")
+            )
+            ->get();
+
+        $options = [
+            'tahun' => $years,
+            'provinsi' => $areaData->pluck('provinsi')->filter()->unique()->sort()->values(),
+            'bulan' => collect(['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']),
+            'quarter' => collect(['Q1','Q2','Q3','Q4']),
+        ];
+
+        return view('Marketing.data-sales-provinsi', compact('filters', 'paginator', 'snapshot', 'options'));
+    }
+
+    public function anomaliKota(Request $request)
+    {
+        $filters = [
+            'start_date' => $request->get('start_date'),
+            'end_date' => $request->get('end_date'),
+            'tahun' => (array) $request->get('tahun', [date('Y')]),
+            'bulan' => (array) $request->get('bulan', ['All']),
+            'quarter' => (array) $request->get('quarter', ['All']),
+            'search' => $request->get('search', ''),
+        ];
+
+        $provRaw = "COALESCE(master_outlets.provinsi, 
+            CASE 
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' OR UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'DI Yogyakarta'
+                ELSE 'Unidentified Area'
+            END
+        )";
+
+        $kotaRaw = "COALESCE(master_outlets.kota_kab, 
+            CASE 
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%SLEMAN%' THEN 'Kabupaten Sleman'
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%BANTUL%' THEN 'Kabupaten Bantul'
+                WHEN UPPER(tbl_outlets.nama_outlet) LIKE '%DIY%' THEN 'Kota Yogyakarta'
+                ELSE 'Unidentified Area'
+            END
+        )";
+
+        $query = \App\Models\LaporanBulanan::query()
+            ->join('tbl_outlets', 'tbl_laporan_bulanan.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
+            ->select(
+                'tbl_outlets.nama_outlet',
+                \Illuminate\Support\Facades\DB::raw("$provRaw as provinsi"),
+                \Illuminate\Support\Facades\DB::raw("$kotaRaw as kota"),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as omset'),
+                \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as cu')
+            );
+
+        if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+            $query->whereBetween('tbl_laporan_bulanan.tanggal', [$filters['start_date'], $filters['end_date']]);
+        } else {
+            if (!empty($filters['tahun']) && !in_array('All', $filters['tahun'])) {
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('YEAR(tbl_laporan_bulanan.tanggal)'), $filters['tahun']);
+            }
+            if (!empty($filters['bulan']) && !in_array('All', $filters['bulan'])) {
+                $months = array_map(function($m) { return date('m', strtotime($m)); }, $filters['bulan']);
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('MONTH(tbl_laporan_bulanan.tanggal)'), $months);
+            }
+            if (!empty($filters['quarter']) && !in_array('All', $filters['quarter'])) {
+                $quarters = array_map(function($q) { return str_replace('Q', '', $q); }, $filters['quarter']);
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('QUARTER(tbl_laporan_bulanan.tanggal)'), $quarters);
+            }
+        }
+
+        if (!empty($filters['search'])) {
+            $query->where('tbl_outlets.nama_outlet', 'LIKE', '%' . $filters['search'] . '%');
+        }
+
+        // Clean zeroes
+        $query->where('tbl_laporan_bulanan.total_omset', '>', 0);
+        
+        // ONLY ANOMALY
+        $query->whereRaw("(($provRaw) = 'Unidentified Area' OR ($kotaRaw) = 'Unidentified Area')");
+
+        // Calculate Totals before grouping
+        $baseQuery = clone $query;
+        $baseQuery->select(
+            \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT tbl_outlets.id) as total_outlet_anomali'),
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset) as total_omzet'), 
+            \Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_cu) as total_cu')
+        );
+        $totals = $baseQuery->first();
+        
+        $totalOmzet = $totals->total_omzet ?? 0;
+        $totalCu = $totals->total_cu ?? 0;
+        $totalOutlet = $totals->total_outlet_anomali ?? 0;
+        $avgBasket = $totalCu > 0 ? round($totalOmzet / $totalCu) : 0;
+        
+        // Apply Grouping
+        $query->groupBy(
+            'tbl_outlets.nama_outlet',
+            \Illuminate\Support\Facades\DB::raw($provRaw),
+            \Illuminate\Support\Facades\DB::raw($kotaRaw)
+        );
+
+        $paginator = $query->orderByDesc(\Illuminate\Support\Facades\DB::raw('SUM(tbl_laporan_bulanan.total_omset)'))->paginate(50)->appends($request->all());
+
+        $snapshot = [
+            'total_omzet' => $this->rupiahShort($totalOmzet),
+            'total_cu' => number_format($totalCu, 0, ',', '.'),
+            'avg_basket' => $this->rupiah($avgBasket),
+            'jumlah_data' => $totalOutlet,
+            'status_sheet' => 'Connected',
+        ];
+
+        $years = \App\Models\LaporanBulanan::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values();
+        
+        $options = [
+            'tahun' => $years,
+            'bulan' => collect(['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']),
+            'quarter' => collect(['Q1','Q2','Q3','Q4']),
+        ];
+
+        return view('Marketing.anomali-kota', compact('filters', 'paginator', 'snapshot', 'options'));
     }
 
     private function isActiveFilter($value)
@@ -2378,6 +2879,7 @@ private function buildApifyInstagramInputs($link)
 
         $query = \App\Models\LaporanPareto::query()
             ->join('tbl_outlets', 'tbl_laporan_pareto.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->whereIn('item_nama', $selectedProduk);
 
         if (!empty($startDate) && !empty($endDate)) {
@@ -2397,7 +2899,7 @@ private function buildApifyInstagramInputs($link)
             'tbl_laporan_pareto.total_jumlah',
             'tbl_laporan_pareto.total_harga',
             'tbl_outlets.nama_outlet',
-            'tbl_outlets.kota as area'
+            'master_outlets.kota_kab as area'
         )->get();
 
         $productStats = [];
@@ -2522,8 +3024,14 @@ private function buildApifyInstagramInputs($link)
             $bulanInfo = date('d M Y', strtotime($startDate)) . ' - ' . date('d M Y', strtotime($endDate));
         }
 
+        $filters = [
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'kota' => (array) $request->get('kota', ['All']),
+        ];
+
         $query = \App\Models\LaporanEcommerce::query()
             ->join('tbl_outlets', 'tbl_laporan_ecommerce.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->where('tbl_outlets.status', 'go');
 
         if (!empty($startDate) && !empty($endDate)) {
@@ -2535,6 +3043,13 @@ private function buildApifyInstagramInputs($link)
                   ->whereYear('tanggal', $tahun);
             $periodStart = date('Y-m-01', strtotime("$tahun-$bulan-01"));
             $periodEnd = date('Y-m-t', strtotime("$tahun-$bulan-01"));
+        }
+
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $query->whereIn('master_outlets.provinsi', $filters['provinsi']);
+        }
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $query->whereIn('master_outlets.kota_kab', $filters['kota']);
         }
 
         $dateColumns = [];
@@ -2549,10 +3064,10 @@ private function buildApifyInstagramInputs($link)
 
         $dailyData = $query->select(
             'tbl_outlets.nama_outlet',
-            'tbl_outlets.kota',
+            'master_outlets.kota_kab as kota',
             'tanggal',
             \Illuminate\Support\Facades\DB::raw('SUM(total_jumlah) as daily_omzet')
-        )->groupBy('tbl_outlets.nama_outlet', 'tbl_outlets.kota', 'tanggal')->get();
+        )->groupBy('tbl_outlets.nama_outlet', 'master_outlets.kota_kab', 'tanggal')->get();
 
         $outlets = [];
         $grouped = $dailyData->groupBy('nama_outlet');
@@ -2590,13 +3105,18 @@ private function buildApifyInstagramInputs($link)
             return $b['total_omset_raw'] <=> $a['total_omset_raw'];
         });
 
+        $areaData = \App\Models\MasterOutlet::select('provinsi', 'kota_kab as kota')->distinct()->get();
         $options = [
             'tahun' => \App\Models\LaporanEcommerce::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values(),
             'bulan' => [
                 1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 
                 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-            ]
+            ],
+            'provinsi' => $areaData->pluck('provinsi')->filter()->unique()->sort()->values(),
+            'kota' => $areaData->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values(),
         ];
 
         $dailyTotals = array_fill_keys($dateColumns, 0);
@@ -2619,7 +3139,7 @@ private function buildApifyInstagramInputs($link)
             ];
         }
 
-        return view('Marketing.outlet-go', compact('bulanInfo', 'outlets', 'options', 'bulan', 'tahun', 'startDate', 'endDate', 'dateColumns', 'trendData'));
+        return view('Marketing.outlet-go', compact('bulanInfo', 'outlets', 'options', 'bulan', 'tahun', 'startDate', 'endDate', 'dateColumns', 'trendData', 'filters'));
     }
 
     public function outletExisting(Request $request)
@@ -2635,8 +3155,14 @@ private function buildApifyInstagramInputs($link)
             $bulanInfo = date('d M Y', strtotime($startDate)) . ' - ' . date('d M Y', strtotime($endDate));
         }
 
+        $filters = [
+            'provinsi' => (array) $request->get('provinsi', ['All']),
+            'kota' => (array) $request->get('kota', ['All']),
+        ];
+
         $query = \App\Models\LaporanEcommerce::query()
             ->join('tbl_outlets', 'tbl_laporan_ecommerce.outlet_id', '=', 'tbl_outlets.id')
+            ->leftJoin('master_outlets', 'tbl_outlets.nama_outlet', '=', 'master_outlets.nama_outlet')
             ->where('tbl_outlets.status', 'existing');
 
         if (!empty($startDate) && !empty($endDate)) {
@@ -2648,6 +3174,13 @@ private function buildApifyInstagramInputs($link)
                   ->whereYear('tanggal', $tahun);
             $periodStart = date('Y-m-01', strtotime("$tahun-$bulan-01"));
             $periodEnd = date('Y-m-t', strtotime("$tahun-$bulan-01"));
+        }
+
+        if (!empty($filters['provinsi']) && !in_array('All', $filters['provinsi'])) {
+            $query->whereIn('master_outlets.provinsi', $filters['provinsi']);
+        }
+        if (!empty($filters['kota']) && !in_array('All', $filters['kota'])) {
+            $query->whereIn('master_outlets.kota_kab', $filters['kota']);
         }
 
         $dateColumns = [];
@@ -2663,10 +3196,10 @@ private function buildApifyInstagramInputs($link)
 
         $dailyData = $query->select(
             'tbl_outlets.nama_outlet',
-            'tbl_outlets.kota',
+            'master_outlets.kota_kab as kota',
             'tanggal',
             \Illuminate\Support\Facades\DB::raw('SUM(total_jumlah) as daily_omzet')
-        )->groupBy('tbl_outlets.nama_outlet', 'tbl_outlets.kota', 'tanggal')->get();
+        )->groupBy('tbl_outlets.nama_outlet', 'master_outlets.kota_kab', 'tanggal')->get();
 
         $outlets = [];
         $grouped = $dailyData->groupBy('nama_outlet');
@@ -2705,13 +3238,18 @@ private function buildApifyInstagramInputs($link)
             return $b['total_omset_raw'] <=> $a['total_omset_raw'];
         });
 
+        $areaData = \App\Models\MasterOutlet::select('provinsi', 'kota_kab as kota')->distinct()->get();
         $options = [
             'tahun' => \App\Models\LaporanEcommerce::selectRaw('YEAR(tanggal) as tahun')->distinct()->pluck('tahun')->sortDesc()->values(),
             'bulan' => [
                 1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 
                 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 
                 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-            ]
+            ],
+            'provinsi' => $areaData->pluck('provinsi')->filter()->unique()->sort()->values(),
+            'kota' => $areaData->pluck('kota')->filter()->map(function($kota) {
+                return trim(str_ireplace(['kota administrasi ', 'kabupaten ', 'kab. ', 'kota ', ' regency', ' city'], '', $kota));
+            })->unique()->sort()->values(),
         ];
 
         $dailyTotals = array_fill_keys($dateColumns, 0);
@@ -2734,7 +3272,7 @@ private function buildApifyInstagramInputs($link)
             ];
         }
 
-        return view('Marketing.outlet-existing', compact('bulanInfo', 'outlets', 'options', 'bulan', 'tahun', 'startDate', 'endDate', 'dateColumns', 'trendData'));
+        return view('Marketing.outlet-existing', compact('bulanInfo', 'outlets', 'options', 'bulan', 'tahun', 'startDate', 'endDate', 'dateColumns', 'trendData', 'filters'));
     }
 
     public function kompetitor()

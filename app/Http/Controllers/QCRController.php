@@ -12159,7 +12159,16 @@ $pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
          | - HPP
          */
         $displayOutletId = (int) ($pricePrimaryOutletIds[0] ?? $outletIds[0] ?? 0);
-        $qcrBahanIdsForOpening = $bahanIdsInRange->map(fn ($id) => (int) $id)->values()->all();
+        $qcrBahanIdsForOpening = $bahanIdsInRange
+            ->map(fn ($id) => (int) $id)
+            ->merge(
+                collect($visibleBahanNames)
+                    ->map(fn ($nama) => (int) ($priceMap[$this->normName($nama)]->id ?? 0))
+            )
+            ->filter(fn ($id) => (int) $id > 0)
+            ->unique()
+            ->values()
+            ->all();
 
         $openingBulkMapQcr = $this->getOpeningBulkFromAliasIds(
             $outletIds,
@@ -12170,24 +12179,86 @@ $pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
 
         /*
          |--------------------------------------------------------------------------
-         | FIX STOCK AVAILABLE QCR IKUT DSC PERIODE AKHIR
+         | FIX STOCK AVAILABLE QCR = ENDING H-1 DARI START DATE
          |--------------------------------------------------------------------------
-         | Baris Stock (Available) di Summary QCR harus sama konsepnya dengan OPEN DSC:
-         | ambil ending stock tanggal sebelumnya dari tanggal aktif/periode akhir.
+         | QCR lama tetap dipakai. Yang diubah hanya sumber angka baris:
+         | Stock (Available).
          |
-         | Contoh range 28-05 s/d 15-06:
-         | Stock Available = ending 14-06, bukan opening 28-05.
+         | Rumus:
+         | - Filter 28-05 s/d 15-06
+         | - Stock Available = ending_stock tanggal 27-05
+         | - Prioritas Shift 2, fallback Shift 1
          |
-         | Map ini hanya dipakai untuk tampilan Stock Available dan prediksi.
-         | Perhitungan Usage DSC range tetap memakai aggregator periode yang sudah ada.
+         | Catatan:
+         | - Tidak mengubah Usage DSC / qty_stock lama.
+         | - Tidak mengubah rumus QCR lain.
+         | - Data utama ambil tbl_stock final dulu.
          |--------------------------------------------------------------------------
          */
-        $stockAvailableBulkMapQcr = $this->getOpeningBulkFromAliasIds(
-            $outletIds,
-            $displayOutletId,
-            $qcrBahanIdsForOpening,
-            $end_date
-        );
+        $stockAvailablePrevDateQcr = Carbon::parse($start_date)->subDay()->format('Y-m-d');
+
+        $stockAvailableRowsQcr = collect();
+
+        if (!empty($qcrBahanIdsForOpening)) {
+            // HARD FIX:
+            // Ambil semua closing sebelum start_date, lalu per bahan dipilih:
+            // 1) tanggal H-1 persis jika ada,
+            // 2) kalau tidak ada, tanggal terakhir sebelum start_date.
+            // Tidak pernah fallback ke usage/available/current ending.
+            $stockAvailableRowsQcr = DB::table('tbl_stock')
+                ->select('bahan_id', 'outlet_id', 'ending_stock', 'tanggal', 'shift', 'id', 'updated_at')
+                ->when(!$isAllOutlet && !empty($outletIds), fn ($q) => $q->whereIn('outlet_id', $outletIds))
+                ->whereIn('bahan_id', $qcrBahanIdsForOpening)
+                ->whereDate('tanggal', '<', $start_date)
+                ->whereNotNull('ending_stock')
+                ->orderByDesc('tanggal')
+                ->orderByDesc('shift')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get();
+        }
+
+        $stockAvailableEndingHMinusOneQcr = [];
+
+        foreach ($stockAvailableRowsQcr->groupBy(fn ($r) => (int) ($r->bahan_id ?? 0)) as $bahanIdForStock => $rowsByBahan) {
+            $rowsByBahan = collect($rowsByBahan);
+
+            // Jika ada data tanggal H-1 persis, kunci ke tanggal itu.
+            $exactRows = $rowsByBahan->filter(fn ($r) => $this->normalizeDateToYmd((string) ($r->tanggal ?? '')) === $stockAvailablePrevDateQcr);
+            if ($exactRows->isNotEmpty()) {
+                $rowsByBahan = $exactRows;
+            } else {
+                // Fallback: kunci ke tanggal terakhir sebelum start_date.
+                $latestDate = $rowsByBahan->max(fn ($r) => $this->normalizeDateToYmd((string) ($r->tanggal ?? '')));
+                $rowsByBahan = $rowsByBahan->filter(fn ($r) => $this->normalizeDateToYmd((string) ($r->tanggal ?? '')) === $latestDate);
+            }
+
+            // Prioritas outlet kerja/display outlet dulu supaya alias tidak mengalahkan outlet yang dipilih.
+            $displayRows = $rowsByBahan->filter(fn ($r) => (int) ($r->outlet_id ?? 0) === (int) $displayOutletId);
+            if ($displayRows->isNotEmpty()) {
+                $rowsByBahan = $displayRows;
+            }
+
+            // Prioritas shift 2, fallback shift 1.
+            $shift2Rows = $rowsByBahan->filter(fn ($r) => (int) ($r->shift ?? 0) === 2);
+            if ($shift2Rows->isNotEmpty()) {
+                $rowsByBahan = $shift2Rows;
+            } else {
+                $shift1Rows = $rowsByBahan->filter(fn ($r) => (int) ($r->shift ?? 0) === 1);
+                if ($shift1Rows->isNotEmpty()) {
+                    $rowsByBahan = $shift1Rows;
+                }
+            }
+
+            $row = $rowsByBahan
+                ->sortByDesc('updated_at')
+                ->sortByDesc('id')
+                ->first();
+
+            if ($row) {
+                $stockAvailableEndingHMinusOneQcr[(int) $bahanIdForStock] = (float) ($row->ending_stock ?? 0);
+            }
+        }
 
         $stockAggByBahanId = $this->buildQcrStockAggByBahanId($stockRows, $outletIds, $displayOutletId, $openingBulkMapQcr, $start_date, $end_date);
 
@@ -12213,14 +12284,22 @@ $pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
             $usageStock = (float) ($agg->usage_stock ?? 0);
 
             $stockAvailableForDisplay = 0.0;
+            $stockAvailableBahanId = 0;
+
             if ($agg) {
-                $aggBahanId = (int) ($agg->bahan_id ?? 0);
-                $stockAvailableForDisplay = (float) (
-                    $stockAvailableBulkMapQcr[$aggBahanId][1]
-                    ?? $agg->stock_available
-                    ?? $agg->ending
-                    ?? $available
-                );
+                $stockAvailableBahanId = (int) ($agg->bahan_id ?? 0);
+            }
+
+            if ($stockAvailableBahanId <= 0 && $priceRow) {
+                $stockAvailableBahanId = (int) ($priceRow->id ?? 0);
+            }
+
+            // HARD FIX:
+            // Stock (Available) QCR wajib pakai ending_stock H-1 / closing terakhir sebelum start_date.
+            // Jangan fallback ke usage_stock, stock_available, available, atau ending periode.
+            // Usage DSC tetap memakai rumus lama dari $usageStock.
+            if ($stockAvailableBahanId > 0 && array_key_exists($stockAvailableBahanId, $stockAvailableEndingHMinusOneQcr)) {
+                $stockAvailableForDisplay = (float) $stockAvailableEndingHMinusOneQcr[$stockAvailableBahanId];
             }
 
             $wasteProduct = (float) ($agg->waste_product_qty ?? 0);
@@ -12235,7 +12314,7 @@ $pakai     = ((float) ($bhn->qty ?? 0)) * $jumlah;
                 'hpp'             => 0,
                 'harga'           => $hargaPerBase,
                 'satuan'          => $agg->bahan_satuan ?? ($priceRow->satuan ?? null),
-                // Stock (Available) = ending stock tanggal sebelumnya dari periode akhir, sama seperti OPEN DSC.
+                // Stock (Available) = ending_stock H-1 dari start_date. Tidak fallback ke Usage DSC.
                 'stock'           => $stockAvailableForDisplay,
                 'stock_available' => $stockAvailableForDisplay,
                 'qty_stock'       => $usageStock,

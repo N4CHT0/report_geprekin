@@ -160,7 +160,7 @@
 
     <!-- Filter Bar -->
     <section class="filter-section" style="margin-bottom: 20px;">
-        <form method="GET" style="display: flex; gap: 15px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); padding: 15px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(16, 185, 129, 0.2);">
+        <form method="GET" style="display: flex; flex-wrap: wrap; gap: 15px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); padding: 15px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid rgba(16, 185, 129, 0.2);">
             <div style="flex: 1; min-width: 140px;">
                 <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-primary); font-weight: 800; display: block; margin-bottom: 5px;">Tahun</label>
                 <select name="tahun" class="select2">
@@ -188,6 +188,26 @@
             <div style="flex: 1; min-width: 140px;">
                 <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-primary); font-weight: 800; display: block; margin-bottom: 5px;">Akhir (Opsional)</label>
                 <input type="date" name="end_date" value="{{ $endDate ?? '' }}" style="width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; outline: none; font-family: 'Inter', sans-serif; color: var(--menu-dark); font-weight: 600;">
+            </div>
+            
+            <div style="flex: 1; min-width: 140px;">
+                <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-primary); font-weight: 800; display: block; margin-bottom: 5px;">Provinsi</label>
+                <select name="provinsi[]" class="select2" multiple="multiple">
+                    <option value="All" @selected(in_array('All', (array)($filters['provinsi'] ?? ['All'])))>All</option>
+                    @foreach($options['provinsi'] ?? [] as $prov)
+                        <option value="{{ $prov }}" @selected(in_array($prov, (array)($filters['provinsi'] ?? [])))>{{ $prov }}</option>
+                    @endforeach
+                </select>
+            </div>
+            
+            <div style="flex: 1; min-width: 140px;">
+                <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-primary); font-weight: 800; display: block; margin-bottom: 5px;">Kota</label>
+                <select name="kota[]" class="select2" multiple="multiple">
+                    <option value="All" @selected(in_array('All', (array)($filters['kota'] ?? ['All'])))>All</option>
+                    @foreach($options['kota'] ?? [] as $kotaItem)
+                        <option value="{{ $kotaItem }}" @selected(in_array($kotaItem, (array)($filters['kota'] ?? [])))>{{ $kotaItem }}</option>
+                    @endforeach
+                </select>
             </div>
             <div style="flex: 1;">
                 <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-primary); font-weight: 800; display: block; margin-bottom: 5px;">Cari Outlet / Kota</label>

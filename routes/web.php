@@ -517,6 +517,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/inventory/qcr/export', [QCRController::class, 'exportQcr'])
         ->middleware('permission:master.qcr.export')
         ->name('master.qcr.export');
+    Route::post('/master/qcr/export/generate', [QCRController::class, 'generateQcrExport'])
+        ->middleware('permission:master.qcr.export')
+        ->name('master.qcr.export.generate');
+    Route::get('/master/qcr/export/status/{jobId?}', [QCRController::class, 'qcrExportStatus'])
+        ->middleware('permission:master.qcr.export')
+        ->name('master.qcr.export.status');
+    Route::get('/master/qcr/export/download/{id?}', [QCRController::class, 'downloadQcrExport'])
+        ->middleware('permission:master.qcr.export')
+        ->name('master.qcr.export.download');
     Route::post('/inventory/qcr/hide-items/save', [QCRController::class, 'saveHiddenItems'])
         ->middleware('permission:master.qcr.hide.save')
         ->name('master.qcr.hide.save');
@@ -1787,6 +1796,14 @@ Route::middleware(['auth'])->prefix('marketing')->name('marketing.')->group(func
     Route::get('/data-sales-perkota', [MarketingController::class, 'dataSalesPerkota'])
         ->middleware('permission:marketing.data-sales-perkota')
         ->name('data-sales-perkota');
+
+    Route::get('/data-sales-provinsi', [MarketingController::class, 'dataSalesProvinsi'])
+        ->middleware('permission:marketing.data-sales-perkota')
+        ->name('data-sales-provinsi');
+
+    Route::get('/anomali-kota', [MarketingController::class, 'anomaliKota'])
+        ->middleware('permission:marketing.data-sales-perkota')
+        ->name('anomali-kota');
 });
 
 // API endpoints for Marketing Area Potensi

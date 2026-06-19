@@ -59,6 +59,36 @@
     .qty { color: var(--menu-blue); font-weight: 900; }
     @media(max-width: 1100px){ .span-3,.span-4,.span-5,.span-7{grid-column:span 6}.channel-grid{grid-template-columns:1fr 1fr} }
     @media(max-width: 700px){ .menu-page{padding:14px}.menu-title{font-size:26px}.span-3,.span-4,.span-5,.span-7,.span-12{grid-column:span 12}.channel-grid{grid-template-columns:1fr} }
+
+    /* Fix Select2 text colors for dark header */
+    .menu-filter .select2-container--default .select2-selection--multiple {
+        background-color: transparent !important;
+        border: none !important;
+        min-height: auto;
+        padding-bottom: 0;
+    }
+    .menu-filter .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: rgba(255,255,255,0.2) !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+        color: #fff !important;
+        border-radius: 8px !important;
+        padding: 4px 8px !important;
+        margin-top: 0;
+    }
+    .menu-filter .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: #fff !important;
+        margin-right: 6px !important;
+        border-right: 1px solid rgba(255,255,255,0.3) !important;
+    }
+    .menu-filter .select2-search__field {
+        color: #fff !important;
+    }
+    .menu-filter .select2-search__field::placeholder {
+        color: rgba(255,255,255,0.6) !important;
+    }
+    .menu-filter .select2-container--default.select2-container--focus .select2-selection--multiple {
+        border: none !important;
+    }
 </style>
 
 @php
@@ -74,19 +104,19 @@
         <form class="menu-actions" method="GET">
             <div class="menu-filter" style="min-width: 140px;">
                 <label>Tahun</label>
-                <select name="tahun" class="select2">
-                    <option value="All">Semua Tahun</option>
+                <select name="tahun[]" class="mk-select2" multiple="multiple">
+                    <option value="All" @selected(in_array('All', (array)($filters['tahun'] ?? ['All'])))>Semua Tahun</option>
                     @foreach($options['tahun'] ?? [] as $tahun)
-                        <option value="{{ $tahun }}" @selected(($filters['tahun'] ?? date('Y')) == $tahun)>{{ $tahun }}</option>
+                        <option value="{{ $tahun }}" @selected(in_array($tahun, (array)($filters['tahun'] ?? [])))>{{ $tahun }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="menu-filter" style="min-width: 140px;">
                 <label>Bulan</label>
-                <select name="bulan" class="select2">
-                    <option value="All">Semua Bulan</option>
+                <select name="bulan[]" class="mk-select2" multiple="multiple">
+                    <option value="All" @selected(in_array('All', (array)($filters['bulan'] ?? ['All'])))>Semua Bulan</option>
                     @foreach($options['bulan'] ?? [] as $bulan)
-                        <option value="{{ $bulan }}" @selected(($filters['bulan'] ?? 'All') == $bulan)>{{ $bulan }}</option>
+                        <option value="{{ $bulan }}" @selected(in_array($bulan, (array)($filters['bulan'] ?? [])))>{{ $bulan }}</option>
                     @endforeach
                 </select>
             </div>
@@ -103,10 +133,10 @@
 
             <div class="menu-filter" style="min-width: 180px;">
                 <label>Outlet</label>
-                <select name="outlet" class="select2">
-                    <option value="All">Semua Outlet</option>
+                <select name="outlet[]" class="mk-select2" multiple="multiple">
+                    <option value="All" @selected(in_array('All', (array)($filters['outlet'] ?? ['All'])))>Semua Outlet</option>
                     @foreach($options['outlet'] ?? [] as $outlet)
-                        <option value="{{ $outlet }}" @selected(($filters['outlet'] ?? 'All') == $outlet)>{{ $outlet }}</option>
+                        <option value="{{ $outlet }}" @selected(in_array($outlet, (array)($filters['outlet'] ?? [])))>{{ $outlet }}</option>
                     @endforeach
                 </select>
             </div>
@@ -182,7 +212,13 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        $('.select2').select2({ width: '100%' });
+        $('.mk-select2').select2({
+            width: '100%',
+            dropdownAutoWidth: true,
+            theme: 'default',
+            placeholder: 'All',
+            closeOnSelect: false
+        });
     });
 </script>
 @endpush

@@ -1,5 +1,5 @@
-@section('title', 'Data Sales Perkota')
-@section('breadcrumb', 'Marketing / Data Sales Perkota')
+@section('title', 'Data Sales Provinsi')
+@section('breadcrumb', 'Marketing / Data Sales Provinsi')
 
 @include('Temp.Investor.header')
 
@@ -172,7 +172,7 @@
 
 <div class="ds-page">
     <section class="ds-panel ds-hero">
-        <h1>Sales Intelligence per Kota</h1>
+        <h1>Sales Intelligence per Provinsi</h1>
         <p>Ringkasan performa omset, CU, outlet aktif, dan basket size (Live Database).</p>
 
         <div class="ds-status">
@@ -181,8 +181,8 @@
 
         <div class="ds-tabs">
             <a href="{{ url('/marketing/sales-per-kota') }}" class="ds-tab">Overview</a>
-            <a href="{{ url('/marketing/data-sales-perkota') }}" class="ds-tab active">Outlet Ranking</a>
-            <a href="{{ url('/marketing/data-sales-provinsi') }}" class="ds-tab">Provinsi</a>
+            <a href="{{ url('/marketing/data-sales-perkota') }}" class="ds-tab">Outlet Ranking</a>
+            <a href="{{ url('/marketing/data-sales-provinsi') }}" class="ds-tab active">Provinsi</a>
             <a href="{{ url('/marketing/anomali-kota') }}" class="ds-tab">Anomali</a>
         </div>
     </section>
@@ -201,17 +201,7 @@
             </select>
         </div>
 
-        <div class="ds-filter-group">
-            <label>Kota/Kab</label>
-            <select name="kota[]" multiple="multiple">
-                <option value="All" @selected(in_array('All', (array)($filters['kota'] ?? ['All'])))>All Kota</option>
-                @foreach($options['kota'] ?? [] as $kota)
-                    <option value="{{ $kota }}" @selected(in_array($kota, (array)($filters['kota'] ?? [])))>
-                        {{ $kota }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+
 
         <div class="ds-filter-group">
             <label>Tahun</label>
@@ -278,7 +268,6 @@
                 <thead>
                     <tr>
                         <th>Rank</th>
-                        <th>Kota</th>
                         <th>Provinsi</th>
                         <th>Outlet Aktif</th>
                         <th>Total Omzet</th>
@@ -291,7 +280,6 @@
                     @forelse($paginator as $index => $row)
                         <tr>
                             <td><span class="ds-rank">{{ $paginator->firstItem() + $index }}</span></td>
-                            <td>{{ $row->kota ?? 'Unidentified Area' }}</td>
                             <td>{{ $row->provinsi ?? 'Unidentified Area' }}</td>
                             <td>{{ $row->jumlah_outlet_aktif ?? 0 }} Unit</td>
                             <td style="color:var(--success); font-weight:800;">Rp{{ number_format((float) ($row->omset ?? 0), 0, ',', '.') }}</td>
@@ -342,7 +330,7 @@
             <div class="ds-panel ds-card">
                 <h3><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Insight Intelijen</h3>
                 <div class="ds-insight">
-                    Data agregat ini di-generate secara <strong>live</strong> dari tabel transaksi gabungan. Anda dapat mengevaluasi kota mana yang paling menguntungkan (Cash Cow) berdasarkan skor performa di samping kiri.
+                    Data agregat ini di-generate secara <strong>live</strong> dari tabel transaksi gabungan. Anda dapat mengevaluasi provinsi mana yang paling menguntungkan (Cash Cow) berdasarkan skor performa di samping kiri.
                 </div>
             </div>
         </aside>
@@ -351,97 +339,10 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        const kotaByProvinsi = @json($kotaByProvinsi ?? []);
-        const hierarchy = @json($hierarchy ?? []);
-        const currentKota = @json((array)($filters['kota'] ?? ['All']));
-        const currentOutlet = @json((array)($filters['outlet'] ?? ['All']));
-        
-        const provinsiSelect = $('select[name="provinsi[]"]');
-        const kotaSelect = $('select[name="kota[]"]');
-        const outletSelect = $('select[name="outlet[]"]');
-
-        function updateKotaOptions(provs, selectedKotas) {
-            kotaSelect.empty();
-            let allOpt = new Option('All Kota', 'All');
-            if (selectedKotas.includes('All')) allOpt.selected = true;
-            kotaSelect.append(allOpt);
-            
-            let cities = [];
-            provs = Array.isArray(provs) ? provs : (provs ? [provs] : ['All']);
-
-            if (provs.includes('All') || provs.length === 0) {
-                Object.values(kotaByProvinsi).forEach(c => {
-                    cities = cities.concat(c);
-                });
-            } else {
-                provs.forEach(p => {
-                    if (kotaByProvinsi[p]) {
-                        cities = cities.concat(kotaByProvinsi[p]);
-                    }
-                });
-            }
-
-            cities = [...new Set(cities)].sort();
-            
-            cities.forEach(city => {
-                let opt = new Option(city, city);
-                if (selectedKotas.includes(city)) {
-                    opt.selected = true;
-                }
-                kotaSelect.append(opt);
-            });
-            kotaSelect.trigger('change.select2');
-        }
-
-        function updateOutletOptions(provs, kotas, selectedOutlets) {
-            outletSelect.empty();
-            let allOpt = new Option('All Outlet', 'All');
-            if (selectedOutlets.includes('All')) allOpt.selected = true;
-            outletSelect.append(allOpt);
-            
-            let filteredOutlets = hierarchy;
-            provs = Array.isArray(provs) ? provs : (provs ? [provs] : ['All']);
-            kotas = Array.isArray(kotas) ? kotas : (kotas ? [kotas] : ['All']);
-
-            if (!provs.includes('All') && provs.length > 0) {
-                filteredOutlets = filteredOutlets.filter(item => provs.includes(item.provinsi));
-            }
-            if (!kotas.includes('All') && kotas.length > 0) {
-                filteredOutlets = filteredOutlets.filter(item => kotas.includes(item.kota));
-            }
-
-            let outletNames = filteredOutlets.map(item => item.outlet).filter(o => o);
-            outletNames = [...new Set(outletNames)].sort();
-
-            outletNames.forEach(out => {
-                let opt = new Option(out, out);
-                if (selectedOutlets.includes(out)) {
-                    opt.selected = true;
-                }
-                outletSelect.append(opt);
-            });
-            outletSelect.trigger('change.select2');
-        }
-
-        provinsiSelect.on('change', function() {
-            let prov = $(this).val();
-            updateKotaOptions(prov, ['All']);
-            updateOutletOptions(prov, ['All'], ['All']);
-        });
-
-        kotaSelect.on('change', function() {
-            updateOutletOptions(provinsiSelect.val(), $(this).val(), ['All']);
-        });
-
-        // initial load
-        let initialProv = provinsiSelect.val();
-        updateKotaOptions(initialProv, currentKota);
-        updateOutletOptions(initialProv, currentKota, currentOutlet);
-
         $('.ds-filter select').select2({
             width: '100%',
             placeholder: 'Pilih...',
-            closeOnSelect: false // Better UX for multiple select
+            closeOnSelect: false
         });
     });
 </script>

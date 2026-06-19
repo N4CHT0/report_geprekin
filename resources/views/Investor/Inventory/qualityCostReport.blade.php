@@ -2327,6 +2327,67 @@
     }
   }
 
+
+
+  /* ==========================================================
+     FINAL DESKTOP STATS FULL WIDTH PATCH
+     Tujuan:
+     - Baris pertama tetap 4 kartu: Total Sales, HPP, Gross Profit, Waste
+     - Card compare seperti Selisih Persediaan / Quality Cost dibuat full width
+     - Menghilangkan space kosong kanan pada desktop
+     - Aman untuk mobile karena aturan mobile lama tetap override layout kecil
+     ========================================================== */
+  @media (min-width: 1200px){
+    .qcr-stats{
+      grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+      align-items: stretch !important;
+    }
+
+    .qcr-stat{
+      min-height: auto !important;
+    }
+
+    .qcr-stat--compact{
+      grid-column: span 3 !important;
+      min-height: 122px !important;
+    }
+
+    .qcr-stat--compare{
+      grid-column: 1 / -1 !important;
+      min-height: auto !important;
+    }
+
+    .qcr-stat--compare .qcr-summary-compare{
+      width: 100% !important;
+    }
+
+    .qcr-stat--compare .qcr-summary-compare.qcr-summary-compare-three{
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    .qcr-stat--compare .qcr-summary-line{
+      min-height: 84px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1199.98px){
+    .qcr-stat--compact{
+      grid-column: span 6 !important;
+    }
+
+    .qcr-stat--compare{
+      grid-column: 1 / -1 !important;
+      min-height: auto !important;
+    }
+
+    .qcr-stat--compare .qcr-summary-compare.qcr-summary-compare-three{
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+  }
+
 </style>
 
 <div class="qcr-page">
@@ -2574,6 +2635,7 @@
                     class="btn btn-excel"
                     data-bs-toggle="modal"
                     data-bs-target="#modalExportExcel"
+                    id="btnOpenExportExcel"
                 >
                     <i class="bi bi-file-earmark-excel me-1"></i>
                     Export Excel
@@ -2591,9 +2653,37 @@
                             </div>
                 
                             <div class="modal-body">
-                                <div class="alert alert-warning mb-0">
-                                    <i class="bi bi-exclamation-triangle me-2"></i>
-                                    Fitur export queue sedang dinonaktifkan sementara.
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Export dijalankan di background supaya halaman tidak berat saat dipakai banyak user.
+                                </div>
+
+                                <div class="small text-muted mb-2">
+                                    Filter export mengikuti filter QCR yang sedang dibuka.
+                                </div>
+
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex justify-content-between gap-2 flex-wrap mb-2">
+                                        <div>
+                                            <div class="fw-bold">Status Export</div>
+                                            <div class="small text-muted" id="qcrExportStatusText">Belum mulai.</div>
+                                        </div>
+                                        <span class="badge bg-secondary align-self-start" id="qcrExportBadge">Idle</span>
+                                    </div>
+
+                                    <div class="progress" style="height: 10px;">
+                                        <div
+                                            class="progress-bar"
+                                            id="qcrExportProgressBar"
+                                            role="progressbar"
+                                            style="width: 0%;"
+                                            aria-valuenow="0"
+                                            aria-valuemin="0"
+                                            aria-valuemax="100"
+                                        ></div>
+                                    </div>
+
+                                    <div class="small text-muted mt-2" id="qcrExportProgressText">0%</div>
                                 </div>
                             </div>
                 
@@ -2604,6 +2694,24 @@
                                     data-bs-dismiss="modal"
                                 >
                                     Tutup
+                                </button>
+
+                                <a
+                                    href="#"
+                                    class="btn btn-success d-none"
+                                    id="btnDownloadQcrExport"
+                                >
+                                    <i class="bi bi-download me-1"></i>
+                                    Download
+                                </a>
+
+                                <button
+                                    type="button"
+                                    class="btn btn-excel"
+                                    id="btnStartQcrExport"
+                                >
+                                    <i class="bi bi-play-circle me-1"></i>
+                                    Mulai Export
                                 </button>
             
                             </div>
@@ -4483,6 +4591,149 @@
     });
   });
 </script>
+
+<script>
+  /* ==========================================================
+     QCR EXPORT QUEUE - ringan untuk banyak user
+     - Tidak generate Excel di request halaman.
+     - Request hanya membuat job, lalu status dipolling.
+     - File baru didownload saat job selesai.
+     ========================================================== */
+  document.addEventListener('DOMContentLoaded', function () {
+    const startBtn = document.getElementById('btnStartQcrExport');
+    const downloadBtn = document.getElementById('btnDownloadQcrExport');
+    const statusText = document.getElementById('qcrExportStatusText');
+    const badge = document.getElementById('qcrExportBadge');
+    const progressBar = document.getElementById('qcrExportProgressBar');
+    const progressText = document.getElementById('qcrExportProgressText');
+
+    if (!startBtn) return;
+
+    const exportGenerateUrl = @json(route('master.qcr.export.generate'));
+    const exportStatusBaseUrl = @json(url('/master/qcr/export/status'));
+
+    let pollingTimer = null;
+
+    function setExportUi(status, message, progress, downloadUrl) {
+      const pct = Math.max(0, Math.min(100, Number(progress || 0)));
+
+      if (statusText) statusText.textContent = message || '-';
+      if (progressText) progressText.textContent = pct.toFixed(pct % 1 ? 1 : 0) + '%';
+      if (progressBar) {
+        progressBar.style.width = pct + '%';
+        progressBar.setAttribute('aria-valuenow', String(pct));
+      }
+
+      if (badge) {
+        badge.className = 'badge align-self-start';
+        if (status === 'done') badge.classList.add('bg-success');
+        else if (status === 'failed') badge.classList.add('bg-danger');
+        else if (status === 'processing') badge.classList.add('bg-primary');
+        else badge.classList.add('bg-secondary');
+        badge.textContent = status || 'Idle';
+      }
+
+      if (downloadBtn) {
+        if (downloadUrl) {
+          downloadBtn.href = downloadUrl;
+          downloadBtn.classList.remove('d-none');
+        } else {
+          downloadBtn.href = '#';
+          downloadBtn.classList.add('d-none');
+        }
+      }
+    }
+
+    async function readJson(res) {
+      try { return await res.json(); } catch (e) { return {}; }
+    }
+
+    async function pollExportStatus(exportId) {
+      clearTimeout(pollingTimer);
+
+      try {
+        const res = await fetch(exportStatusBaseUrl + '/' + encodeURIComponent(exportId), {
+          headers: { 'Accept': 'application/json' }
+        });
+        const json = await readJson(res);
+
+        if (!res.ok || !json.ok) {
+          throw new Error(json.message || 'Gagal membaca status export.');
+        }
+
+        const data = json.data || {};
+        const status = data.status || 'pending';
+        const progress = Number(data.progress || 0);
+
+        if (status === 'done') {
+          setExportUi('done', 'Export selesai. Silakan download file.', 100, data.download_url);
+          startBtn.disabled = false;
+          startBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Export Lagi';
+          return;
+        }
+
+        if (status === 'failed') {
+          setExportUi('failed', data.error_message || 'Export gagal.', progress, null);
+          startBtn.disabled = false;
+          startBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i> Mulai Export';
+          return;
+        }
+
+        setExportUi(
+          status,
+          'Export sedang diproses: ' + Number(data.processed_outlet || 0) + ' / ' + Number(data.total_outlet || 0) + ' outlet.',
+          progress,
+          null
+        );
+
+        pollingTimer = setTimeout(function () {
+          pollExportStatus(exportId);
+        }, 2500);
+      } catch (err) {
+        setExportUi('failed', err.message || 'Gagal membaca status export.', 0, null);
+        startBtn.disabled = false;
+      }
+    }
+
+    startBtn.addEventListener('click', async function () {
+      clearTimeout(pollingTimer);
+
+      const payload = new FormData();
+      payload.append('outlet_id', @json((string) $outletId));
+      payload.append('start_date', @json((string) $start_date));
+      payload.append('end_date', @json((string) $end_date));
+
+      startBtn.disabled = true;
+      startBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Membuat job...';
+      setExportUi('pending', 'Membuat antrian export...', 0, null);
+
+      try {
+        const res = await fetch(exportGenerateUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRF-TOKEN': @json(csrf_token()),
+            'Accept': 'application/json'
+          },
+          body: payload
+        });
+        const json = await readJson(res);
+
+        if (!res.ok || !json.ok) {
+          throw new Error(json.message || 'Gagal membuat job export.');
+        }
+
+        startBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Diproses...';
+        setExportUi('processing', json.message || 'Export sedang diproses.', 2, null);
+        pollExportStatus(json.export_id);
+      } catch (err) {
+        setExportUi('failed', err.message || 'Gagal membuat job export.', 0, null);
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i> Mulai Export';
+      }
+    });
+  });
+</script>
+
 @endpush
 
 @include('Temp.Investor.footer')

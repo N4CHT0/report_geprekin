@@ -4412,11 +4412,37 @@
 
                 markTouched(id);
 
+                /*
+                 |--------------------------------------------------------------------------
+                 | FIX MUTASI OUT MASUK KE ENDING, BUKAN ACTUAL USED
+                 |--------------------------------------------------------------------------
+                 | Mutasi Out adalah perpindahan stok keluar, bukan pemakaian.
+                 | Jika user mengubah Mutasi Out, Ending otomatis dikurangi sebesar
+                 | delta Mutasi Out supaya Actual Used tetap mengikuti pemakaian real.
+                 |
+                 | Contoh:
+                 | Actual Used awal 45, Mutasi Out ditambah 100
+                 | => Ending turun 100
+                 | => Actual Used tetap 45
+                 |--------------------------------------------------------------------------
+                 */
+                const isMutasiOutInput = $(this).hasClass('mo');
+                const prevMo = Number(x.mo || 0);
+
                 x.pin = toNum($tr.find('input.pin').val());
                 x.mi = toNum($tr.find('input.mi').val());
                 x.mo = toNum($tr.find('input.mo').val());
                 x.adj = toNum($tr.find('input.adj').val());
                 x.ending = toNum($tr.find('input.ending').val());
+
+                if (isMutasiOutInput) {
+                    const deltaMo = Number(x.mo || 0) - prevMo;
+                    if (Math.abs(deltaMo) >= 0.00001) {
+                        x.ending = Number(x.ending || 0) - deltaMo;
+                        $tr.find('input.ending').val(x.ending);
+                    }
+                }
+
                 x.wProd = toNum($tr.find('input.wprod').val());
                 x.wBahan = toNum($tr.find('input.wbahan').val());
                 x.ket = ($tr.find('input.ket').val() || '');
@@ -4456,11 +4482,31 @@
 
                 markTouched(id);
 
+                /*
+                 |--------------------------------------------------------------------------
+                 | FIX MUTASI OUT MASUK KE ENDING, BUKAN ACTUAL USED - MOBILE
+                 |--------------------------------------------------------------------------
+                 | Sama seperti desktop: saat Mutasi OUT berubah, Ending otomatis
+                 | turun/naik mengikuti delta Mutasi OUT agar Actual Used tidak berubah.
+                 |--------------------------------------------------------------------------
+                 */
+                const isMutasiOutInput = $(this).hasClass('mo');
+                const prevMo = Number(x.mo || 0);
+
                 x.pin = toNum($card.find('input.pin').val());
                 x.mi = toNum($card.find('input.mi').val());
                 x.mo = toNum($card.find('input.mo').val());
                 x.adj = toNum($card.find('input.adj').val());
                 x.ending = toNum($card.find('input.ending').val());
+
+                if (isMutasiOutInput) {
+                    const deltaMo = Number(x.mo || 0) - prevMo;
+                    if (Math.abs(deltaMo) >= 0.00001) {
+                        x.ending = Number(x.ending || 0) - deltaMo;
+                        $card.find('input.ending').val(x.ending);
+                    }
+                }
+
                 x.wProd = toNum($card.find('input.wprod').val());
                 x.wBahan = toNum($card.find('input.wbahan').val());
                 x.ket = ($card.find('input.ket').val() || '');

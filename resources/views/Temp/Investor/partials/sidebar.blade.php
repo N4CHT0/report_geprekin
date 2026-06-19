@@ -238,24 +238,19 @@
                 </button>
                 <div class="side-child" x-show="open" x-collapse>
                     @if(Route::has('marketing.sales-per-kota') && hasPermission('marketing.sales-per-kota'))
-                        <a href="{{ route('marketing.sales-per-kota') }}" class="{{ request()->routeIs('marketing.sales-per-kota') ? 'active' : '' }}">Sales per Kota</a>
+                        <a href="{{ route('marketing.sales-per-kota') }}" class="{{ request()->routeIs('marketing.sales-per-kota') || request()->routeIs('marketing.data-sales-perkota') || request()->routeIs('marketing.data-sales-provinsi') || request()->routeIs('marketing.anomali-kota') ? 'active' : '' }}">Sales Intelligence</a>
                     @endif
+                    @if(Route::has('marketing.market-intelligence') && hasPermission('marketing.market-intelligence'))
+                        <a href="{{ route('marketing.market-intelligence') }}" class="{{ request()->routeIs('marketing.market-intelligence') ? 'active' : '' }}">Market Intelligence</a>
+                    @endif
+                    @if(Route::has('marketing.kompetitor') && hasPermission('marketing.kompetitor'))
+                        <a href="{{ route('marketing.kompetitor') }}" class="{{ request()->routeIs('marketing.kompetitor') ? 'active' : '' }}">Analisis Kompetitor</a>
+                    @endif
+
                     <hr>
-                    <a href="{{ route('marketing.brand24.index') }}" class="{{ request()->routeIs('marketing.brand24.*') ? 'active' : '' }}">
-                        <i class="bi bi-radar text-primary me-1"></i> Brand 24 (On Going)
-                    </a>
-                    <hr>
+
                     @if(Route::has('marketing.outlet-z') && hasPermission('marketing.outlet-z1'))
                         <a href="{{ route('marketing.outlet-z') }}" class="{{ request()->routeIs('marketing.outlet-z') ? 'active' : '' }}">Outlet Z</a>
-                    @endif
-                    @if(Route::has('marketing.data-sales-perkota') && hasPermission('marketing.data-sales-perkota'))
-                        <a href="{{ route('marketing.data-sales-perkota') }}" class="{{ request()->routeIs('marketing.data-sales-perkota') ? 'active' : '' }}">Data Sales Perkota</a>
-                    @endif
-                    @if(Route::has('marketing.menu-terlaris') && hasPermission('marketing.menu-terlaris'))
-                        <a href="{{ route('marketing.menu-terlaris') }}" class="{{ request()->routeIs('marketing.menu-terlaris') ? 'active' : '' }}">Menu Terlaris</a>
-                    @endif
-                    @if(Route::has('marketing.produk-baru') && hasPermission('marketing.produk-baru'))
-                        <a href="{{ route('marketing.produk-baru') }}" class="{{ request()->routeIs('marketing.produk-baru') ? 'active' : '' }}">Produk Baru</a>
                     @endif
                     @if(Route::has('marketing.outlet-go') && hasPermission('marketing.outlet-go'))
                         <a href="{{ route('marketing.outlet-go') }}" class="{{ request()->routeIs('marketing.outlet-go') ? 'active' : '' }}">Outlet Go</a>
@@ -263,19 +258,27 @@
                     @if(Route::has('marketing.outlet-existing') && hasPermission('marketing.outlet-existing'))
                         <a href="{{ route('marketing.outlet-existing') }}" class="{{ request()->routeIs('marketing.outlet-existing') ? 'active' : '' }}">Outlet Existing</a>
                     @endif
-                    @if(Route::has('marketing.kompetitor') && hasPermission('marketing.kompetitor'))
-                        <a href="{{ route('marketing.kompetitor') }}" class="{{ request()->routeIs('marketing.kompetitor') ? 'active' : '' }}">Kompetitor</a>
+
+                    <hr>
+
+                    @if(Route::has('marketing.menu-terlaris') && hasPermission('marketing.menu-terlaris'))
+                        <a href="{{ route('marketing.menu-terlaris') }}" class="{{ request()->routeIs('marketing.menu-terlaris') ? 'active' : '' }}">Menu Terlaris</a>
                     @endif
-                    @if(Route::has('marketing.market-intelligence') && hasPermission('marketing.market-intelligence'))
-                        <a href="{{ route('marketing.market-intelligence') }}" class="{{ request()->routeIs('marketing.market-intelligence') ? 'active' : '' }}">Market Intelligence</a>
+                    @if(Route::has('marketing.produk-baru') && hasPermission('marketing.produk-baru'))
+                        <a href="{{ route('marketing.produk-baru') }}" class="{{ request()->routeIs('marketing.produk-baru') ? 'active' : '' }}">Produk Baru</a>
                     @endif
                     @if(Route::has('marketing.area_potensi'))
                         <a href="{{ route('marketing.area_potensi') }}" class="{{ request()->routeIs('marketing.area_potensi') ? 'active' : '' }}">Area Potensi</a>
                     @endif
-                    <hr/>
+
+                    <hr>
+
                     @if(Route::has('marketing.content-posting') && hasPermission('marketing.content-posting'))
                         <a href="{{ route('marketing.content-posting') }}" class="{{ request()->routeIs('marketing.content-posting') ? 'active' : '' }}">Content Posting</a>
                     @endif
+                    <a href="{{ route('marketing.brand24.index') }}" class="{{ request()->routeIs('marketing.brand24.*') ? 'active' : '' }}">
+                        <i class="bi bi-radar text-primary me-1"></i> Brand 24
+                    </a>
                 </div>
             </div>
         @endif

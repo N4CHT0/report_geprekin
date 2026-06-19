@@ -47,9 +47,12 @@ class SyncMasterOutlets extends Command
         }
 
         $count = 0;
+        $syncedNames = [];
         foreach ($lines as $index => $line) {
-            // Data starts at row 14 (index 13)
-            if ($index < 13) continue;
+            // Data starts at row 6 (index 5)
+            if ($index < 5) continue;
+            // User requested to follow the GS formula limit: =COUNTA(D6:D840)
+            if ($index > 839) break;
 
             $data = str_getcsv($line);
             
@@ -94,7 +97,7 @@ class SyncMasterOutlets extends Command
                         'X-Goog-Api-Key' => $apiKey,
                         'X-Goog-FieldMask' => 'places.location',
                         'Content-Type' => 'application/json',
-                        'Referer' => 'https://report.geprekincloud.tech/'
+                        'Referer' => 'https://geprekinaja.tech/'
                     ])->post($placesUrl, [
                         'textQuery' => $searchQuery
                     ]);
@@ -116,7 +119,16 @@ class SyncMasterOutlets extends Command
             }
 
             $outlet->save();
+            $syncedNames[] = $nama;
             $count++;
+        }
+
+        // Delete outlets that are no longer in the CSV
+        if (count($syncedNames) > 0) {
+            $deleted = MasterOutlet::whereNotIn('nama_outlet', $syncedNames)->delete();
+            if ($deleted > 0) {
+                $this->info("Deleted {$deleted} outlets that are no longer in the Google Sheet.");
+            }
         }
 
         $this->info("Sync completed! Processed {$count} outlets.");

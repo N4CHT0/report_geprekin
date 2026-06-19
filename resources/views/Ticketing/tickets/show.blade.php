@@ -472,8 +472,30 @@
                                     Batal
                                 </button>
 
-                                <form method="POST" :action="actionUrl">
+                                <form method="POST" :action="actionUrl" class="w-full space-y-4 sm:w-auto">
                                     @csrf
+
+                                    <div
+                                        x-show="actionLabel === 'Hold' || actionLabel === 'Cancel'"
+                                        x-transition
+                                        class="sm:min-w-[320px]"
+                                    >
+                                        <label class="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                            Alasan
+                                        </label>
+
+                                        <textarea
+                                            name="reason"
+                                            rows="3"
+                                            placeholder="Isi alasan hold / cancel..."
+                                            :required="actionLabel === 'Hold' || actionLabel === 'Cancel'"
+                                            class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                                        >{{ old('reason') }}</textarea>
+
+                                        @error('reason')
+                                            <div class="mt-2 text-xs font-bold text-red-600">{{ $message }}</div>
+                                        @enderror
+                                    </div>
 
                                     <button
                                         type="submit"

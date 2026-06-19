@@ -1,5 +1,5 @@
-@section('title', 'Data Sales Perkota')
-@section('breadcrumb', 'Marketing / Data Sales Perkota')
+@section('title', 'Data Anomali Area')
+@section('breadcrumb', 'Marketing / Data Anomali Area')
 
 @include('Temp.Investor.header')
 
@@ -171,47 +171,27 @@
 </style>
 
 <div class="ds-page">
-    <section class="ds-panel ds-hero">
-        <h1>Sales Intelligence per Kota</h1>
-        <p>Ringkasan performa omset, CU, outlet aktif, dan basket size (Live Database).</p>
+    <section class="ds-panel ds-hero" style="border-color: #fecaca; background: #fff5f5;">
+        <h1 style="color: #991b1b;">Data Outlet Unidentified (Anomali)</h1>
+        <p>Menampilkan outlet-outlet yang wilayah Kota/Kabupaten atau Provinsinya gagal terpetakan (Unidentified Area).</p>
 
-        <div class="ds-status">
-            Connected to Database | Data: {{ $snapshot['jumlah_data'] ?? 0 }}
+        <div class="ds-status" style="background: #fee2e2; color: #b91c1c; border-color: #fecaca;">
+            Ditemukan {{ $snapshot['jumlah_data'] ?? 0 }} Outlet Anomali
         </div>
 
         <div class="ds-tabs">
             <a href="{{ url('/marketing/sales-per-kota') }}" class="ds-tab">Overview</a>
-            <a href="{{ url('/marketing/data-sales-perkota') }}" class="ds-tab active">Outlet Ranking</a>
+            <a href="{{ url('/marketing/data-sales-perkota') }}" class="ds-tab">Outlet Ranking</a>
             <a href="{{ url('/marketing/data-sales-provinsi') }}" class="ds-tab">Provinsi</a>
-            <a href="{{ url('/marketing/anomali-kota') }}" class="ds-tab">Anomali</a>
+            <a href="{{ url('/marketing/anomali-kota') }}" class="ds-tab active" style="background: #dc2626; border-color: #dc2626;">Anomali</a>
         </div>
     </section>
 
     <form class="ds-panel ds-filter" method="GET" action="{{ url()->current() }}">
         
-        <div class="ds-filter-group">
-            <label>Provinsi</label>
-            <select name="provinsi[]" multiple="multiple">
-                <option value="All" @selected(in_array('All', (array)($filters['provinsi'] ?? ['All'])))>All Provinsi</option>
-                @foreach($options['provinsi'] ?? [] as $provinsi)
-                    <option value="{{ $provinsi }}" @selected(in_array($provinsi, (array)($filters['provinsi'] ?? [])))>
-                        {{ $provinsi }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
 
-        <div class="ds-filter-group">
-            <label>Kota/Kab</label>
-            <select name="kota[]" multiple="multiple">
-                <option value="All" @selected(in_array('All', (array)($filters['kota'] ?? ['All'])))>All Kota</option>
-                @foreach($options['kota'] ?? [] as $kota)
-                    <option value="{{ $kota }}" @selected(in_array($kota, (array)($filters['kota'] ?? [])))>
-                        {{ $kota }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+
+
 
         <div class="ds-filter-group">
             <label>Tahun</label>
@@ -277,31 +257,25 @@
             <table class="ds-table">
                 <thead>
                     <tr>
-                        <th>Rank</th>
-                        <th>Kota</th>
-                        <th>Provinsi</th>
-                        <th>Outlet Aktif</th>
+                        <th>#</th>
+                        <th>Outlet</th>
+                        <th>Kota Mapped</th>
+                        <th>Provinsi Mapped</th>
                         <th>Total Omzet</th>
                         <th>Total CU</th>
                         <th>Avg Basket Size</th>
-                        <th>Performa Skor</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($paginator as $index => $row)
                         <tr>
-                            <td><span class="ds-rank">{{ $paginator->firstItem() + $index }}</span></td>
-                            <td>{{ $row->kota ?? 'Unidentified Area' }}</td>
-                            <td>{{ $row->provinsi ?? 'Unidentified Area' }}</td>
-                            <td>{{ $row->jumlah_outlet_aktif ?? 0 }} Unit</td>
+                            <td><span class="ds-rank" style="background: #fee2e2; border-color:#fca5a5; color: #b91c1c;">{{ $paginator->firstItem() + $index }}</span></td>
+                            <td style="font-weight: 700;">{{ $row->nama_outlet }}</td>
+                            <td style="color: {{ $row->kota === 'Unidentified Area' ? '#dc2626' : 'inherit' }}">{{ $row->kota ?? 'Unidentified Area' }}</td>
+                            <td style="color: {{ $row->provinsi === 'Unidentified Area' ? '#dc2626' : 'inherit' }}">{{ $row->provinsi ?? 'Unidentified Area' }}</td>
                             <td style="color:var(--success); font-weight:800;">Rp{{ number_format((float) ($row->omset ?? 0), 0, ',', '.') }}</td>
                             <td>{{ number_format((float) ($row->cu ?? 0), 0, ',', '.') }}</td>
                             <td>Rp{{ number_format((float) ($row->avg_basket ?? 0), 0, ',', '.') }}</td>
-                            <td style="width: 250px;">
-                                <div class="ds-score" title="{{ $row->skor }}%">
-                                    <span style="width:{{ $row->skor }}%"></span>
-                                </div>
-                            </td>
                         </tr>
                     @empty
                         <tr>
@@ -341,8 +315,9 @@
 
             <div class="ds-panel ds-card">
                 <h3><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Insight Intelijen</h3>
-                <div class="ds-insight">
-                    Data agregat ini di-generate secara <strong>live</strong> dari tabel transaksi gabungan. Anda dapat mengevaluasi kota mana yang paling menguntungkan (Cash Cow) berdasarkan skor performa di samping kiri.
+                <div class="ds-insight" style="background: #fef2f2; border-color: #fecaca; color: #991b1b;">
+                    Daftar di atas adalah outlet yang kota atau provinsinya <strong>Unidentified Area</strong> di master data. Hal ini menyebabkan omzet outlet tersebut tidak masuk ke hitungan kota yang benar.<br><br>
+                    <strong>Solusi:</strong> Silakan tambahkan atau koreksi mapping kota/provinsi untuk outlet-outlet tersebut di sistem atau <code>master_outlets</code>.
                 </div>
             </div>
         </aside>
@@ -351,97 +326,10 @@
 @push('scripts')
 <script>
     $(document).ready(function() {
-        const kotaByProvinsi = @json($kotaByProvinsi ?? []);
-        const hierarchy = @json($hierarchy ?? []);
-        const currentKota = @json((array)($filters['kota'] ?? ['All']));
-        const currentOutlet = @json((array)($filters['outlet'] ?? ['All']));
-        
-        const provinsiSelect = $('select[name="provinsi[]"]');
-        const kotaSelect = $('select[name="kota[]"]');
-        const outletSelect = $('select[name="outlet[]"]');
-
-        function updateKotaOptions(provs, selectedKotas) {
-            kotaSelect.empty();
-            let allOpt = new Option('All Kota', 'All');
-            if (selectedKotas.includes('All')) allOpt.selected = true;
-            kotaSelect.append(allOpt);
-            
-            let cities = [];
-            provs = Array.isArray(provs) ? provs : (provs ? [provs] : ['All']);
-
-            if (provs.includes('All') || provs.length === 0) {
-                Object.values(kotaByProvinsi).forEach(c => {
-                    cities = cities.concat(c);
-                });
-            } else {
-                provs.forEach(p => {
-                    if (kotaByProvinsi[p]) {
-                        cities = cities.concat(kotaByProvinsi[p]);
-                    }
-                });
-            }
-
-            cities = [...new Set(cities)].sort();
-            
-            cities.forEach(city => {
-                let opt = new Option(city, city);
-                if (selectedKotas.includes(city)) {
-                    opt.selected = true;
-                }
-                kotaSelect.append(opt);
-            });
-            kotaSelect.trigger('change.select2');
-        }
-
-        function updateOutletOptions(provs, kotas, selectedOutlets) {
-            outletSelect.empty();
-            let allOpt = new Option('All Outlet', 'All');
-            if (selectedOutlets.includes('All')) allOpt.selected = true;
-            outletSelect.append(allOpt);
-            
-            let filteredOutlets = hierarchy;
-            provs = Array.isArray(provs) ? provs : (provs ? [provs] : ['All']);
-            kotas = Array.isArray(kotas) ? kotas : (kotas ? [kotas] : ['All']);
-
-            if (!provs.includes('All') && provs.length > 0) {
-                filteredOutlets = filteredOutlets.filter(item => provs.includes(item.provinsi));
-            }
-            if (!kotas.includes('All') && kotas.length > 0) {
-                filteredOutlets = filteredOutlets.filter(item => kotas.includes(item.kota));
-            }
-
-            let outletNames = filteredOutlets.map(item => item.outlet).filter(o => o);
-            outletNames = [...new Set(outletNames)].sort();
-
-            outletNames.forEach(out => {
-                let opt = new Option(out, out);
-                if (selectedOutlets.includes(out)) {
-                    opt.selected = true;
-                }
-                outletSelect.append(opt);
-            });
-            outletSelect.trigger('change.select2');
-        }
-
-        provinsiSelect.on('change', function() {
-            let prov = $(this).val();
-            updateKotaOptions(prov, ['All']);
-            updateOutletOptions(prov, ['All'], ['All']);
-        });
-
-        kotaSelect.on('change', function() {
-            updateOutletOptions(provinsiSelect.val(), $(this).val(), ['All']);
-        });
-
-        // initial load
-        let initialProv = provinsiSelect.val();
-        updateKotaOptions(initialProv, currentKota);
-        updateOutletOptions(initialProv, currentKota, currentOutlet);
-
         $('.ds-filter select').select2({
             width: '100%',
             placeholder: 'Pilih...',
-            closeOnSelect: false // Better UX for multiple select
+            closeOnSelect: false
         });
     });
 </script>

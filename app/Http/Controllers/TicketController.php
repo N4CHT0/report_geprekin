@@ -840,15 +840,42 @@ class TicketController extends Controller
         $allowedStatuses = $this->statuses;
 
         $data = $request->validate([
-            'status' => ['required', 'string', 'in:' . implode(',', $allowedStatuses)],
+            'status' => ['required', 'string'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $newStatus = $data['status'];
+        $newStatus = collect($allowedStatuses)->first(function ($status) use ($data) {
+            return strtolower($status) === strtolower(trim((string) $data['status']));
+        });
+
+        if (!$newStatus) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'status' => 'Status tidak valid.',
+                ]);
+        }
+
         $noteInput = trim((string) ($data['note'] ?? ''));
 
         if ($newStatus === 'Cancel') {
             abort_if(!$this->isTicketAdmin($user) && $this->ticketRole($user) !== 'pic', 403);
+
+            if ($noteInput === '') {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'note' => 'Alasan cancel wajib diisi.',
+                    ]);
+            }
+        }
+
+        if ($newStatus === 'Hold' && $noteInput === '') {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'note' => 'Alasan hold wajib diisi.',
+                ]);
         }
 
         return $this->lockedUpdate($ticket, $user, function ($row) use ($user, $newStatus, $noteInput) {
@@ -888,12 +915,8 @@ class TicketController extends Controller
                     break;
 
                 case 'Hold':
-                    $extra['hold_reason'] = $noteInput !== ''
-                        ? $noteInput
-                        : ($row->hold_reason ?: 'Diubah cepat dari halaman daftar ticket.');
-                    if ($noteInput === '') {
-                        $note = 'Ticket di-hold dari halaman daftar ticket.';
-                    }
+                    $extra['hold_reason'] = $noteInput;
+                    $note = $noteInput;
                     break;
 
                 case 'Closed':
@@ -907,12 +930,8 @@ class TicketController extends Controller
 
                 case 'Cancel':
                     $extra['cancelled_at'] = now();
-                    $extra['cancel_reason'] = $noteInput !== ''
-                        ? $noteInput
-                        : ($row->cancel_reason ?: 'Dibatalkan dari halaman daftar ticket.');
-                    if ($noteInput === '') {
-                        $note = 'Ticket dibatalkan dari halaman daftar ticket.';
-                    }
+                    $extra['cancel_reason'] = $noteInput;
+                    $note = $noteInput;
                     break;
             }
 
@@ -984,7 +1003,12 @@ class TicketController extends Controller
     {
         $user = Auth::user();
         abort_if(!$this->canExecute($user), 403);
-        $data = $request->validate(['reason' => ['required', 'string']]);
+        $data = $request->validate([
+            'reason' => ['required', 'string'],
+        ], [
+            'reason.required' => 'Alasan hold wajib diisi.',
+        ]);
+
         return $this->changeStatus($ticket, $user, 'Hold', ['hold_reason' => $data['reason']], $data['reason']);
     }
 
@@ -1011,7 +1035,12 @@ class TicketController extends Controller
     {
         $user = Auth::user();
         abort_if(!$this->isTicketAdmin($user) && $this->ticketRole($user) !== 'pic', 403);
-        $data = $request->validate(['reason' => ['required', 'string']]);
+        $data = $request->validate([
+            'reason' => ['required', 'string'],
+        ], [
+            'reason.required' => 'Alasan cancel wajib diisi.',
+        ]);
+
         return $this->changeStatus($ticket, $user, 'Cancel', ['cancelled_at' => now(), 'cancel_reason' => $data['reason']], $data['reason']);
     }
 

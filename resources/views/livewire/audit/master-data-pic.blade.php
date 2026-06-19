@@ -1,3 +1,9 @@
+{{--
+    FIXED VERSION
+    - Action buttons dibuat selalu visible dan clickable.
+    - Loading overlay diberi wire:target dan pointer-events:none agar tidak menutup semua klik.
+    - Semua button non-submit diberi type="button" supaya tidak trigger submit form secara tidak sengaja.
+--}}
 <div style="font-family: var(--font-sans); color: var(--text-primary);">
 
     {{-- ── TOAST NOTIFICATIONS ── --}}
@@ -101,7 +107,7 @@
             </div>
 
             {{-- Tombol Tambah --}}
-            <button wire:click="openModal" class="btn btn-primary" style="white-space:nowrap;">
+            <button type="button" wire:click="openModal" wire:loading.attr="disabled" wire:target="openModal" class="btn btn-primary" style="white-space:nowrap;">
                 <i class="bi bi-plus-lg"></i> Tambah PIC
             </button>
         </div>
@@ -109,7 +115,7 @@
         {{-- Main Table --}}
         <div style="overflow-x:auto; position:relative; min-height:300px;">
             
-            <div wire:loading.flex style="position:absolute; inset:0; background:rgba(255,255,255,0.75); backdrop-filter:blur(2px); z-index:10; align-items:center; justify-content:center;">
+            <div wire:loading.flex wire:target="filterPic,filterLevel,filterOutlet,openModal,editMapping,deleteMapping" style="position:absolute; inset:0; background:rgba(255,255,255,0.75); backdrop-filter:blur(2px); z-index:10; align-items:center; justify-content:center; pointer-events:none;">
                 <div class="badge badge-neutral" style="font-size:13px; padding:8px 16px; box-shadow:0 4px 12px rgba(0,0,0,0.08); background:var(--bg-surface);">
                     <i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; margin-right:8px;"></i> Memuat data...
                 </div>
@@ -175,11 +181,11 @@
 
                             {{-- Actions Hover --}}
                             <td style="text-align:right;">
-                                <div class="actions" style="display:flex; justify-content:flex-end; gap:6px; opacity:0; transition:opacity 0.2s;" onmouseenter="this.style.opacity='1'" onmouseleave="this.parentElement.parentElement.matches(':hover') ? this.style.opacity='1' : this.style.opacity='0'">
-                                    <button wire:click="editMapping('{{ $item->pic_id }}', '{{ $item->level_pic }}')" class="btn btn-ghost btn-icon btn-sm" title="Edit">
+                                <div class="actions" style="display:flex; justify-content:flex-end; gap:6px; opacity:1; transition:opacity 0.2s;">
+                                    <button type="button" wire:click="editMapping('{{ $item->pic_id }}', '{{ $item->level_pic }}')" wire:loading.attr="disabled" wire:target="editMapping" class="btn btn-ghost btn-icon btn-sm" title="Edit">
                                         <i class="bi bi-pencil-square" style="font-size:16px;"></i>
                                     </button>
-                                    <button wire:click="deleteMapping('{{ $item->pic_id }}', '{{ $item->level_pic }}')" wire:confirm="Hapus SEMUA mapping outlet untuk PIC ini?" class="btn btn-danger btn-icon btn-sm" title="Hapus">
+                                    <button type="button" wire:click="deleteMapping('{{ $item->pic_id }}', '{{ $item->level_pic }}')" wire:confirm="Hapus SEMUA mapping outlet untuk PIC ini?" wire:loading.attr="disabled" wire:target="deleteMapping" class="btn btn-danger btn-icon btn-sm" title="Hapus">
                                         <i class="bi bi-trash" style="font-size:16px;"></i>
                                     </button>
                                 </div>
@@ -344,4 +350,5 @@
 <style>
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .c-table tr:hover .actions { opacity: 1 !important; }
+    button:not(:disabled), .combo-trigger, .combo-item { pointer-events:auto; }
 </style>

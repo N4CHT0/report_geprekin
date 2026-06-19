@@ -260,16 +260,62 @@
                             @if($canQuickUpdate)
                                 <form method="POST" action="{{ route('ticketing.quick-status', $t->id) }}">
                                     @csrf
-                                    @method('PATCH')
+
+                                    <input type="hidden" name="note" value="">
+
                                     <select
                                         name="status"
-                                        onchange="if(confirm('Ubah status ticket {{ $t->ticket_number }} menjadi ' + this.value + '?')) { this.form.submit(); } else { this.value = '{{ $t->status }}'; }"
+                                        data-current-status="{{ $t->status }}"
+                                        data-ticket-number="{{ $t->ticket_number }}"
+                                        onchange="
+                                            const selectedStatus = this.value;
+                                            const currentStatus = this.dataset.currentStatus;
+                                            const ticketNumber = this.dataset.ticketNumber;
+                                            const noteInput = this.form.querySelector('input[name=note]');
+
+                                            noteInput.value = '';
+
+                                            if (selectedStatus === currentStatus) {
+                                                return;
+                                            }
+
+                                            if (selectedStatus === 'Hold' || selectedStatus === 'Cancel') {
+                                                const reason = prompt('Masukkan alasan ' + selectedStatus + ' untuk ticket ' + ticketNumber + ':');
+
+                                                if (reason === null || reason.trim() === '') {
+                                                    alert('Alasan wajib diisi untuk status ' + selectedStatus + '.');
+                                                    this.value = currentStatus;
+                                                    return;
+                                                }
+
+                                                noteInput.value = reason.trim();
+                                                this.form.submit();
+                                                return;
+                                            }
+
+                                            if (confirm('Ubah status ticket ' + ticketNumber + ' menjadi ' + selectedStatus + '?')) {
+                                                this.form.submit();
+                                            } else {
+                                                this.value = currentStatus;
+                                            }
+                                        "
                                         class="min-w-[150px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
                                     >
                                         @foreach($statusList as $status)
-                                            <option value="{{ $status }}" @selected(strtolower($t->status) === strtolower($status))>
-                                                {{ $status }}
-                                            </option>
+                                            @php
+                                                $statusLower = strtolower($status);
+                                                $canShowStatus = true;
+
+                                                if ($statusLower === 'cancel' && !in_array($role ?? '', ['admin', 'pic'], true)) {
+                                                    $canShowStatus = false;
+                                                }
+                                            @endphp
+
+                                            @if($canShowStatus)
+                                                <option value="{{ $status }}" @selected(strtolower($t->status) === strtolower($status))>
+                                                    {{ $status }}
+                                                </option>
+                                            @endif
                                         @endforeach
                                     </select>
                                 </form>
